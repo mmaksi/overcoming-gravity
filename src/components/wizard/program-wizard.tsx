@@ -1,8 +1,11 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Plus, X } from "lucide-react";
 import {
+  GOAL_AREA_LABELS,
+  GOAL_AREAS,
+  GoalArea,
   MAX_WEEKS,
   MIN_WEEKS,
   Periodization,
@@ -23,7 +26,13 @@ import { ChoiceCard } from "./choice-card";
 import { WeekdayPicker } from "./weekday-picker";
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Basics", "Periodization", "Schedule"] as const;
+const STEPS = ["Basics", "Goals", "Periodization", "Schedule"] as const;
+
+const GOAL_PLACEHOLDERS: Record<GoalArea, string> = {
+  skills: "e.g. Hold a 10s front lever",
+  push: "e.g. 5 clean dips",
+  pull: "e.g. First muscle-up",
+};
 
 const TYPE_DESCRIPTIONS: Record<ProgramType, string> = {
   full_body:
@@ -57,6 +66,15 @@ export function ProgramWizard() {
   );
   const [trainingDays, setTrainingDays] = useState<Weekday[]>([]);
   const [weeks, setWeeks] = useState(6);
+  const [goals, setGoals] = useState<Record<GoalArea, string[]>>({
+    skills: [""],
+    push: [""],
+    pull: [""],
+  });
+
+  const goalsValid = GOAL_AREAS.every((area) =>
+    goals[area].some((g) => g.trim()),
+  );
 
   const stepValid = useMemo(() => {
     switch (step) {
@@ -67,13 +85,26 @@ export function ProgramWizard() {
           return false;
         return true;
       case 1:
-        return periodization !== null;
+        return goalsValid;
       case 2:
+        return periodization !== null;
+      case 3:
         return trainingDays.length > 0;
       default:
         return false;
     }
-  }, [step, name, type, splitType, sportName, sportDays, periodization, trainingDays]);
+  }, [step, name, type, splitType, sportName, sportDays, goalsValid, periodization, trainingDays]);
+
+  function setGoal(area: GoalArea, index: number, value: string) {
+    setGoals((g) => ({
+      ...g,
+      [area]: g[area].map((x, i) => (i === index ? value : x)),
+    }));
+  }
+
+  function cleanGoals(area: GoalArea): string[] {
+    return goals[area].map((g) => g.trim()).filter(Boolean).slice(0, 2);
+  }
 
   function finish() {
     if (!type || !periodization) return;
@@ -85,6 +116,11 @@ export function ProgramWizard() {
         type === "sport_mix"
           ? { name: sportName.trim(), days: sportDays }
           : undefined,
+      goals: {
+        skills: cleanGoals("skills"),
+        push: cleanGoals("push"),
+        pull: cleanGoals("pull"),
+      },
       periodization,
       trainingDays,
       weeks,
@@ -187,6 +223,59 @@ export function ProgramWizard() {
       )}
 
       {step === 1 && (
+        <div className="space-y-5">
+          <div>
+            <h2 className="font-semibold">Your goals</h2>
+            <p className="text-sm text-muted-foreground">
+              Define 1–2 goals for each area. They keep your program focused —
+              you&apos;ll see them on the program page.
+            </p>
+          </div>
+          {GOAL_AREAS.map((area) => (
+            <div key={area} className="space-y-2">
+              <Label>{GOAL_AREA_LABELS[area]}</Label>
+              {goals[area].map((g, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    aria-label={`${GOAL_AREA_LABELS[area]} goal ${i + 1}`}
+                    placeholder={GOAL_PLACEHOLDERS[area]}
+                    value={g}
+                    onChange={(e) => setGoal(area, i, e.target.value)}
+                  />
+                  {i === 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remove second goal"
+                      onClick={() =>
+                        setGoals((gs) => ({
+                          ...gs,
+                          [area]: gs[area].slice(0, 1),
+                        }))
+                      }
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {goals[area].length < 2 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setGoals((gs) => ({ ...gs, [area]: [...gs[area], ""] }))
+                  }
+                >
+                  <Plus className="size-4" /> Add a second goal
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {step === 2 && (
         <div className="space-y-3">
           <div>
             <h2 className="font-semibold">Periodization</h2>
@@ -207,7 +296,7 @@ export function ProgramWizard() {
         </div>
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Training days</Label>

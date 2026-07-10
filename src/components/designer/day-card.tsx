@@ -10,10 +10,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  restrictToParentElement,
-  restrictToVerticalAxis,
-} from "@dnd-kit/modifiers";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
   sortableKeyboardCoordinates,
@@ -30,7 +27,10 @@ import {
   X,
 } from "lucide-react";
 import {
+  Attribute,
   ATTRIBUTE_LABELS,
+  ATTRIBUTE_ORDER,
+  GROUP_TYPE_COLORS,
   GROUP_TYPE_LABELS,
   GroupType,
   GROUP_TYPES,
@@ -39,8 +39,6 @@ import {
 } from "@/lib/domain/types";
 import { Exercise, WorkoutDay, WorkoutExercise } from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 function setsSummary(we: WorkoutExercise, exercise: Exercise): string {
@@ -56,13 +54,6 @@ function setsSummary(we: WorkoutExercise, exercise: Exercise): string {
   return `${we.sets.length} sets · ${values}${unit}${weight}${cluster} · rest ${we.restSeconds}s`;
 }
 
-const GROUP_COLORS = [
-  "border-l-violet-500",
-  "border-l-emerald-500",
-  "border-l-amber-500",
-  "border-l-rose-500",
-];
-
 export function DayCard({
   weekday,
   day,
@@ -71,6 +62,7 @@ export function DayCard({
   onToggleIntensity,
   onCopyDay,
   onAddExercise,
+  onRemoveSection,
   onEditExercise,
   onRemoveExercise,
   onReorder,
@@ -83,15 +75,128 @@ export function DayCard({
   exercisesById: Map<string, Exercise>;
   onToggleIntensity: () => void;
   onCopyDay?: () => void;
-  onAddExercise: () => void;
+  /** Open the picker scoped to one section. */
+  onAddExercise: (attribute: Attribute) => void;
+  /** Clear a whole section (its title and placeholder remain). */
+  onRemoveSection: (attribute: Attribute) => void;
   onEditExercise: (workoutExerciseId: string) => void;
   onRemoveExercise: (workoutExerciseId: string) => void;
   onReorder: (fromId: string, toId: string) => void;
   onGroup: (ids: string[], type: GroupType) => void;
   onUngroup: (groupId: string) => void;
 }) {
-  const [selecting, setSelecting] = useState(false);
+  // Selection mode is scoped to one section: exercises can only be grouped
+  // (and reordered) inside their own section.
+  const [selecting, setSelecting] = useState<Attribute | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+
+  const attributeOf = (we: WorkoutExercise): Attribute =>
+    exercisesById.get(we.exerciseId)?.attribute ?? "strength";
+
+  return (
+    <section className="space-y-5">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold">{WEEKDAY_LABELS[weekday]}</h3>
+          {periodized && (
+            <button
+              type="button"
+              onClick={onToggleIntensity}
+              title="Toggle high/low volume"
+              className={cn(
+                "rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
+                day.intensity === "high"
+                  ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                  : "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+              )}
+            >
+              {day.intensity === "high" ? "High volume" : "Low volume"}
+            </button>
+          )}
+        </span>
+        {onCopyDay && (
+          <Button variant="ghost" size="sm" onClick={onCopyDay}>
+            <Copy className="size-4" /> Copy day
+          </Button>
+        )}
+      </div>
+
+      {ATTRIBUTE_ORDER.map((attribute) => {
+        const section = day.exercises.filter(
+          (we) => attributeOf(we) === attribute,
+        );
+        return (
+          <DaySection
+            key={attribute}
+            weekday={weekday}
+            attribute={attribute}
+            exercises={section}
+            day={day}
+            exercisesById={exercisesById}
+            selecting={selecting === attribute}
+            selected={selected}
+            onStartSelecting={() => {
+              setSelecting(selecting === attribute ? null : attribute);
+              setSelected([]);
+            }}
+            onToggleSelected={(id) =>
+              setSelected((s) =>
+                s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
+              )
+            }
+            onGroup={(type) => {
+              onGroup(selected, type);
+              setSelecting(null);
+              setSelected([]);
+            }}
+            onUngroup={onUngroup}
+            onAddExercise={() => onAddExercise(attribute)}
+            onRemoveSection={() => onRemoveSection(attribute)}
+            onEditExercise={onEditExercise}
+            onRemoveExercise={onRemoveExercise}
+            onReorder={onReorder}
+          />
+        );
+      })}
+    </section>
+  );
+}
+
+function DaySection({
+  weekday,
+  attribute,
+  exercises,
+  day,
+  exercisesById,
+  selecting,
+  selected,
+  onStartSelecting,
+  onToggleSelected,
+  onGroup,
+  onUngroup,
+  onAddExercise,
+  onRemoveSection,
+  onEditExercise,
+  onRemoveExercise,
+  onReorder,
+}: {
+  weekday: Weekday;
+  attribute: Attribute;
+  exercises: WorkoutExercise[];
+  day: WorkoutDay;
+  exercisesById: Map<string, Exercise>;
+  selecting: boolean;
+  selected: string[];
+  onStartSelecting: () => void;
+  onToggleSelected: (id: string) => void;
+  onGroup: (type: GroupType) => void;
+  onUngroup: (groupId: string) => void;
+  onAddExercise: () => void;
+  onRemoveSection: () => void;
+  onEditExercise: (workoutExerciseId: string) => void;
+  onRemoveExercise: (workoutExerciseId: string) => void;
+  onReorder: (fromId: string, toId: string) => void;
+}) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -104,159 +209,126 @@ export function DayCard({
     }
   }
 
-  const groupIndex = new Map(
-    (day.groups ?? []).map((g, i) => [g.id, i] as const),
-  );
-
   return (
-    <Card
-      className={cn(
-        "gap-3 py-4",
-        periodized &&
-          (day.intensity === "high"
-            ? "border-orange-400/70 bg-orange-500/5"
-            : "border-sky-400/70 bg-sky-500/5"),
-      )}
-    >
-      <CardHeader className="px-4">
-        <CardTitle className="flex items-center justify-between text-base">
-          <span className="flex items-center gap-2">
-            {WEEKDAY_LABELS[weekday]}
-            {periodized && (
-              <button
-                type="button"
-                onClick={onToggleIntensity}
-                title="Toggle high/low volume"
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide",
-                  day.intensity === "high"
-                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
-                    : "bg-sky-500/15 text-sky-600 dark:text-sky-400",
-                )}
-              >
-                {day.intensity === "high" ? "High volume" : "Low volume"}
-              </button>
-            )}
-          </span>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {ATTRIBUTE_LABELS[attribute]}
+        </h4>
+        {exercises.length > 0 && (
           <span className="flex items-center">
             <Button
               variant="ghost"
               size="sm"
               aria-pressed={selecting}
-              onClick={() => {
-                setSelecting(!selecting);
-                setSelected([]);
-              }}
+              onClick={onStartSelecting}
             >
               {selecting ? <X className="size-4" /> : <ListChecks className="size-4" />}
-              {selecting ? "Cancel" : "Select"}
+              {selecting ? "Cancel" : "Mode"}
             </Button>
-            {onCopyDay && !selecting && (
-              <Button variant="ghost" size="sm" onClick={onCopyDay}>
-                <Copy className="size-4" /> Copy
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              aria-label={`Remove ${ATTRIBUTE_LABELS[attribute]} section`}
+              onClick={onRemoveSection}
+            >
+              <Trash2 className="size-4" />
+            </Button>
           </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 px-4">
-        <DndContext
-          id={`day-dnd-${weekday}`}
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-          onDragEnd={handleDragEnd}
+        )}
+      </div>
+
+      <DndContext
+        id={`day-dnd-${weekday}-${attribute}`}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVerticalAxis]}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={exercises.map((we) => we.id)}
+          strategy={verticalListSortingStrategy}
         >
-          <SortableContext
-            items={day.exercises.map((we) => we.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-2">
-              {day.exercises.map((we, i) => {
-                const ex = exercisesById.get(we.exerciseId);
-                if (!ex) return null;
-                const prev = day.exercises[i - 1];
-                const group = we.groupId
-                  ? (day.groups ?? []).find((g) => g.id === we.groupId)
-                  : undefined;
-                const isGroupStart =
-                  group && (!prev || prev.groupId !== we.groupId);
-                return (
-                  <div key={we.id}>
-                    {isGroupStart && group && (
-                      <div className="mb-1 flex items-center gap-1">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {GROUP_TYPE_LABELS[group.type]}
-                        </Badge>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground"
-                          title="Ungroup"
-                          onClick={() => onUngroup(group.id)}
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </div>
-                    )}
-                    <SortableExerciseRow
-                      we={we}
-                      exercise={ex}
-                      groupColor={
-                        we.groupId !== undefined &&
-                        groupIndex.has(we.groupId)
-                          ? GROUP_COLORS[
-                              groupIndex.get(we.groupId)! % GROUP_COLORS.length
-                            ]
-                          : undefined
-                      }
-                      selecting={selecting}
-                      selected={selected.includes(we.id)}
-                      onToggleSelected={() =>
-                        setSelected((s) =>
-                          s.includes(we.id)
-                            ? s.filter((id) => id !== we.id)
-                            : [...s, we.id],
-                        )
-                      }
-                      onEdit={() => onEditExercise(we.id)}
-                      onRemove={() => onRemoveExercise(we.id)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </SortableContext>
-        </DndContext>
-
-        {selecting && selected.length >= 2 && (
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-background p-2">
-            <span className="mr-1 text-xs text-muted-foreground">
-              Group {selected.length} as:
-            </span>
-            {GROUP_TYPES.map((type) => (
-              <Button
-                key={type}
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  onGroup(selected, type);
-                  setSelecting(false);
-                  setSelected([]);
-                }}
-              >
-                {GROUP_TYPE_LABELS[type]}
-              </Button>
-            ))}
+          <div className="space-y-2">
+            {exercises.map((we, i) => {
+              const ex = exercisesById.get(we.exerciseId);
+              if (!ex) return null;
+              const prev = exercises[i - 1];
+              const group = we.groupId
+                ? (day.groups ?? []).find((g) => g.id === we.groupId)
+                : undefined;
+              const isGroupStart =
+                group && (!prev || prev.groupId !== we.groupId);
+              return (
+                <div key={we.id}>
+                  {isGroupStart && group && (
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                          GROUP_TYPE_COLORS[group.type].badge,
+                        )}
+                      >
+                        {GROUP_TYPE_LABELS[group.type]}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Remove mode"
+                        onClick={() => onUngroup(group.id)}
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <SortableExerciseRow
+                    we={we}
+                    exercise={ex}
+                    groupColor={group && GROUP_TYPE_COLORS[group.type].border}
+                    selecting={selecting}
+                    selected={selected.includes(we.id)}
+                    onToggleSelected={() => onToggleSelected(we.id)}
+                    onEdit={() => onEditExercise(we.id)}
+                    onRemove={() => onRemoveExercise(we.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
-        )}
+        </SortableContext>
+      </DndContext>
 
-        {!selecting && (
-          <Button variant="outline" size="sm" className="w-full" onClick={onAddExercise}>
-            <Plus className="size-4" /> Add exercise
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+      {selecting && selected.length >= 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-sm text-muted-foreground">
+            Mode for {selected.length}:
+          </span>
+          {GROUP_TYPES.filter(
+            (type) => type !== "superset" || selected.length >= 2,
+          ).map((type) => (
+            <Button
+              key={type}
+              size="sm"
+              variant="outline"
+              onClick={() => onGroup(type)}
+            >
+              {GROUP_TYPE_LABELS[type]}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {!selecting && (
+        <button
+          type="button"
+          onClick={onAddExercise}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed py-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+        >
+          <Plus className="size-4" /> Add {ATTRIBUTE_LABELS[attribute].toLowerCase()} exercise
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -329,12 +401,13 @@ function SortableExerciseRow({
       className={cn("relative", isDragging && "z-10 opacity-90")}
     >
       {/* swipe reveal */}
-      <div className="absolute inset-0 flex items-center justify-end rounded-lg bg-destructive pr-4">
+      <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-destructive pr-4">
         <Trash2 className="size-4 text-white" />
       </div>
       <div
         className={cn(
-          "relative flex items-center gap-1 rounded-lg border bg-background p-2 transition-transform",
+          // Opaque: the swipe-to-delete red layer sits right behind this row.
+          "relative flex items-center gap-2 rounded-xl bg-muted p-3 transition-transform",
           groupColor && `border-l-4 ${groupColor}`,
           selected && "ring-2 ring-primary",
         )}
@@ -350,7 +423,7 @@ function SortableExerciseRow({
             aria-checked={selected}
             onClick={onToggleSelected}
             className={cn(
-              "flex size-5 shrink-0 items-center justify-center rounded border",
+              "flex size-6 shrink-0 items-center justify-center rounded border",
               selected && "border-primary bg-primary text-primary-foreground",
             )}
           >
@@ -359,31 +432,28 @@ function SortableExerciseRow({
         ) : (
           <button
             type="button"
-            className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+            className="shrink-0 cursor-grab touch-none p-1 text-muted-foreground active:cursor-grabbing"
             aria-label="Drag to reorder"
             {...attributes}
             {...listeners}
           >
-            <GripVertical className="size-4" />
+            <GripVertical className="size-5" />
           </button>
         )}
         <button
           type="button"
           onClick={selecting ? onToggleSelected : onEdit}
-          className="min-w-0 flex-1 text-left"
+          className="min-w-0 flex-1 py-0.5 text-left"
         >
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{exercise.title}</span>
-            <Badge variant="secondary" className="shrink-0 text-[10px]">
-              {ATTRIBUTE_LABELS[exercise.attribute]}
-            </Badge>
+            <span className="truncate font-medium">{exercise.title}</span>
             {we.progressionMethod === "inter" && (
-              <Badge variant="outline" className="shrink-0 text-[10px]">
+              <span className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
                 inter
-              </Badge>
+              </span>
             )}
           </div>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground">
             {progression?.name} · {setsSummary(we, exercise)}
           </p>
         </button>

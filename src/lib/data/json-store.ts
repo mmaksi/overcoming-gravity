@@ -5,6 +5,7 @@ import { Low } from "lowdb";
 import {
   DefaultTemplate,
   Exercise,
+  ExerciseNote,
   Profile,
   Program,
   ProgramRun,
@@ -31,6 +32,8 @@ async function getDb(): Promise<Low<DbData>> {
     mkdirSync(path.dirname(DB_FILE), { recursive: true });
     globalCache.__caliJsonDb = JSONFilePreset<DbData>(DB_FILE, seedData()).then(
       async (db) => {
+        // Databases created before exercise notes existed lack the key.
+        db.data.exerciseNotes ??= [];
         await db.write(); // materialize the seed on first run
         return db;
       },
@@ -39,6 +42,8 @@ async function getDb(): Promise<Low<DbData>> {
   }
   const db = await globalCache.__caliJsonDb;
   await db.read();
+  // Databases created before exercise notes existed lack the key.
+  db.data.exerciseNotes ??= [];
   return db;
 }
 
@@ -188,6 +193,25 @@ export class JsonStore implements DataStore {
       .filter((s) => s.userId === userId && s.status === "completed")
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, limit);
+  }
+
+  async listExerciseNotes(userId: string): Promise<ExerciseNote[]> {
+    return (await getDb()).data.exerciseNotes.filter(
+      (n) => n.userId === userId,
+    );
+  }
+  async saveExerciseNote(note: ExerciseNote): Promise<ExerciseNote> {
+    const db = await getDb();
+    const i = db.data.exerciseNotes.findIndex(
+      (n) =>
+        n.userId === note.userId &&
+        n.exerciseId === note.exerciseId &&
+        n.techniqueId === note.techniqueId,
+    );
+    if (i === -1) db.data.exerciseNotes.push(note);
+    else db.data.exerciseNotes[i] = note;
+    await db.write();
+    return note;
   }
 
   // Users -----------------------------------------------------------------

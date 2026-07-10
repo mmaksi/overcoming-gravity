@@ -18,6 +18,10 @@ export function buildDefaultWorkoutDay(
 ): WorkoutDay {
   const exercises: WorkoutExercise[] = template.entries
     .filter((entry) => exercisesById.has(entry.exerciseId))
+    // The strength section always starts empty — athletes pick their own.
+    .filter(
+      (entry) => exercisesById.get(entry.exerciseId)?.attribute !== "strength",
+    )
     .map((entry) => ({
       id: newId(),
       exerciseId: entry.exerciseId,

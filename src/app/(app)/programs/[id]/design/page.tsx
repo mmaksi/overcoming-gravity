@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { exerciseNoteKey } from "@/lib/domain/schemas";
 import { MesocycleDesigner } from "@/components/designer/mesocycle-designer";
 
 export default async function DesignPage({
@@ -15,7 +16,19 @@ export default async function DesignPage({
   const program = await store.getProgram(id);
   if (!program || program.userId !== user.id) notFound();
 
-  const exercises = await store.listExercises();
+  const [exercises, notes] = await Promise.all([
+    store.listExercises(),
+    store.listExerciseNotes(user.id),
+  ]);
+  const userNotes = Object.fromEntries(
+    notes.map((n) => [exerciseNoteKey(n.exerciseId, n.techniqueId), n.note]),
+  );
 
-  return <MesocycleDesigner program={program} exercises={exercises} />;
+  return (
+    <MesocycleDesigner
+      program={program}
+      exercises={exercises}
+      userNotes={userNotes}
+    />
+  );
 }

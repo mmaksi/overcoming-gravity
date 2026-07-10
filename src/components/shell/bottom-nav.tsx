@@ -37,13 +37,13 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
               key={href}
               href={href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
+                "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors",
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Icon className="size-5" strokeWidth={active ? 2.4 : 1.8} />
+              <Icon className="size-6" strokeWidth={active ? 2.4 : 1.8} />
               {label}
             </Link>
           );

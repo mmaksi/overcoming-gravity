@@ -13,11 +13,17 @@ test("create a program end-to-end", async ({ page }) => {
   await page.getByRole("button", { name: "Full Body" }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
-  // Step 2 — periodization
+  // Step 2 — goals (1–2 per area: skills, push, pull)
+  await page.getByLabel("Skills goal 1").fill("10s front lever");
+  await page.getByLabel("Push goal 1").fill("5 clean dips");
+  await page.getByLabel("Pull goal 1").fill("First muscle-up");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+
+  // Step 3 — periodization
   await page.getByRole("button", { name: /High–Low/ }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
-  // Step 3 — schedule
+  // Step 4 — schedule
   await page.getByRole("button", { name: "Mon", exact: true }).click();
   await page.getByRole("button", { name: "Thu", exact: true }).click();
   await expect(page.getByText("Deload week")).toBeVisible();
@@ -31,10 +37,13 @@ test("create a program end-to-end", async ({ page }) => {
   // default template prefill + skill work
   await expect(page.getByText("Wrist Circles & Prep").first()).toBeVisible();
   await expect(page.getByText("Front Lever").first()).toBeVisible();
+  // sections render with per-section add placeholders; strength starts empty
+  await expect(
+    page.getByRole("button", { name: "Add strength exercise" }).first(),
+  ).toBeVisible();
 
   // Activate
   await page.getByRole("button", { name: "Finish & activate" }).click();
-  await expect(page.getByText("active").first()).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Start program" }),
   ).toBeVisible();

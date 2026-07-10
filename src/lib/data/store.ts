@@ -1,6 +1,7 @@
 import {
   DefaultTemplate,
   Exercise,
+  ExerciseNote,
   Profile,
   Program,
   ProgramRun,
@@ -54,6 +55,13 @@ export interface DataStore {
    * and intra-exercise progression memory (see domain/volume.ts).
    */
   listCompletedSessions(userId: string, limit?: number): Promise<WorkoutSession[]>;
+
+  /**
+   * A user's remembered notes per exercise + inter-technique pair. Saving
+   * upserts on (userId, exerciseId, techniqueId).
+   */
+  listExerciseNotes(userId: string): Promise<ExerciseNote[]>;
+  saveExerciseNote(note: ExerciseNote): Promise<ExerciseNote>;
 
   // Users -----------------------------------------------------------------
   getProfile(userId: string): Promise<Profile | null>;

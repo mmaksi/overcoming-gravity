@@ -3,6 +3,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import {
   DefaultTemplate,
   Exercise,
+  ExerciseNote,
   Profile,
   Program,
   ProgramRun,
@@ -32,6 +33,7 @@ const toProgram = (r: Row): Program => ({
   type: r.type,
   splitType: r.split_type ?? undefined,
   sport: r.sport ?? undefined,
+  goals: r.goals ?? undefined,
   periodization: r.periodization,
   weeks: r.weeks,
   trainingDays: r.training_days,
@@ -48,6 +50,7 @@ const fromProgram = (p: Program): Row => ({
   type: p.type,
   split_type: p.splitType ?? null,
   sport: p.sport ?? null,
+  goals: p.goals ?? null,
   periodization: p.periodization,
   weeks: p.weeks,
   training_days: p.trainingDays,
@@ -298,6 +301,33 @@ class SupabaseStore implements DataStore {
         .order("date", { ascending: false })
         .limit(limit),
     ).map(toSession);
+  }
+
+  async listExerciseNotes(userId: string): Promise<ExerciseNote[]> {
+    return orThrow(
+      await this.db.from("exercise_notes").select().eq("user_id", userId),
+    ).map((r: Row) => ({
+      userId: r.user_id,
+      exerciseId: r.exercise_id,
+      techniqueId: r.technique_id,
+      note: r.note,
+      updatedAt: r.updated_at,
+    }));
+  }
+  async saveExerciseNote(note: ExerciseNote): Promise<ExerciseNote> {
+    orThrow(
+      await this.db
+        .from("exercise_notes")
+        .upsert({
+          user_id: note.userId,
+          exercise_id: note.exerciseId,
+          technique_id: note.techniqueId,
+          note: note.note,
+          updated_at: note.updatedAt,
+        })
+        .select(),
+    );
+    return note;
   }
 
   // Users -----------------------------------------------------------------

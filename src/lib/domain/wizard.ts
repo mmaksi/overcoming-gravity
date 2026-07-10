@@ -7,7 +7,7 @@ import {
   SPLIT_TYPES,
   WEEKDAYS,
 } from "./types";
-import { sportSchema } from "./schemas";
+import { goalsSchema, sportSchema } from "./schemas";
 
 /** What the create-program wizard collects in steps 1–4. */
 export const wizardPayloadSchema = z
@@ -16,6 +16,7 @@ export const wizardPayloadSchema = z
     type: z.enum(PROGRAM_TYPES),
     splitType: z.enum(SPLIT_TYPES).optional(),
     sport: sportSchema.optional(),
+    goals: goalsSchema,
     periodization: z.enum(PERIODIZATIONS),
     trainingDays: z.array(z.enum(WEEKDAYS)).min(1),
     weeks: z.number().int().min(MIN_WEEKS).max(MAX_WEEKS),

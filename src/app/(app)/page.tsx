@@ -107,7 +107,9 @@ export default async function DashboardPage() {
                 <Play className="size-4" />
                 {todaySession.status === "completed"
                   ? "Review workout"
-                  : "Start workout"}
+                  : todaySession.entries.length > 0
+                    ? "Continue workout"
+                    : "Start workout"}
               </Link>
             </Button>
           </CardContent>

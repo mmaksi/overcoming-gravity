@@ -3,21 +3,13 @@ import { CalendarDays, TrendingUp } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { buildVolumeStats, statsKey } from "@/lib/domain/volume";
-import {
-  ATTRIBUTE_LABELS,
-  ATTRIBUTE_ORDER,
-  TECHNIQUES_BY_ID,
-  WEEKDAY_LABELS,
-} from "@/lib/domain/types";
+import { TECHNIQUES_BY_ID, WEEKDAY_LABELS } from "@/lib/domain/types";
 import { Exercise, WorkoutSession } from "@/lib/domain/schemas";
-import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ProgressList,
+  ProgressRow,
+} from "@/components/history/progress-list";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /** "Intra" or the inter-exercise technique's name — what to do next time. */
@@ -87,12 +79,32 @@ export default async function HistoryPage() {
     }
   }
 
-  const byAttribute = ATTRIBUTE_ORDER.map((attribute) => ({
-    attribute,
-    exercises: exercises
-      .filter((e) => e.attribute === attribute)
-      .sort((a, b) => a.title.localeCompare(b.title)),
-  })).filter((g) => g.exercises.length > 0);
+  // Progress overview covers only the skill and strength sections.
+  const progressRows: ProgressRow[] = exercises
+    .filter((e) => e.attribute === "skill" || e.attribute === "strength")
+    .sort((a, b) => a.title.localeCompare(b.title))
+    .map((ex) => {
+      const progressionId = currentProgression.get(ex.id);
+      const progression = progressionId
+        ? ex.progressions.find((p) => p.id === progressionId)
+        : undefined;
+      const best = progressionId
+        ? stats[statsKey(ex.id, progressionId)]?.maxReps
+        : undefined;
+      const step = progression
+        ? ex.progressions.findIndex((p) => p.id === progression.id) + 1
+        : 0;
+      return {
+        exerciseId: ex.id,
+        title: ex.title,
+        attribute: ex.attribute as "skill" | "strength",
+        detail: progression
+          ? `${progression.name} · best ${best ?? "—"}${ex.measurement === "time" ? "s" : " reps"} · ${methodLabel(currentMethod.get(ex.id))}`
+          : "Not trained yet",
+        step,
+        totalSteps: ex.progressions.length,
+      };
+    });
 
   return (
     <div className="space-y-4">
@@ -108,108 +120,60 @@ export default async function HistoryPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="workouts" className="space-y-3 pt-2">
+        <TabsContent value="workouts" className="space-y-8 pt-3">
           {completed.length === 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">No workouts yet</CardTitle>
-                <CardDescription>
-                  Completed workouts appear here with everything you logged.
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <div className="space-y-1 py-8 text-center">
+              <p className="font-medium">No workouts yet</p>
+              <p className="text-sm text-muted-foreground">
+                Completed workouts appear here with everything you logged.
+              </p>
+            </div>
           )}
           {completed.map((session) => (
             <Link
               key={session.id}
               href={`/workout/${session.id}`}
-              className="block"
+              className="block space-y-2"
             >
-              <Card className="gap-2 py-4 transition-colors hover:border-foreground/30">
-                <CardHeader className="px-4">
-                  <CardTitle className="flex items-center justify-between text-base">
-                    {session.date}
-                    <Badge variant="secondary">
-                      {programNameByRun.get(session.runId)}
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    {WEEKDAY_LABELS[session.weekday]}, week{" "}
-                    {session.weekIndex + 1} · {session.entries.length} exercises
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-1 px-4">
-                  {entryLabel(session, exercisesById).map((line) => (
-                    <div key={line.id} className="text-xs text-muted-foreground">
-                      <p className="flex items-center gap-1.5">
-                        <span className="font-medium text-foreground">
-                          {line.title}
-                        </span>{" "}
-                        {line.detail}
-                        <Badge
-                          variant={line.isInter ? "default" : "outline"}
-                          className="ml-auto shrink-0 text-[9px]"
-                        >
-                          {line.method}
-                        </Badge>
-                      </p>
-                      {line.notes && (
-                        <p className="pl-2 italic">“{line.notes}”</p>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">{session.date}</span>
+                <Badge variant="secondary">
+                  {programNameByRun.get(session.runId)}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {WEEKDAY_LABELS[session.weekday]}, week {session.weekIndex + 1}{" "}
+                · {session.entries.length} exercises
+              </p>
+              <div className="space-y-1.5">
+                {entryLabel(session, exercisesById).map((line) => (
+                  <div key={line.id} className="text-sm text-muted-foreground">
+                    <p className="flex items-center gap-1.5">
+                      <span className="font-medium text-foreground">
+                        {line.title}
+                      </span>{" "}
+                      {line.detail}
+                      <Badge
+                        variant={line.isInter ? "default" : "outline"}
+                        className="ml-auto shrink-0 text-[10px]"
+                      >
+                        {line.method}
+                      </Badge>
+                    </p>
+                    {line.notes && <p className="pl-2 italic">“{line.notes}”</p>}
+                  </div>
+                ))}
+              </div>
             </Link>
           ))}
         </TabsContent>
 
         <TabsContent value="progress" className="space-y-4 pt-2">
           <p className="text-sm text-muted-foreground">
-            Your current progression, method and best set in every exercise —
-            so you know exactly what to do next workout.
+            Your current progression, method and best set in every skill and
+            strength exercise — so you know exactly what to do next workout.
           </p>
-          {byAttribute.map(({ attribute, exercises: group }) => (
-            <div key={attribute} className="space-y-2">
-              <h2 className="text-sm font-semibold text-muted-foreground">
-                {ATTRIBUTE_LABELS[attribute]}
-              </h2>
-              {group.map((ex) => {
-                const progressionId = currentProgression.get(ex.id);
-                const progression = progressionId
-                  ? ex.progressions.find((p) => p.id === progressionId)
-                  : undefined;
-                const best = progressionId
-                  ? stats[statsKey(ex.id, progressionId)]?.maxReps
-                  : undefined;
-                const step = progression
-                  ? ex.progressions.findIndex((p) => p.id === progression.id) + 1
-                  : 0;
-                return (
-                  <div
-                    key={ex.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">
-                        {ex.title}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {progression
-                          ? `${progression.name} · best ${best ?? "—"}${ex.measurement === "time" ? "s" : " reps"} · ${methodLabel(currentMethod.get(ex.id))}`
-                          : "Not trained yet"}
-                      </p>
-                    </div>
-                    {progression && (
-                      <Badge variant="outline" className="shrink-0">
-                        {step}/{ex.progressions.length}
-                      </Badge>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+          <ProgressList rows={progressRows} />
         </TabsContent>
       </Tabs>
     </div>

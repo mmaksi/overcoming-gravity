@@ -25,47 +25,60 @@ export function ExercisePicker({
   open,
   onOpenChange,
   exercises,
+  lockedAttribute = null,
   onPick,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   exercises: Exercise[];
+  /** When set, only exercises of this section are offered. */
+  lockedAttribute?: Attribute | null;
   onPick: (exercise: Exercise) => void;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [attribute, setAttribute] = useState<Attribute | null>(null);
 
+  const effectiveAttribute = lockedAttribute ?? attribute;
+
   const filtered = useMemo(
     () =>
       exercises.filter((e) => {
         if (category && e.category !== category) return false;
-        if (attribute && e.attribute !== attribute) return false;
+        if (effectiveAttribute && e.attribute !== effectiveAttribute)
+          return false;
         if (query && !e.title.toLowerCase().includes(query.toLowerCase()))
           return false;
         return true;
       }),
-    [exercises, category, attribute, query],
+    [exercises, category, effectiveAttribute, query],
   );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85dvh] overflow-hidden p-0">
-        <div className="flex h-full flex-col">
+      {/* h + max-h together: the sheet's own h-auto must never win, or the
+          list outgrows the viewport and can't scroll. */}
+      <SheetContent
+        side="bottom"
+        className="h-[85dvh] max-h-[85dvh] overflow-hidden p-0"
+      >
+        <div className="flex h-full min-h-0 flex-col">
           <SheetHeader className="pb-2">
-            <SheetTitle>Add exercise</SheetTitle>
-            <SheetDescription>
-              Pick from the exercise library.
-            </SheetDescription>
+            <SheetTitle>
+              {lockedAttribute
+                ? `Add ${ATTRIBUTE_LABELS[lockedAttribute].toLowerCase()} exercise`
+                : "Add exercise"}
+            </SheetTitle>
+            <SheetDescription>Pick from the exercise library.</SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-2 px-4 pb-2">
+          <div className="space-y-2.5 px-4 pb-3">
             <Input
               placeholder="Search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {CATEGORIES.map((c) => (
                 <FilterChip
                   key={c}
@@ -75,21 +88,23 @@ export function ExercisePicker({
                 />
               ))}
             </div>
-            <div className="flex flex-wrap gap-1">
-              {ATTRIBUTES.map((a) => (
-                <FilterChip
-                  key={a}
-                  label={ATTRIBUTE_LABELS[a]}
-                  active={attribute === a}
-                  onClick={() => setAttribute(attribute === a ? null : a)}
-                />
-              ))}
-            </div>
+            {!lockedAttribute && (
+              <div className="flex flex-wrap gap-1.5">
+                {ATTRIBUTES.map((a) => (
+                  <FilterChip
+                    key={a}
+                    label={ATTRIBUTE_LABELS[a]}
+                    active={attribute === a}
+                    onClick={() => setAttribute(attribute === a ? null : a)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 pb-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
             {filtered.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
+              <p className="py-8 text-center text-muted-foreground">
                 No exercises match.
               </p>
             )}
@@ -99,7 +114,7 @@ export function ExercisePicker({
                   key={e.id}
                   type="button"
                   onClick={() => onPick(e)}
-                  className="w-full rounded-lg border p-3 text-left transition-colors hover:border-foreground/30"
+                  className="w-full rounded-xl bg-muted/50 p-4 text-left transition-colors hover:bg-muted"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{e.title}</span>
@@ -107,12 +122,14 @@ export function ExercisePicker({
                       <Badge variant="outline">
                         {CATEGORY_LABELS[e.category]}
                       </Badge>
-                      <Badge variant="secondary">
-                        {ATTRIBUTE_LABELS[e.attribute]}
-                      </Badge>
+                      {!lockedAttribute && (
+                        <Badge variant="secondary">
+                          {ATTRIBUTE_LABELS[e.attribute]}
+                        </Badge>
+                      )}
                     </span>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                     {e.progressions.map((p) => p.name).join(" → ")}
                   </p>
                 </button>
@@ -139,7 +156,7 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-full border px-2.5 py-1 text-xs transition-colors",
+        "rounded-full border px-3 py-1.5 text-sm transition-colors",
         active
           ? "border-primary bg-primary text-primary-foreground"
           : "text-muted-foreground hover:border-foreground/30",

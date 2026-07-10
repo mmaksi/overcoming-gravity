@@ -12,8 +12,6 @@ import {
   Measurement,
   MEASUREMENT_LABELS,
   MEASUREMENTS,
-  REP_STYLE_LABELS,
-  REP_STYLES,
   RepStyle,
 } from "@/lib/domain/types";
 import { Exercise } from "@/lib/domain/schemas";
@@ -49,16 +47,18 @@ type Draft = {
 
 export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
   const [query, setQuery] = useState("");
+  const [attribute, setAttribute] = useState<Attribute | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const filtered = useMemo(
     () =>
-      exercises.filter((e) =>
-        e.title.toLowerCase().includes(query.toLowerCase()),
-      ),
-    [exercises, query],
+      exercises.filter((e) => {
+        if (attribute && e.attribute !== attribute) return false;
+        return e.title.toLowerCase().includes(query.toLowerCase());
+      }),
+    [exercises, query, attribute],
   );
 
   const isEdit = exercises.some((e) => e.id === draft?.id);
@@ -111,6 +111,23 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
         >
           <Plus className="size-4" /> Add
         </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {ATTRIBUTES.map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => setAttribute(attribute === a ? null : a)}
+            className={
+              attribute === a
+                ? "rounded-full border border-primary bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                : "rounded-full border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-foreground/30"
+            }
+          >
+            {ATTRIBUTE_LABELS[a]}
+          </button>
+        ))}
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -242,54 +259,26 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Measured by</Label>
-                  <Select
-                    value={draft.measurement}
-                    onValueChange={(v) =>
-                      setDraft({ ...draft, measurement: v as Measurement })
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MEASUREMENTS.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {MEASUREMENT_LABELS[m]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Rep style</Label>
-                  <Select
-                    value={draft.repStyle}
-                    onValueChange={(v) =>
-                      setDraft({ ...draft, repStyle: v as RepStyle })
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REP_STYLES.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {REP_STYLE_LABELS[r]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label>Measured by</Label>
+                <Select
+                  value={draft.measurement}
+                  onValueChange={(v) =>
+                    setDraft({ ...draft, measurement: v as Measurement })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MEASUREMENTS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {MEASUREMENT_LABELS[m]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              {draft.repStyle === "cluster" && (
-                <p className="text-xs text-muted-foreground">
-                  Cluster reps: athletes perform single reps with a short rest
-                  between each inside one set — typical for eccentric work.
-                </p>
-              )}
 
               <div className="space-y-2">
                 <Label>Progressions (easiest → hardest)</Label>

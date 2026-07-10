@@ -12,12 +12,14 @@ import {
 } from "lucide-react";
 import {
   ATTRIBUTE_LABELS,
+  GROUP_TYPE_COLORS,
   GROUP_TYPE_LABELS,
   TECHNIQUES_BY_ID,
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
 import {
   Exercise,
+  exerciseNoteKey,
   Program,
   SessionEntry,
   VolumeStats,
@@ -87,6 +89,7 @@ export function WorkoutLogger({
   isDeload,
   exercises,
   stats,
+  userNotes = {},
 }: {
   session: WorkoutSession;
   program: Program;
@@ -94,6 +97,8 @@ export function WorkoutLogger({
   isDeload: boolean;
   exercises: Exercise[];
   stats: Record<string, VolumeStats>;
+  /** Remembered notes keyed `${exerciseId}:${techniqueId}`. */
+  userNotes?: Record<string, string>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -291,14 +296,19 @@ export function WorkoutLogger({
         return (
           <div key={we.id}>
             {isGroupStart && group && (
-              <Badge variant="secondary" className="mb-1 text-[10px]">
-                {GROUP_TYPE_LABELS[group.type]} — alternate these exercises
-              </Badge>
+              <span
+                className={cn(
+                  "mb-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                  GROUP_TYPE_COLORS[group.type].badge,
+                )}
+              >
+                {GROUP_TYPE_LABELS[group.type]}
+              </span>
             )}
             <Card
               className={cn(
                 "gap-3 py-4",
-                group && "border-l-4 border-l-violet-500",
+                group && `border-l-4 ${GROUP_TYPE_COLORS[group.type].border}`,
               )}
             >
               <CardHeader className="px-4">
@@ -527,6 +537,18 @@ export function WorkoutLogger({
                   ...(patch.notes !== undefined && { notes: patch.notes }),
                   ...(patch.interTechniqueId !== undefined && {
                     interTechniqueId: patch.interTechniqueId ?? undefined,
+                    // Prefill the remembered note for this exercise +
+                    // technique pair (never overwrite what's typed).
+                    ...(patch.interTechniqueId &&
+                      !en.notes?.trim() && {
+                        notes:
+                          userNotes[
+                            exerciseNoteKey(
+                              en.exerciseId,
+                              patch.interTechniqueId,
+                            )
+                          ],
+                      }),
                   }),
                 }))
               }

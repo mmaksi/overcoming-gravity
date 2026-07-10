@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { buildVolumeStats } from "@/lib/domain/volume";
+import { exerciseNoteKey } from "@/lib/domain/schemas";
 import { WorkoutLogger } from "@/components/workout/workout-logger";
 
 export default async function WorkoutPage({
@@ -24,15 +25,19 @@ export default async function WorkoutPage({
   const plannedDay = week?.days[session.weekday];
   if (!plannedDay) notFound();
 
-  const [exercises, completed] = await Promise.all([
+  const [exercises, completed, notes] = await Promise.all([
     store.listExercises(),
     store.listCompletedSessions(user.id),
+    store.listExerciseNotes(user.id),
   ]);
 
   // Stats for every progression of every planned exercise, so swapping
   // progression mid-workout still shows the right memory instantly.
   const stats = buildVolumeStats(
     completed.filter((s) => s.id !== session.id),
+  );
+  const userNotes = Object.fromEntries(
+    notes.map((n) => [exerciseNoteKey(n.exerciseId, n.techniqueId), n.note]),
   );
 
   return (
@@ -43,6 +48,7 @@ export default async function WorkoutPage({
       isDeload={week.isDeload}
       exercises={exercises}
       stats={stats}
+      userNotes={userNotes}
     />
   );
 }

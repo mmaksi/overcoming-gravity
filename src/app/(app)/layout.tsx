@@ -9,7 +9,7 @@ export default async function AppLayout({
   const user = await getCurrentUser();
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24 pt-4">
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-32 pt-4">
         {children}
       </main>
       <BottomNav isAdmin={user?.isAdmin ?? false} />

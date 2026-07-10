@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AdminToggle } from "@/components/settings/admin-toggle";
+import { FeedbackForm } from "@/components/settings/feedback-form";
 import { SignOutButton } from "@/components/settings/sign-out-button";
 
 export default async function SettingsPage() {
@@ -31,6 +32,17 @@ export default async function SettingsPage() {
           ) : (
             <SignOutButton />
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Feedback</CardTitle>
+          <CardDescription>
+            Something broken or missing? We read every message.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FeedbackForm />
         </CardContent>
       </Card>
       <p className="text-xs text-muted-foreground">

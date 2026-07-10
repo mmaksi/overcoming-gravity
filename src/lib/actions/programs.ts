@@ -5,9 +5,46 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
-import { mesocycleSchema, Program } from "@/lib/domain/schemas";
+import { Mesocycle, mesocycleSchema, Program } from "@/lib/domain/schemas";
 import { buildMesocycle } from "@/lib/domain/build";
 import { WizardPayload, wizardPayloadSchema } from "@/lib/domain/wizard";
+import { DataStore } from "@/lib/data/store";
+
+/**
+ * Notes typed against an inter-exercise technique belong to the user +
+ * exercise + technique, not to one workout or program — remember the latest
+ * one so it can prefill everywhere that pair is picked again.
+ */
+async function rememberMesocycleNotes(
+  store: DataStore,
+  userId: string,
+  mesocycle: Mesocycle,
+): Promise<void> {
+  const latest = new Map<string, { exerciseId: string; techniqueId: string; note: string }>();
+  for (const week of mesocycle.weeks) {
+    for (const day of Object.values(week.days)) {
+      for (const we of day?.exercises ?? []) {
+        if (we.interTechniqueId && we.notes?.trim()) {
+          latest.set(`${we.exerciseId}:${we.interTechniqueId}`, {
+            exerciseId: we.exerciseId,
+            techniqueId: we.interTechniqueId,
+            note: we.notes.trim(),
+          });
+        }
+      }
+    }
+  }
+  const now = new Date().toISOString();
+  for (const { exerciseId, techniqueId, note } of latest.values()) {
+    await store.saveExerciseNote({
+      userId,
+      exerciseId,
+      techniqueId,
+      note,
+      updatedAt: now,
+    });
+  }
+}
 
 export async function createProgramFromWizard(
   payload: WizardPayload,
@@ -29,6 +66,7 @@ export async function createProgramFromWizard(
     type: parsed.type,
     splitType: parsed.type === "split" ? parsed.splitType : undefined,
     sport: parsed.type === "sport_mix" ? parsed.sport : undefined,
+    goals: parsed.goals,
     periodization: parsed.periodization,
     weeks: parsed.weeks,
     trainingDays: parsed.trainingDays,
@@ -71,6 +109,7 @@ export async function saveMesocycle(input: {
     updatedAt: new Date().toISOString(),
   };
   await store.updateProgram(updated);
+  await rememberMesocycleNotes(store, user.id, updated.mesocycle);
   return { savedAt: updated.updatedAt };
 }
 

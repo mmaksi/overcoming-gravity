@@ -2,6 +2,7 @@ import { Attribute, Category, Measurement, RepStyle } from "@/lib/domain/types";
 import {
   DefaultTemplate,
   Exercise,
+  ExerciseNote,
   Profile,
   Program,
   ProgramRun,
@@ -16,6 +17,7 @@ export type DbData = {
   programs: Program[];
   runs: ProgramRun[];
   sessions: WorkoutSession[];
+  exerciseNotes: ExerciseNote[];
 };
 
 function ex(
@@ -271,5 +273,6 @@ export function seedData(): DbData {
     programs: [],
     runs: [],
     sessions: [],
+    exerciseNotes: [],
   };
 }

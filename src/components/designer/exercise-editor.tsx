@@ -2,7 +2,12 @@
 
 import { Minus, Plus } from "lucide-react";
 import { INTER_TECHNIQUES, TECHNIQUES_BY_ID } from "@/lib/domain/types";
-import { Exercise, WorkoutExercise } from "@/lib/domain/schemas";
+import {
+  Exercise,
+  exerciseNoteKey,
+  WorkoutExercise,
+} from "@/lib/domain/schemas";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import {
   Sheet,
   SheetContent,
@@ -28,6 +33,7 @@ export function ExerciseEditor({
   onOpenChange,
   exercise,
   value,
+  userNotes = {},
   onChange,
   onRemove,
 }: {
@@ -35,6 +41,8 @@ export function ExerciseEditor({
   onOpenChange: (open: boolean) => void;
   exercise: Exercise | null;
   value: WorkoutExercise | null;
+  /** Remembered notes keyed `${exerciseId}:${techniqueId}`. */
+  userNotes?: Record<string, string>;
   onChange: (we: WorkoutExercise) => void;
   onRemove: () => void;
 }) {
@@ -80,9 +88,7 @@ export function ExerciseEditor({
               </SelectContent>
             </Select>
             {selectedProgression?.description && (
-              <p className="text-xs text-muted-foreground">
-                {selectedProgression.description}
-              </p>
+              <ExpandableText text={selectedProgression.description} />
             )}
           </div>
 
@@ -251,7 +257,16 @@ export function ExerciseEditor({
                 <Select
                   value={value.interTechniqueId ?? ""}
                   onValueChange={(interTechniqueId) =>
-                    set({ interTechniqueId })
+                    set({
+                      interTechniqueId,
+                      // Prefill with the user's remembered note for this
+                      // exercise + technique pair (never overwrite typing).
+                      notes: value.notes?.trim()
+                        ? value.notes
+                        : (userNotes[
+                            exerciseNoteKey(value.exerciseId, interTechniqueId)
+                          ] ?? value.notes),
+                    })
                   }
                 >
                   <SelectTrigger className="w-full">

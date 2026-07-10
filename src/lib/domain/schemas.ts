@@ -116,6 +116,14 @@ export const sportSchema = z.object({
 });
 export type Sport = z.infer<typeof sportSchema>;
 
+/** 1–2 goals per area, defined when the program is created. */
+export const goalsSchema = z.object({
+  skills: z.array(z.string().min(1)).min(1).max(2),
+  push: z.array(z.string().min(1)).min(1).max(2),
+  pull: z.array(z.string().min(1)).min(1).max(2),
+});
+export type Goals = z.infer<typeof goalsSchema>;
+
 export const programSchema = z
   .object({
     id: z.string(),
@@ -124,6 +132,8 @@ export const programSchema = z
     type: z.enum(PROGRAM_TYPES),
     splitType: z.enum(SPLIT_TYPES).optional(),
     sport: sportSchema.optional(),
+    /** Optional for programs created before goals existed. */
+    goals: goalsSchema.optional(),
     periodization: z.enum(PERIODIZATIONS),
     weeks: z.number().int().min(MIN_WEEKS).max(MAX_WEEKS),
     trainingDays: z.array(z.enum(WEEKDAYS)).min(1),
@@ -196,6 +206,25 @@ export const workoutSessionSchema = z.object({
   entries: z.array(sessionEntrySchema),
 });
 export type WorkoutSession = z.infer<typeof workoutSessionSchema>;
+
+/**
+ * A user's remembered note for one exercise + inter-exercise technique pair.
+ * Written whenever the athlete logs a note with a technique; read back to
+ * prefill the note the next time they pick that exercise with that technique.
+ */
+export const exerciseNoteSchema = z.object({
+  userId: z.string(),
+  exerciseId: z.string(),
+  techniqueId: z.string(),
+  note: z.string(),
+  updatedAt: z.string(),
+});
+export type ExerciseNote = z.infer<typeof exerciseNoteSchema>;
+
+/** Map key for exercise-note lookups. */
+export function exerciseNoteKey(exerciseId: string, techniqueId: string) {
+  return `${exerciseId}:${techniqueId}`;
+}
 
 // ---------------------------------------------------------------------------
 // Users

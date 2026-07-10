@@ -4,6 +4,8 @@ import { Pencil, Trophy } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
+  GOAL_AREA_LABELS,
+  GOAL_AREAS,
   PERIODIZATION_LABELS,
   PROGRAM_TYPE_LABELS,
   SPLIT_TYPE_LABELS,
@@ -53,9 +55,12 @@ export default async function ProgramPage({
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-2xl font-bold">{program.name}</h1>
-        <Badge variant={program.status === "draft" ? "outline" : "default"}>
-          {program.status}
-        </Badge>
+        {/* "Active" is reserved for the program currently being followed. */}
+        {activeRun ? (
+          <Badge>Active</Badge>
+        ) : program.status === "draft" ? (
+          <Badge variant="outline">Draft</Badge>
+        ) : null}
       </div>
 
       {justFinished && (
@@ -85,6 +90,17 @@ export default async function ProgramPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
+          {program.goals &&
+            GOAL_AREAS.map(
+              (area) =>
+                program.goals![area].length > 0 && (
+                  <Row
+                    key={area}
+                    label={`${GOAL_AREA_LABELS[area]} goals`}
+                    value={program.goals![area].join(" · ")}
+                  />
+                ),
+            )}
           <Row
             label="Periodization"
             value={PERIODIZATION_LABELS[program.periodization]}

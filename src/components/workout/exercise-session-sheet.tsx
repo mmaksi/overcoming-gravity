@@ -25,6 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { cn } from "@/lib/utils";
 
 const NONE = "none";
@@ -108,9 +109,7 @@ export function ExerciseSessionSheet({
                       {active && <Check className="ml-auto size-4 text-primary" />}
                     </div>
                     {p.description && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {p.description}
-                      </p>
+                      <ExpandableText text={p.description} className="mt-1" />
                     )}
                     {s?.maxReps != null && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">

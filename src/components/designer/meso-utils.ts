@@ -73,16 +73,17 @@ export function reorderExercises(
 }
 
 /**
- * Group the selected exercises (superset/circuit/pyramid). Members are made
- * contiguous at the position of the first selected exercise; previous group
- * membership of the selection is dissolved.
+ * Put the selected exercises in a mode (superset/circuit/pyramid/HIIT/…).
+ * A single exercise is enough for every mode except superset (enforced by
+ * the UI). Members are made contiguous at the position of the first selected
+ * exercise; previous group membership of the selection is dissolved.
  */
 export function groupExercises(
   day: WorkoutDay,
   ids: string[],
   type: ExerciseGroup["type"],
 ): WorkoutDay {
-  if (ids.length < 2) return day;
+  if (ids.length < 1) return day;
   const groupId = crypto.randomUUID();
   const selected = day.exercises.filter((we) => ids.includes(we.id));
   const rest = day.exercises.filter((we) => !ids.includes(we.id));

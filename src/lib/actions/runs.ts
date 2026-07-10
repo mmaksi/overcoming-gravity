@@ -87,6 +87,21 @@ export async function saveWorkoutSession(input: {
         : session.status;
   await store.updateSession({ ...session, entries, status });
 
+  // Technique notes belong to the user + exercise + technique pair — remember
+  // the latest so it prefills wherever that pair is picked again.
+  const now = new Date().toISOString();
+  for (const entry of entries) {
+    if (entry.interTechniqueId && entry.notes?.trim()) {
+      await store.saveExerciseNote({
+        userId: user.id,
+        exerciseId: entry.exerciseId,
+        techniqueId: entry.interTechniqueId,
+        note: entry.notes.trim(),
+        updatedAt: now,
+      });
+    }
+  }
+
   // A run is finished once no planned sessions remain.
   let runCompleted = false;
   let programId: string | null = null;

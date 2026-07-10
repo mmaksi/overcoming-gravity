@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CloudUpload, Copy, Loader2 } from "lucide-react";
-import { Weekday, WEEKDAYS } from "@/lib/domain/types";
+import { Attribute, Weekday, WEEKDAYS } from "@/lib/domain/types";
 import {
   Exercise,
   Mesocycle,
@@ -34,9 +34,12 @@ type SaveState = "saved" | "dirty" | "saving";
 export function MesocycleDesigner({
   program,
   exercises,
+  userNotes,
 }: {
   program: Program;
   exercises: Exercise[];
+  /** Remembered notes keyed `${exerciseId}:${techniqueId}` (see schemas). */
+  userNotes: Record<string, string>;
 }) {
   const router = useRouter();
   const [meso, setMeso] = useState<Mesocycle>(program.mesocycle);
@@ -49,7 +52,10 @@ export function MesocycleDesigner({
     weekday: Weekday;
     workoutExerciseId: string;
   } | null>(null);
-  const [pickingFor, setPickingFor] = useState<Weekday | null>(null);
+  const [pickingFor, setPickingFor] = useState<{
+    weekday: Weekday;
+    attribute: Attribute;
+  } | null>(null);
   const [copyingDay, setCopyingDay] = useState<Weekday | null>(null);
   const [copyingWeek, setCopyingWeek] = useState(false);
 
@@ -190,8 +196,8 @@ export function MesocycleDesigner({
         </Button>
       </div>
 
-      {/* Days */}
-      <div className="space-y-3">
+      {/* Days — separated by generous spacing rather than boxes */}
+      <div className="space-y-10">
         {orderedDays.map((weekday) => {
           const day = week?.days[weekday];
           if (!day) return null;
@@ -211,7 +217,27 @@ export function MesocycleDesigner({
                 )
               }
               onCopyDay={() => setCopyingDay(weekday)}
-              onAddExercise={() => setPickingFor(weekday)}
+              onAddExercise={(attribute) =>
+                setPickingFor({ weekday, attribute })
+              }
+              onRemoveSection={(attribute) =>
+                apply(
+                  updateDay(meso, weekIndex, weekday, (d) => {
+                    const remaining = d.exercises.filter(
+                      (we) =>
+                        (exercisesById.get(we.exerciseId)?.attribute ??
+                          "strength") !== attribute,
+                    );
+                    return {
+                      ...d,
+                      exercises: remaining,
+                      groups: (d.groups ?? []).filter((g) =>
+                        remaining.some((we) => we.groupId === g.id),
+                      ),
+                    };
+                  }),
+                )
+              }
               onEditExercise={(workoutExerciseId) =>
                 setEditing({ weekday, workoutExerciseId })
               }
@@ -256,9 +282,10 @@ export function MesocycleDesigner({
         open={pickingFor !== null}
         onOpenChange={(open) => !open && setPickingFor(null)}
         exercises={exercises}
+        lockedAttribute={pickingFor?.attribute ?? null}
         onPick={(exercise) => {
           if (!pickingFor) return;
-          const weekday = pickingFor;
+          const { weekday } = pickingFor;
           const defaultValue = exercise.measurement === "time" ? 10 : 8;
           const we: WorkoutExercise = {
             id: crypto.randomUUID(),
@@ -290,6 +317,7 @@ export function MesocycleDesigner({
             : null
         }
         value={editingExercise}
+        userNotes={userNotes}
         onChange={(we) => {
           if (!editing) return;
           apply(
