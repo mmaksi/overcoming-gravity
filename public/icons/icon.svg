@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <!-- pull-up bar -->
+  <rect x="96" y="128" width="320" height="20" rx="10" fill="#f29e23"/>
+  <rect x="106" y="128" width="16" height="120" rx="8" fill="#fafafa" opacity="0.5"/>
+  <rect x="390" y="128" width="16" height="120" rx="8" fill="#fafafa" opacity="0.5"/>
+  <!-- athlete in front lever -->
+  <circle cx="196" cy="210" r="26" fill="#fafafa"/>
+  <path d="M196 236 L216 258 L352 286 Q366 289 364 303 Q362 317 348 314 L204 288 Q186 284 178 268 L164 240 Z" fill="#fafafa"/>
+  <!-- arms to the bar -->
+  <path d="M188 160 L196 236 M232 156 L216 258" stroke="#fafafa" stroke-width="18" stroke-linecap="round" fill="none"/>
+</svg>

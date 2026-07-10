@@ -1,0 +1,225 @@
+// Core domain vocabulary: enums as const tuples plus human-readable labels.
+// Zod schemas in ./schemas.ts are the single source of truth for shapes;
+// this file holds the constants they are built from.
+
+export const CATEGORIES = ["push", "pull", "both", "legs"] as const;
+export type Category = (typeof CATEGORIES)[number];
+
+export const ATTRIBUTES = [
+  "warmup",
+  "skill",
+  "strength",
+  "cardio",
+  "prehabilitation",
+  "isolation",
+  "flexibility",
+  "cooldown",
+] as const;
+export type Attribute = (typeof ATTRIBUTES)[number];
+
+/** The order in which attributes appear inside a workout. */
+export const ATTRIBUTE_ORDER: Attribute[] = [
+  "warmup",
+  "skill",
+  "strength",
+  "cardio",
+  "prehabilitation",
+  "isolation",
+  "flexibility",
+  "cooldown",
+];
+
+export const WEEKDAYS = [
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+  "sun",
+] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+
+export const PROGRAM_TYPES = ["full_body", "split", "sport_mix"] as const;
+export type ProgramType = (typeof PROGRAM_TYPES)[number];
+
+export const SPLIT_TYPES = [
+  "straight_arm_bent_arm",
+  "push_pull",
+  "upper_lower",
+] as const;
+export type SplitType = (typeof SPLIT_TYPES)[number];
+
+export const PERIODIZATIONS = ["none", "daily_undulating", "high_low"] as const;
+export type Periodization = (typeof PERIODIZATIONS)[number];
+
+export const INTENSITIES = ["high", "low"] as const;
+export type Intensity = (typeof INTENSITIES)[number];
+
+export const PROGRESSION_METHODS = ["intra", "inter"] as const;
+export type ProgressionMethod = (typeof PROGRESSION_METHODS)[number];
+
+/** How an exercise is measured: repetitions, or seconds of hold. */
+export const MEASUREMENTS = ["reps", "time"] as const;
+export type Measurement = (typeof MEASUREMENTS)[number];
+
+/**
+ * How reps are performed. "cluster" is for eccentric-style work: one set is
+ * several cluster reps with a short rest between each rep, plus the normal
+ * rest between sets.
+ */
+export const REP_STYLES = ["standard", "cluster"] as const;
+export type RepStyle = (typeof REP_STYLES)[number];
+
+/** Ways to group exercises inside a workout. */
+export const GROUP_TYPES = ["superset", "circuit", "pyramid"] as const;
+export type GroupType = (typeof GROUP_TYPES)[number];
+
+/**
+ * Inter-exercise progression techniques are a fixed taxonomy, each with its
+ * own logging UI:
+ * - "notes" techniques capture a free-text measurement,
+ * - "hybrid" lets the athlete pick a progression per set,
+ * - "hybrid_eccentric" splits each set into dynamic + eccentric reps.
+ */
+export type TechniqueKind = "notes" | "hybrid" | "hybrid_eccentric";
+
+export type InterTechniqueDef = {
+  id: string;
+  name: string;
+  kind: TechniqueKind;
+  description: string;
+  /** Placeholder/prompt for the notes input (notes kind only). */
+  prompt?: string;
+};
+
+export const INTER_TECHNIQUES: InterTechniqueDef[] = [
+  {
+    id: "assistance",
+    name: "Assistance",
+    kind: "notes",
+    description:
+      "Use a measurable assistance tool and reduce it over time (band strength, counterweight, foot support).",
+    prompt: "Which assistance did you use? e.g. green band, 10kg counterweight…",
+  },
+  {
+    id: "eccentric",
+    name: "Eccentric",
+    kind: "notes",
+    description:
+      "Perform only the lowering phase, slow and controlled; progress by slowing down or adding reps.",
+    prompt: "Rest between reps? e.g. 20s between eccentrics…",
+  },
+  {
+    id: "momentum-rom",
+    name: "Momentum & Extra ROM",
+    kind: "notes",
+    description:
+      "Use a little swing or extra range to get through the sticking point; reduce it as you get stronger.",
+    prompt: "How much momentum / extra range? e.g. small kip, +10cm ROM…",
+  },
+  {
+    id: "modification",
+    name: "Exercise modification",
+    kind: "notes",
+    description:
+      "Change the exercise slightly to make it achievable (grip, angle, tempo).",
+    prompt: "What did you modify? e.g. wide grip, paused at top…",
+  },
+  {
+    id: "hybrid",
+    name: "Hybrid sets",
+    kind: "hybrid",
+    description:
+      "Mix progressions within the exercise: pick which progression you performed for every set.",
+  },
+  {
+    id: "hybrid-eccentric",
+    name: "Hybrid sets with eccentrics",
+    kind: "hybrid_eccentric",
+    description:
+      "In each set, do your dynamic reps first, then finish with eccentric-only reps (e.g. 1 L-pull-up + 4 eccentrics).",
+  },
+];
+
+export const TECHNIQUES_BY_ID = new Map(
+  INTER_TECHNIQUES.map((t) => [t.id, t]),
+);
+
+export const MIN_WEEKS = 6;
+export const MAX_WEEKS = 8;
+
+// ---------------------------------------------------------------------------
+// Labels
+
+export const CATEGORY_LABELS: Record<Category, string> = {
+  push: "Push",
+  pull: "Pull",
+  both: "Push & Pull",
+  legs: "Legs",
+};
+
+export const ATTRIBUTE_LABELS: Record<Attribute, string> = {
+  warmup: "Warm-up",
+  skill: "Skill",
+  strength: "Strength",
+  cardio: "Cardio",
+  prehabilitation: "Prehabilitation",
+  isolation: "Isolation",
+  flexibility: "Flexibility",
+  cooldown: "Cool-down",
+};
+
+export const WEEKDAY_LABELS: Record<Weekday, string> = {
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+  sun: "Sunday",
+};
+
+export const WEEKDAY_SHORT: Record<Weekday, string> = {
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
+  sun: "Sun",
+};
+
+export const PROGRAM_TYPE_LABELS: Record<ProgramType, string> = {
+  full_body: "Full Body",
+  split: "Split",
+  sport_mix: "Mix with a Sport",
+};
+
+export const SPLIT_TYPE_LABELS: Record<SplitType, string> = {
+  straight_arm_bent_arm: "Straight Arm / Bent Arm",
+  push_pull: "Push / Pull",
+  upper_lower: "Upper / Lower",
+};
+
+export const PERIODIZATION_LABELS: Record<Periodization, string> = {
+  none: "No periodization",
+  daily_undulating: "Daily Undulating (DUP)",
+  high_low: "High–Low",
+};
+
+export const MEASUREMENT_LABELS: Record<Measurement, string> = {
+  reps: "Reps",
+  time: "Hold time (seconds)",
+};
+
+export const REP_STYLE_LABELS: Record<RepStyle, string> = {
+  standard: "Standard",
+  cluster: "Cluster reps (eccentrics)",
+};
+
+export const GROUP_TYPE_LABELS: Record<GroupType, string> = {
+  superset: "Superset",
+  circuit: "Circuit",
+  pyramid: "Pyramid",
+};
