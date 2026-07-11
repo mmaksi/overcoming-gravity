@@ -7,7 +7,18 @@ import {
   SPLIT_TYPES,
   WEEKDAYS,
 } from "./types";
-import { goalsSchema, sportSchema } from "./schemas";
+import { sportSchema } from "./schemas";
+
+/** Goals arrive from the wizard as plain strings; one in total is enough. */
+const wizardGoalsSchema = z
+  .object({
+    skills: z.array(z.string().min(1)).max(2),
+    push: z.array(z.string().min(1)).max(2),
+    pull: z.array(z.string().min(1)).max(2),
+  })
+  .refine((g) => g.skills.length + g.push.length + g.pull.length >= 1, {
+    message: "Define at least one goal",
+  });
 
 /** What the create-program wizard collects in steps 1–4. */
 export const wizardPayloadSchema = z
@@ -16,7 +27,7 @@ export const wizardPayloadSchema = z
     type: z.enum(PROGRAM_TYPES),
     splitType: z.enum(SPLIT_TYPES).optional(),
     sport: sportSchema.optional(),
-    goals: goalsSchema,
+    goals: wizardGoalsSchema,
     periodization: z.enum(PERIODIZATIONS),
     trainingDays: z.array(z.enum(WEEKDAYS)).min(1),
     weeks: z.number().int().min(MIN_WEEKS).max(MAX_WEEKS),

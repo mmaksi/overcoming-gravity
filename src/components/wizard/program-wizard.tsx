@@ -72,7 +72,8 @@ export function ProgramWizard() {
     pull: [""],
   });
 
-  const goalsValid = GOAL_AREAS.every((area) =>
+  // One goal in total (any area) is enough to continue.
+  const goalsValid = GOAL_AREAS.some((area) =>
     goals[area].some((g) => g.trim()),
   );
 
@@ -227,8 +228,8 @@ export function ProgramWizard() {
           <div>
             <h2 className="font-semibold">Your goals</h2>
             <p className="text-sm text-muted-foreground">
-              Define 1–2 goals for each area. They keep your program focused —
-              you&apos;ll see them on the program page.
+              Up to 2 goals per area — one goal in total is enough. You&apos;ll
+              see them on your dashboard and tick them off as you get there.
             </p>
           </div>
           {GOAL_AREAS.map((area) => (

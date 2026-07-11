@@ -51,7 +51,8 @@ function setsSummary(we: WorkoutExercise, exercise: Exercise): string {
     exercise.repStyle === "cluster"
       ? ` · cluster (${we.clusterRestSeconds ?? 15}s between reps)`
       : "";
-  return `${we.sets.length} sets · ${values}${unit}${weight}${cluster} · rest ${we.restSeconds}s`;
+  const tempo = we.tempo ? ` · tempo ${we.tempo}` : "";
+  return `${we.sets.length} sets · ${values}${unit}${weight}${cluster}${tempo} · rest ${we.restSeconds}s`;
 }
 
 export function DayCard({
@@ -94,7 +95,15 @@ export function DayCard({
     exercisesById.get(we.exerciseId)?.attribute ?? "strength";
 
   return (
-    <section className="space-y-5">
+    <section
+      className={cn(
+        "space-y-5",
+        // Periodized days get a soft tint so high/low reads at a glance.
+        periodized && "-mx-2 rounded-2xl p-2",
+        periodized &&
+          (day.intensity === "high" ? "bg-orange-500/[0.06]" : "bg-sky-500/[0.06]"),
+      )}
+    >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2">
           <h3 className="text-lg font-semibold">{WEEKDAY_LABELS[weekday]}</h3>

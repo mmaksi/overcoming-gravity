@@ -23,6 +23,18 @@ export function buildVolumeStats(
       }
       for (const set of entry.performedSets) {
         if (set.reps === null) continue; // never recorded
+        // Hybrid parts: credit each progression with its own reps instead of
+        // counting the set total against the entry's progression.
+        if (set.parts && set.parts.length > 0) {
+          for (const part of set.parts) {
+            const partKey = statsKey(entry.exerciseId, part.progressionId);
+            const partStats = (index[partKey] ??= { last: null, maxReps: null });
+            if (partStats.maxReps === null || part.reps > partStats.maxReps) {
+              partStats.maxReps = part.reps;
+            }
+          }
+          continue;
+        }
         if (stats.maxReps === null || set.reps > stats.maxReps) {
           stats.maxReps = set.reps;
         }

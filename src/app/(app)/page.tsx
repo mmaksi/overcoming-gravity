@@ -6,6 +6,7 @@ import { toISODate } from "@/lib/domain/schedule";
 import { WEEKDAY_LABELS } from "@/lib/domain/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GoalsCard } from "@/components/home/goals-card";
 import {
   Card,
   CardContent,
@@ -134,6 +135,10 @@ export default async function DashboardPage() {
             </CardContent>
           )}
         </Card>
+      )}
+
+      {program?.goals && (
+        <GoalsCard programId={program.id} goals={program.goals} />
       )}
 
       <Button asChild variant="outline" className="w-full">

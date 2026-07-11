@@ -151,8 +151,8 @@ export function ExerciseSessionSheet({
             )}
             {technique?.kind === "hybrid" && (
               <p className="text-xs font-medium text-primary">
-                Pick the progression you performed next to each set on the
-                workout screen.
+                Each set can mix progressions: log reps per progression inside
+                the set on the workout screen (e.g. 1 full + 5 knee push-ups).
               </p>
             )}
             {technique?.kind === "hybrid_eccentric" && (

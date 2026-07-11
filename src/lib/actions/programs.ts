@@ -5,46 +5,13 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
-import { Mesocycle, mesocycleSchema, Program } from "@/lib/domain/schemas";
+import { GoalItem, mesocycleSchema, Program } from "@/lib/domain/schemas";
+import { GOAL_AREAS, GoalArea } from "@/lib/domain/types";
 import { buildMesocycle } from "@/lib/domain/build";
 import { WizardPayload, wizardPayloadSchema } from "@/lib/domain/wizard";
-import { DataStore } from "@/lib/data/store";
 
-/**
- * Notes typed against an inter-exercise technique belong to the user +
- * exercise + technique, not to one workout or program — remember the latest
- * one so it can prefill everywhere that pair is picked again.
- */
-async function rememberMesocycleNotes(
-  store: DataStore,
-  userId: string,
-  mesocycle: Mesocycle,
-): Promise<void> {
-  const latest = new Map<string, { exerciseId: string; techniqueId: string; note: string }>();
-  for (const week of mesocycle.weeks) {
-    for (const day of Object.values(week.days)) {
-      for (const we of day?.exercises ?? []) {
-        if (we.interTechniqueId && we.notes?.trim()) {
-          latest.set(`${we.exerciseId}:${we.interTechniqueId}`, {
-            exerciseId: we.exerciseId,
-            techniqueId: we.interTechniqueId,
-            note: we.notes.trim(),
-          });
-        }
-      }
-    }
-  }
-  const now = new Date().toISOString();
-  for (const { exerciseId, techniqueId, note } of latest.values()) {
-    await store.saveExerciseNote({
-      userId,
-      exerciseId,
-      techniqueId,
-      note,
-      updatedAt: now,
-    });
-  }
-}
+const asGoalItems = (texts: string[]): GoalItem[] =>
+  texts.map((text) => ({ text, done: false }));
 
 export async function createProgramFromWizard(
   payload: WizardPayload,
@@ -66,7 +33,11 @@ export async function createProgramFromWizard(
     type: parsed.type,
     splitType: parsed.type === "split" ? parsed.splitType : undefined,
     sport: parsed.type === "sport_mix" ? parsed.sport : undefined,
-    goals: parsed.goals,
+    goals: {
+      skills: asGoalItems(parsed.goals.skills),
+      push: asGoalItems(parsed.goals.push),
+      pull: asGoalItems(parsed.goals.pull),
+    },
     periodization: parsed.periodization,
     weeks: parsed.weeks,
     trainingDays: parsed.trainingDays,
@@ -109,7 +80,6 @@ export async function saveMesocycle(input: {
     updatedAt: new Date().toISOString(),
   };
   await store.updateProgram(updated);
-  await rememberMesocycleNotes(store, user.id, updated.mesocycle);
   return { savedAt: updated.updatedAt };
 }
 
@@ -127,6 +97,42 @@ export async function activateProgram(programId: string): Promise<void> {
   });
   revalidatePath("/programs");
   redirect(`/programs/${programId}`);
+}
+
+const toggleGoalSchema = z.object({
+  programId: z.string(),
+  area: z.enum(GOAL_AREAS),
+  index: z.number().int().min(0),
+  done: z.boolean(),
+});
+
+/** Tick / untick one program goal from the dashboard. */
+export async function toggleProgramGoal(input: {
+  programId: string;
+  area: GoalArea;
+  index: number;
+  done: boolean;
+}): Promise<void> {
+  const user = await requireUser();
+  const { programId, area, index, done } = toggleGoalSchema.parse(input);
+  const store = await getStore();
+  const program = await store.getProgram(programId);
+  if (!program || program.userId !== user.id) {
+    throw new Error("Program not found");
+  }
+  if (!program.goals || !program.goals[area][index]) return;
+  const goals = {
+    ...program.goals,
+    [area]: program.goals[area].map((g, i) =>
+      i === index ? { ...g, done } : g,
+    ),
+  };
+  await store.updateProgram({
+    ...program,
+    goals,
+    updatedAt: new Date().toISOString(),
+  });
+  revalidatePath("/", "layout");
 }
 
 export async function deleteProgram(programId: string): Promise<void> {

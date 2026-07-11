@@ -75,6 +75,8 @@ export const workoutExerciseSchema = z.object({
   progressionId: z.string(),
   sets: z.array(setPlanSchema).min(1),
   restSeconds: z.number().int().min(0),
+  /** Rep tempo, e.g. "31X1" (eccentric-pause-concentric-pause seconds). */
+  tempo: z.string().optional(),
   /** Cluster exercises only: rest between the single reps inside a set. */
   clusterRestSeconds: z.number().int().min(0).optional(),
   progressionMethod: z.enum(PROGRESSION_METHODS),
@@ -116,12 +118,26 @@ export const sportSchema = z.object({
 });
 export type Sport = z.infer<typeof sportSchema>;
 
-/** 1–2 goals per area, defined when the program is created. */
-export const goalsSchema = z.object({
-  skills: z.array(z.string().min(1)).min(1).max(2),
-  push: z.array(z.string().min(1)).min(1).max(2),
-  pull: z.array(z.string().min(1)).min(1).max(2),
+/** One program goal; `done` is ticked by the athlete from the dashboard. */
+export const goalItemSchema = z.object({
+  text: z.string().min(1),
+  done: z.boolean().default(false),
 });
+export type GoalItem = z.infer<typeof goalItemSchema>;
+
+/**
+ * Up to 2 goals per area, defined when the program is created. One goal in
+ * total (any area) is enough.
+ */
+export const goalsSchema = z
+  .object({
+    skills: z.array(goalItemSchema).max(2),
+    push: z.array(goalItemSchema).max(2),
+    pull: z.array(goalItemSchema).max(2),
+  })
+  .refine((g) => g.skills.length + g.push.length + g.pull.length >= 1, {
+    message: "Define at least one goal",
+  });
 export type Goals = z.infer<typeof goalsSchema>;
 
 export const programSchema = z
@@ -174,8 +190,21 @@ export type ProgramRun = z.infer<typeof programRunSchema>;
 export const performedSetSchema = z.object({
   reps: z.number().int().min(0).nullable(),
   weight: z.number().min(0).optional(),
-  /** Hybrid sets: the progression actually used for this set. */
+  /** Legacy hybrid sets: the single progression used for this set. */
   progressionId: z.string().optional(),
+  /**
+   * Hybrid sets: one set can mix several progressions of the same exercise
+   * (e.g. 1 full push-up + 5 knee push-ups in set 1). When present, `reps`
+   * holds the total across parts.
+   */
+  parts: z
+    .array(
+      z.object({
+        progressionId: z.string(),
+        reps: z.number().int().min(0),
+      }),
+    )
+    .optional(),
   /** Hybrid sets with eccentrics: eccentric reps done after the dynamic reps. */
   eccentricReps: z.number().int().min(0).optional(),
 });

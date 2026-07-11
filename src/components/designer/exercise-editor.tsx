@@ -2,12 +2,18 @@
 
 import { Minus, Plus } from "lucide-react";
 import { INTER_TECHNIQUES, TECHNIQUES_BY_ID } from "@/lib/domain/types";
-import {
-  Exercise,
-  exerciseNoteKey,
-  WorkoutExercise,
-} from "@/lib/domain/schemas";
+import { Exercise, WorkoutExercise } from "@/lib/domain/schemas";
 import { ExpandableText } from "@/components/ui/expandable-text";
+
+/** Quick rest picks, shown as tappable chips (values in seconds). */
+const REST_PRESETS = [
+  { label: "1 min", seconds: 60 },
+  { label: "1.5 min", seconds: 90 },
+  { label: "2 min", seconds: 120 },
+  { label: "3 min", seconds: 180 },
+  { label: "4 min", seconds: 240 },
+  { label: "5 min", seconds: 300 },
+];
 import {
   Sheet,
   SheetContent,
@@ -25,7 +31,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 export function ExerciseEditor({
@@ -33,7 +38,6 @@ export function ExerciseEditor({
   onOpenChange,
   exercise,
   value,
-  userNotes = {},
   onChange,
   onRemove,
 }: {
@@ -41,8 +45,6 @@ export function ExerciseEditor({
   onOpenChange: (open: boolean) => void;
   exercise: Exercise | null;
   value: WorkoutExercise | null;
-  /** Remembered notes keyed `${exerciseId}:${techniqueId}`. */
-  userNotes?: Record<string, string>;
   onChange: (we: WorkoutExercise) => void;
   onRemove: () => void;
 }) {
@@ -191,6 +193,36 @@ export function ExerciseEditor({
                 set({ restSeconds: Math.max(0, Number(e.target.value) || 0) })
               }
             />
+            <div className="flex flex-wrap gap-1.5">
+              {REST_PRESETS.map((preset) => (
+                <button
+                  key={preset.seconds}
+                  type="button"
+                  onClick={() => set({ restSeconds: preset.seconds })}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                    value.restSeconds === preset.seconds
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:border-foreground/30",
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tempo */}
+          <div className="space-y-2">
+            <Label htmlFor="tempo">Tempo (optional)</Label>
+            <Input
+              id="tempo"
+              placeholder="e.g. 31X1 — 3s down, 1s pause, explode up, 1s hold"
+              value={value.tempo ?? ""}
+              onChange={(e) =>
+                set({ tempo: e.target.value || undefined })
+              }
+            />
           </div>
 
           {isCluster && (
@@ -251,50 +283,31 @@ export function ExerciseEditor({
           </div>
 
           {value.progressionMethod === "inter" && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Technique</Label>
-                <Select
-                  value={value.interTechniqueId ?? ""}
-                  onValueChange={(interTechniqueId) =>
-                    set({
-                      interTechniqueId,
-                      // Prefill with the user's remembered note for this
-                      // exercise + technique pair (never overwrite typing).
-                      notes: value.notes?.trim()
-                        ? value.notes
-                        : (userNotes[
-                            exerciseNoteKey(value.exerciseId, interTechniqueId)
-                          ] ?? value.notes),
-                    })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Pick a technique" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INTER_TECHNIQUES.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {value.interTechniqueId && (
-                  <p className="text-xs text-muted-foreground">
-                    {TECHNIQUES_BY_ID.get(value.interTechniqueId)?.description}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Manual notes</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Track how you're progressing with this technique…"
-                  value={value.notes ?? ""}
-                  onChange={(e) => set({ notes: e.target.value })}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Technique</Label>
+              <Select
+                value={value.interTechniqueId ?? ""}
+                onValueChange={(interTechniqueId) => set({ interTechniqueId })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pick a technique" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INTER_TECHNIQUES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {value.interTechniqueId && (
+                <p className="text-xs text-muted-foreground">
+                  {TECHNIQUES_BY_ID.get(value.interTechniqueId)?.description}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                You&apos;ll take notes on this technique during the workout.
+              </p>
             </div>
           )}
 

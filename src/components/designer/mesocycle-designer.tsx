@@ -34,12 +34,9 @@ type SaveState = "saved" | "dirty" | "saving";
 export function MesocycleDesigner({
   program,
   exercises,
-  userNotes,
 }: {
   program: Program;
   exercises: Exercise[];
-  /** Remembered notes keyed `${exerciseId}:${techniqueId}` (see schemas). */
-  userNotes: Record<string, string>;
 }) {
   const router = useRouter();
   const [meso, setMeso] = useState<Mesocycle>(program.mesocycle);
@@ -317,7 +314,6 @@ export function MesocycleDesigner({
             : null
         }
         value={editingExercise}
-        userNotes={userNotes}
         onChange={(we) => {
           if (!editing) return;
           apply(

@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Loader2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Minus,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import {
   Attribute,
   ATTRIBUTE_LABELS,
@@ -45,6 +53,11 @@ type Draft = {
   progressions: { id: string; name: string; order: number; description: string }[];
 };
 
+/** Capitalize the first letter of every word as the admin types. */
+function titleCase(value: string): string {
+  return value.replace(/(^|\s)(\S)/g, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
 export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
   const [query, setQuery] = useState("");
   const [attribute, setAttribute] = useState<Attribute | null>(null);
@@ -62,11 +75,45 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
   );
 
   const isEdit = exercises.some((e) => e.id === draft?.id);
+
+  // Exercise titles are unique (case-insensitive). Surface the clash while
+  // typing, before the admin ever reaches the Save button.
+  const draftTitle = draft?.title.trim().toLowerCase() ?? "";
+  const duplicate =
+    draftTitle.length > 0 &&
+    exercises.some(
+      (e) => e.id !== draft?.id && e.title.trim().toLowerCase() === draftTitle,
+    );
+  const titleMatches =
+    draft && draftTitle.length >= 2
+      ? exercises
+          .filter(
+            (e) =>
+              e.id !== draft.id &&
+              e.title.toLowerCase().includes(draftTitle),
+          )
+          .slice(0, 3)
+      : [];
+
   const valid =
     draft &&
     draft.title.trim() &&
+    !duplicate &&
     draft.progressions.length > 0 &&
     draft.progressions.every((p) => p.name.trim());
+
+  const [focusProgressionId, setFocusProgressionId] = useState<string | null>(
+    null,
+  );
+
+  function moveProgression(index: number, delta: -1 | 1) {
+    if (!draft) return;
+    const target = index + delta;
+    if (target < 0 || target >= draft.progressions.length) return;
+    const next = [...draft.progressions];
+    [next[index], next[target]] = [next[target], next[index]];
+    setDraft({ ...draft, progressions: next });
+  }
 
   function submit() {
     if (!draft) return;
@@ -209,11 +256,27 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                 <Label htmlFor="ex-title">Title</Label>
                 <Input
                   id="ex-title"
+                  aria-invalid={duplicate || undefined}
                   value={draft.title}
                   onChange={(e) =>
-                    setDraft({ ...draft, title: e.target.value })
+                    setDraft({ ...draft, title: titleCase(e.target.value) })
                   }
                 />
+                {duplicate && (
+                  <p className="text-sm font-medium text-destructive">
+                    An exercise with this title already exists.
+                  </p>
+                )}
+                {!duplicate && titleMatches.length > 0 && (
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p>Similar existing exercises:</p>
+                    {titleMatches.map((e) => (
+                      <p key={e.id} className="pl-2">
+                        · {e.title}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -291,15 +354,38 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                       <Input
                         value={p.name}
                         placeholder="e.g. Tuck"
+                        autoFocus={p.id === focusProgressionId}
                         onChange={(e) =>
                           setDraft({
                             ...draft,
                             progressions: draft.progressions.map((x, j) =>
-                              j === i ? { ...x, name: e.target.value } : x,
+                              j === i
+                                ? { ...x, name: titleCase(e.target.value) }
+                                : x,
                             ),
                           })
                         }
                       />
+                      <div className="flex flex-col">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="Move progression up"
+                          disabled={i === 0}
+                          onClick={() => moveProgression(i, -1)}
+                        >
+                          <ChevronUp className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="Move progression down"
+                          disabled={i === draft.progressions.length - 1}
+                          onClick={() => moveProgression(i, 1)}
+                        >
+                          <ChevronDown className="size-4" />
+                        </Button>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -335,20 +421,22 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
+                  onClick={() => {
+                    const id = crypto.randomUUID();
+                    setFocusProgressionId(id);
                     setDraft({
                       ...draft,
                       progressions: [
                         ...draft.progressions,
                         {
-                          id: crypto.randomUUID(),
+                          id,
                           name: "",
                           order: draft.progressions.length,
                           description: "",
                         },
                       ],
-                    })
-                  }
+                    });
+                  }}
                 >
                   <Plus className="size-4" /> Add progression
                 </Button>

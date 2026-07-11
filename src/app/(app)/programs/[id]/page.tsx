@@ -97,7 +97,9 @@ export default async function ProgramPage({
                   <Row
                     key={area}
                     label={`${GOAL_AREA_LABELS[area]} goals`}
-                    value={program.goals![area].join(" · ")}
+                    value={program.goals![area]
+                      .map((g) => `${g.done ? "✓ " : ""}${g.text}`)
+                      .join(" · ")}
                   />
                 ),
             )}

@@ -28,12 +28,20 @@ function entryLabel(
       (p) => p.id === entry.progressionId,
     );
     const unit = ex?.measurement === "time" ? "s" : "";
+    const progressionName = (id: string) =>
+      ex?.progressions.find((p) => p.id === id)?.name ?? "?";
     const values = entry.performedSets
-      .map((s) =>
-        s.eccentricReps !== undefined
+      .map((s) => {
+        // Hybrid sets: show the per-progression breakdown of the set.
+        if (s.parts && s.parts.length > 0) {
+          return s.parts
+            .map((p) => `${p.reps} ${progressionName(p.progressionId)}`)
+            .join(" + ");
+        }
+        return s.eccentricReps !== undefined
           ? `${s.reps ?? "—"}+${s.eccentricReps}ecc`
-          : `${s.reps ?? "—"}`,
-      )
+          : `${s.reps ?? "—"}`;
+      })
       .join("/");
     return {
       id: `${session.id}-${entry.workoutExerciseId}`,
