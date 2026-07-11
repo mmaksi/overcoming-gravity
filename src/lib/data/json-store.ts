@@ -54,6 +54,30 @@ function normalizeLegacy(data: DbData): void {
       exercise.attribute = "warmup";
     }
   }
+  // The template used to be a flat entries list; it is now a workout day.
+  const template = data.defaultTemplate as unknown as {
+    day?: DbData["defaultTemplate"]["day"];
+    entries?: {
+      exerciseId: string;
+      progressionId: string;
+      sets: { reps: number }[];
+      restSeconds: number;
+    }[];
+  };
+  if (!template.day) {
+    template.day = {
+      exercises: (template.entries ?? []).map((entry, i) => ({
+        id: `default-${entry.exerciseId}-${i}`,
+        exerciseId: entry.exerciseId,
+        progressionId: entry.progressionId,
+        sets: entry.sets,
+        restSeconds: entry.restSeconds,
+        progressionMethod: "intra" as const,
+      })),
+      groups: [],
+    };
+    delete template.entries;
+  }
 }
 
 function upsert<T extends { id: string }>(list: T[], item: T): void {

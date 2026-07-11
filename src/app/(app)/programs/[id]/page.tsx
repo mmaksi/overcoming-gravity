@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { StartRunButton } from "@/components/programs/start-run-button";
 import { DeleteProgramButton } from "@/components/programs/delete-program-button";
+import { GoalsEditor } from "@/components/programs/goals-editor";
 
 export default async function ProgramPage({
   params,
@@ -103,6 +104,14 @@ export default async function ProgramPage({
                   />
                 ),
             )}
+          <div className="flex justify-end">
+            <GoalsEditor
+              // Remount when goals change so the draft stays in sync.
+              key={JSON.stringify(program.goals ?? null)}
+              programId={program.id}
+              goals={program.goals}
+            />
+          </div>
           <Row
             label="Periodization"
             value={PERIODIZATION_LABELS[program.periodization]}

@@ -1,21 +1,31 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Check, Loader2, Minus, Plus } from "lucide-react";
-import { ATTRIBUTE_LABELS } from "@/lib/domain/types";
-import { DefaultTemplate, Exercise, TemplateEntry } from "@/lib/domain/schemas";
-import { saveTemplate } from "@/lib/actions/admin";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, CloudUpload, Loader2 } from "lucide-react";
+import { Attribute } from "@/lib/domain/types";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DefaultTemplate,
+  Exercise,
+  WorkoutDay,
+  WorkoutExercise,
+} from "@/lib/domain/schemas";
+import { saveTemplate } from "@/lib/actions/admin";
+import { DaySections } from "@/components/designer/day-card";
+import { ExercisePicker } from "@/components/designer/exercise-picker";
+import { ExerciseEditor } from "@/components/designer/exercise-editor";
+import {
+  groupExercises,
+  reorderExercises,
+  ungroupExercises,
+} from "@/components/designer/meso-utils";
 
+type SaveState = "saved" | "dirty" | "saving";
+
+/**
+ * The default template is one workout day, edited with exactly the same
+ * section UI as the program designer. Athletes get a copy of this day on
+ * every new program day (their strength section always starts empty).
+ */
 export function DefaultsManager({
   template,
   exercises,
@@ -23,164 +33,148 @@ export function DefaultsManager({
   template: DefaultTemplate;
   exercises: Exercise[];
 }) {
-  const [entries, setEntries] = useState<TemplateEntry[]>(template.entries);
-  const [pending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [day, setDay] = useState<WorkoutDay>(template.day);
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [pickingFor, setPickingFor] = useState<Attribute | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const byId = new Map(exercises.map((e) => [e.id, e]));
+  const exercisesById = new Map(exercises.map((e) => [e.id, e]));
 
-  function update(i: number, patch: Partial<TemplateEntry>) {
-    setSaved(false);
-    setEntries((prev) =>
-      prev.map((e, j) => (j === i ? { ...e, ...patch } : e)),
-    );
-  }
-
-  function submit() {
-    setError(null);
-    startTransition(async () => {
+  // Debounced autosave, same rhythm as the mesocycle designer.
+  const dayRef = useRef(day);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const apply = useCallback((next: WorkoutDay) => {
+    dayRef.current = next;
+    setDay(next);
+    setSaveState("dirty");
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      setSaveState("saving");
       try {
-        await saveTemplate({ id: "default", entries });
-        setSaved(true);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to save");
+        await saveTemplate({ id: "default", day: dayRef.current });
+        setSaveState("saved");
+      } catch {
+        setSaveState("dirty");
       }
-    });
-  }
+    }, 1200);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const editingExercise: WorkoutExercise | null =
+    day.exercises.find((we) => we.id === editingId) ?? null;
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Recommended default exercises every new workout day starts with
-        (warm-up, prehab, isolation, flexibility, cool-down…). Athletes can
-        modify them freely. Skill work is added from the athlete&apos;s chosen
-        skills.
-      </p>
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground">
+          Recommended defaults every new workout day starts with. Athletes can
+          modify them freely; their strength section always starts empty.
+        </p>
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+          {saveState === "saved" && (
+            <>
+              <Check className="size-3" /> Saved
+            </>
+          )}
+          {saveState === "dirty" && (
+            <>
+              <CloudUpload className="size-3" /> Unsaved changes…
+            </>
+          )}
+          {saveState === "saving" && (
+            <>
+              <Loader2 className="size-3 animate-spin" /> Saving…
+            </>
+          )}
+        </p>
+      </div>
 
-      {entries.map((entry, i) => {
-        const exercise = byId.get(entry.exerciseId);
-        return (
-          <div key={i} className="space-y-2 rounded-lg border p-3">
-            <div className="flex items-center justify-between gap-2">
-              <Select
-                value={entry.exerciseId}
-                onValueChange={(exerciseId) => {
-                  const ex = byId.get(exerciseId);
-                  update(i, {
-                    exerciseId,
-                    progressionId: ex?.progressions[0].id ?? "",
-                  });
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {exercises.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {exercise && (
-                <Badge variant="secondary" className="shrink-0 text-[10px]">
-                  {ATTRIBUTE_LABELS[exercise.attribute]}
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="shrink-0 text-destructive"
-                onClick={() => {
-                  setSaved(false);
-                  setEntries((prev) => prev.filter((_, j) => j !== i));
-                }}
-              >
-                <Minus className="size-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Select
-                value={entry.progressionId}
-                onValueChange={(progressionId) => update(i, { progressionId })}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Progression" />
-                </SelectTrigger>
-                <SelectContent>
-                  {exercise?.progressions.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                className="w-28"
-                value={entry.sets.map((s) => s.reps).join(",")}
-                placeholder="reps: 10,8,8"
-                onChange={(e) => {
-                  const sets = e.target.value
-                    .split(",")
-                    .map((x) => parseInt(x.trim(), 10))
-                    .filter((n) => Number.isFinite(n) && n > 0)
-                    .map((reps) => ({ reps }));
-                  if (sets.length > 0) update(i, { sets });
-                }}
-              />
-              <Input
-                className="w-20"
-                type="number"
-                min={0}
-                value={entry.restSeconds}
-                onChange={(e) =>
-                  update(i, {
-                    restSeconds: Math.max(0, Number(e.target.value) || 0),
-                  })
-                }
-              />
-              <span className="text-xs text-muted-foreground">s rest</span>
-            </div>
-          </div>
-        );
-      })}
+      <div className="space-y-5">
+        <DaySections
+          dndIdPrefix="defaults"
+          day={day}
+          exercisesById={exercisesById}
+          onAddExercise={(attribute) => setPickingFor(attribute)}
+          onRemoveSection={(attribute) => {
+            const remaining = day.exercises.filter(
+              (we) =>
+                (exercisesById.get(we.exerciseId)?.attribute ?? "strength") !==
+                attribute,
+            );
+            apply({
+              ...day,
+              exercises: remaining,
+              groups: (day.groups ?? []).filter((g) =>
+                remaining.some((we) => we.groupId === g.id),
+              ),
+            });
+          }}
+          onEditExercise={(id) => setEditingId(id)}
+          onRemoveExercise={(id) =>
+            apply({
+              ...day,
+              exercises: day.exercises.filter((we) => we.id !== id),
+            })
+          }
+          onReorder={(fromId, toId) =>
+            apply(reorderExercises(day, fromId, toId))
+          }
+          onGroup={(ids, type) => apply(groupExercises(day, ids, type))}
+          onUngroup={(groupId) => apply(ungroupExercises(day, groupId))}
+        />
+      </div>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          const first = exercises[0];
-          if (!first) return;
-          setSaved(false);
-          setEntries((prev) => [
-            ...prev,
-            {
-              exerciseId: first.id,
-              progressionId: first.progressions[0].id,
-              sets: [{ reps: 10 }],
-              restSeconds: 60,
-            },
-          ]);
+      <ExercisePicker
+        open={pickingFor !== null}
+        onOpenChange={(open) => !open && setPickingFor(null)}
+        exercises={exercises}
+        lockedAttribute={pickingFor}
+        onPick={(exercise) => {
+          const defaultValue = exercise.measurement === "time" ? 10 : 8;
+          const we: WorkoutExercise = {
+            id: crypto.randomUUID(),
+            exerciseId: exercise.id,
+            progressionId: exercise.progressions[0].id,
+            sets: Array.from({ length: 3 }, () => ({ reps: defaultValue })),
+            restSeconds: 90,
+            clusterRestSeconds:
+              exercise.repStyle === "cluster" ? 15 : undefined,
+            progressionMethod: "intra",
+          };
+          apply({ ...day, exercises: [...day.exercises, we] });
+          setPickingFor(null);
+          setEditingId(we.id);
         }}
-      >
-        <Plus className="size-4" /> Add entry
-      </Button>
+      />
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <Button className="w-full" disabled={pending} onClick={submit}>
-        {pending ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : saved ? (
-          <>
-            <Check className="size-4" /> Saved
-          </>
-        ) : (
-          "Save defaults"
-        )}
-      </Button>
+      <ExerciseEditor
+        open={editingId !== null}
+        onOpenChange={(open) => !open && setEditingId(null)}
+        exercise={
+          editingExercise
+            ? (exercisesById.get(editingExercise.exerciseId) ?? null)
+            : null
+        }
+        value={editingExercise}
+        onChange={(we) =>
+          apply({
+            ...day,
+            exercises: day.exercises.map((x) => (x.id === we.id ? we : x)),
+          })
+        }
+        onRemove={() => {
+          if (!editingId) return;
+          apply({
+            ...day,
+            exercises: day.exercises.filter((we) => we.id !== editingId),
+          });
+          setEditingId(null);
+        }}
+      />
     </div>
   );
 }

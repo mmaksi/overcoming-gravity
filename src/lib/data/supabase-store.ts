@@ -88,6 +88,7 @@ const toSession = (r: Row): WorkoutSession => ({
   weekday: r.weekday,
   status: r.status,
   entries: r.entries,
+  durationSeconds: r.duration_seconds ?? undefined,
 });
 
 const fromSession = (s: WorkoutSession): Row => ({
@@ -99,6 +100,7 @@ const fromSession = (s: WorkoutSession): Row => ({
   weekday: s.weekday,
   status: s.status,
   entries: s.entries,
+  duration_seconds: s.durationSeconds ?? null,
 });
 
 function orThrow<T>(result: { data: T | null; error: { message: string } | null }): T {
@@ -156,15 +158,32 @@ class SupabaseStore implements DataStore {
     const rows = orThrow(
       await this.db.from("default_template").select().eq("id", "default"),
     );
-    return rows.length > 0
-      ? { id: "default", entries: rows[0].entries }
-      : { id: "default", entries: [] };
+    if (rows.length === 0) {
+      return { id: "default", day: { exercises: [], groups: [] } };
+    }
+    if (rows[0].day) return { id: "default", day: rows[0].day };
+    // Legacy shape: a flat entries list, converted on read (0006 backfills).
+    const entries: Row[] = rows[0].entries ?? [];
+    return {
+      id: "default",
+      day: {
+        exercises: entries.map((entry, i) => ({
+          id: `default-${entry.exerciseId}-${i}`,
+          exerciseId: entry.exerciseId,
+          progressionId: entry.progressionId,
+          sets: entry.sets,
+          restSeconds: entry.restSeconds,
+          progressionMethod: "intra" as const,
+        })),
+        groups: [],
+      },
+    };
   }
   async saveDefaultTemplate(template: DefaultTemplate): Promise<DefaultTemplate> {
     orThrow(
       await this.db
         .from("default_template")
-        .upsert({ id: "default", entries: template.entries })
+        .upsert({ id: "default", day: template.day })
         .select(),
     );
     return template;

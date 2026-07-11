@@ -22,7 +22,10 @@ function entryLabel(
   session: WorkoutSession,
   exercisesById: Map<string, Exercise>,
 ) {
-  return session.entries.map((entry) => {
+  // Unfilled exercises are skipped on completion — nothing to show for them.
+  return session.entries
+    .filter((entry) => entry.performedSets.length > 0)
+    .map((entry) => {
     const ex = exercisesById.get(entry.exerciseId);
     const progression = ex?.progressions.find(
       (p) => p.id === entry.progressionId,

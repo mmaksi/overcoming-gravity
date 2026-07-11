@@ -99,6 +99,53 @@ export async function activateProgram(programId: string): Promise<void> {
   redirect(`/programs/${programId}`);
 }
 
+const editGoalsSchema = z
+  .object({
+    programId: z.string(),
+    skills: z.array(z.string().trim().min(1)).max(2),
+    push: z.array(z.string().trim().min(1)).max(2),
+    pull: z.array(z.string().trim().min(1)).max(2),
+  })
+  .refine((g) => g.skills.length + g.push.length + g.pull.length >= 1, {
+    message: "Define at least one goal",
+  });
+
+/**
+ * Replace a program's goals. A goal keeps its "achieved" tick when its text
+ * is unchanged in the same slot; edited or new goals start unticked.
+ */
+export async function updateProgramGoals(input: {
+  programId: string;
+  skills: string[];
+  push: string[];
+  pull: string[];
+}): Promise<void> {
+  const user = await requireUser();
+  const parsed = editGoalsSchema.parse(input);
+  const store = await getStore();
+  const program = await store.getProgram(parsed.programId);
+  if (!program || program.userId !== user.id) {
+    throw new Error("Program not found");
+  }
+  const merge = (area: GoalArea, texts: string[]): GoalItem[] =>
+    texts.map((text, i) => ({
+      text,
+      done: program.goals?.[area][i]?.text === text
+        ? (program.goals[area][i].done ?? false)
+        : false,
+    }));
+  await store.updateProgram({
+    ...program,
+    goals: {
+      skills: merge("skills", parsed.skills),
+      push: merge("push", parsed.push),
+      pull: merge("pull", parsed.pull),
+    },
+    updatedAt: new Date().toISOString(),
+  });
+  revalidatePath("/", "layout");
+}
+
 const toggleGoalSchema = z.object({
   programId: z.string(),
   area: z.enum(GOAL_AREAS),

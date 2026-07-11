@@ -40,20 +40,8 @@ export const exerciseSchema = z.object({
 });
 export type Exercise = z.infer<typeof exerciseSchema>;
 
-/** One prefill entry of the admin-managed recommended defaults. */
-export const templateEntrySchema = z.object({
-  exerciseId: z.string(),
-  progressionId: z.string(),
-  sets: z.array(z.object({ reps: z.number().int().min(1) })).min(1),
-  restSeconds: z.number().int().min(0),
-});
-export type TemplateEntry = z.infer<typeof templateEntrySchema>;
-
-export const defaultTemplateSchema = z.object({
-  id: z.literal("default"),
-  entries: z.array(templateEntrySchema),
-});
-export type DefaultTemplate = z.infer<typeof defaultTemplateSchema>;
+// defaultTemplateSchema is defined below the program section: the template
+// is a full WorkoutDay so the defaults admin page is the designer day UI.
 
 // ---------------------------------------------------------------------------
 // Programs
@@ -99,6 +87,17 @@ export const workoutDaySchema = z.object({
   groups: z.array(exerciseGroupSchema).default([]),
 });
 export type WorkoutDay = z.infer<typeof workoutDaySchema>;
+
+/**
+ * The admin-managed recommended defaults: a full workout day every new
+ * program day is prefilled from (the strength section always starts empty
+ * for athletes regardless of what the template holds).
+ */
+export const defaultTemplateSchema = z.object({
+  id: z.literal("default"),
+  day: workoutDaySchema,
+});
+export type DefaultTemplate = z.infer<typeof defaultTemplateSchema>;
 
 export const weekSchema = z.object({
   index: z.number().int().min(0),
@@ -233,6 +232,8 @@ export const workoutSessionSchema = z.object({
   weekday: z.enum(WEEKDAYS),
   status: z.enum(["planned", "completed", "skipped"]),
   entries: z.array(sessionEntrySchema),
+  /** Active workout time in seconds (paused while the draft is closed). */
+  durationSeconds: z.number().int().min(0).optional(),
 });
 export type WorkoutSession = z.infer<typeof workoutSessionSchema>;
 

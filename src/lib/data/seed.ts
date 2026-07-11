@@ -243,22 +243,42 @@ const exercises: Exercise[] = [
   ], { measurement: "time" }),
 ];
 
+/** Template seed helper: one default workout-exercise entry. */
+function tpl(
+  exerciseId: string,
+  reps: number[],
+  restSeconds: number,
+): DefaultTemplate["day"]["exercises"][number] {
+  return {
+    id: `default-${exerciseId}`,
+    exerciseId,
+    progressionId: `${exerciseId}-p0`,
+    sets: reps.map((r) => ({ reps: r })),
+    restSeconds,
+    progressionMethod: "intra",
+  };
+}
+
 /**
- * The admin-managed recommended defaults every new workout day starts from.
+ * The admin-managed recommended defaults every new workout day starts from —
+ * a full workout day, edited with the same UI as the program designer.
  * Athletes add their own skill/strength work from the library on top.
  */
 const defaultTemplate: DefaultTemplate = {
   id: "default",
-  entries: [
-    { exerciseId: "wrist-prep", progressionId: "wrist-prep-p0", sets: [{ reps: 10 }], restSeconds: 30 },
-    { exerciseId: "band-dislocates", progressionId: "band-dislocates-p0", sets: [{ reps: 10 }], restSeconds: 30 },
-    { exerciseId: "scap-pulls", progressionId: "scap-pulls-p0", sets: [{ reps: 8 }, { reps: 8 }], restSeconds: 60 },
-    { exerciseId: "front-lever", progressionId: "front-lever-p0", sets: [{ reps: 5 }, { reps: 5 }, { reps: 5 }], restSeconds: 180 },
-    { exerciseId: "cuban-rotation", progressionId: "cuban-rotation-p0", sets: [{ reps: 12 }, { reps: 12 }], restSeconds: 60 },
-    { exerciseId: "ring-curl", progressionId: "ring-curl-p0", sets: [{ reps: 10 }, { reps: 10 }], restSeconds: 90 },
-    { exerciseId: "shoulder-ext", progressionId: "shoulder-ext-p0", sets: [{ reps: 5 }], restSeconds: 30 },
-    { exerciseId: "hang-decompress", progressionId: "hang-decompress-p0", sets: [{ reps: 1 }], restSeconds: 0 },
-  ],
+  day: {
+    exercises: [
+      tpl("wrist-prep", [10], 30),
+      tpl("band-dislocates", [10], 30),
+      tpl("scap-pulls", [8, 8], 60),
+      tpl("front-lever", [5, 5, 5], 180),
+      tpl("cuban-rotation", [12, 12], 60),
+      tpl("ring-curl", [10, 10], 90),
+      tpl("shoulder-ext", [5], 30),
+      tpl("hang-decompress", [1], 0),
+    ],
+    groups: [],
+  },
 };
 
 const profiles: Profile[] = [

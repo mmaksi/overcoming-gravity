@@ -86,14 +86,6 @@ export function DayCard({
   onGroup: (ids: string[], type: GroupType) => void;
   onUngroup: (groupId: string) => void;
 }) {
-  // Selection mode is scoped to one section: exercises can only be grouped
-  // (and reordered) inside their own section.
-  const [selecting, setSelecting] = useState<Attribute | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
-
-  const attributeOf = (we: WorkoutExercise): Attribute =>
-    exercisesById.get(we.exerciseId)?.attribute ?? "strength";
-
   return (
     <section
       className={cn(
@@ -130,6 +122,61 @@ export function DayCard({
         )}
       </div>
 
+      <DaySections
+        dndIdPrefix={weekday}
+        day={day}
+        exercisesById={exercisesById}
+        onAddExercise={onAddExercise}
+        onRemoveSection={onRemoveSection}
+        onEditExercise={onEditExercise}
+        onRemoveExercise={onRemoveExercise}
+        onReorder={onReorder}
+        onGroup={onGroup}
+        onUngroup={onUngroup}
+      />
+    </section>
+  );
+}
+
+/**
+ * The attribute sections of one workout day (warm-up → cool-down), each with
+ * its own reorder DnD, mode selection and add-exercise placeholder. Shared
+ * by the program designer (per weekday) and the admin defaults page.
+ */
+export function DaySections({
+  dndIdPrefix,
+  day,
+  exercisesById,
+  onAddExercise,
+  onRemoveSection,
+  onEditExercise,
+  onRemoveExercise,
+  onReorder,
+  onGroup,
+  onUngroup,
+}: {
+  /** Keeps DnD context ids unique when several days render at once. */
+  dndIdPrefix: string;
+  day: WorkoutDay;
+  exercisesById: Map<string, Exercise>;
+  onAddExercise: (attribute: Attribute) => void;
+  onRemoveSection: (attribute: Attribute) => void;
+  onEditExercise: (workoutExerciseId: string) => void;
+  onRemoveExercise: (workoutExerciseId: string) => void;
+  onReorder: (fromId: string, toId: string) => void;
+  onGroup: (ids: string[], type: GroupType) => void;
+  onUngroup: (groupId: string) => void;
+}) {
+  // Selection mode is scoped to one section: exercises can only be grouped
+  // (and reordered) inside their own section.
+  const [selecting, setSelecting] = useState<Attribute | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+
+  const attributeOf = (we: WorkoutExercise): Attribute =>
+    exercisesById.get(we.exerciseId)?.attribute ?? "strength";
+
+  return (
+    <>
       {ATTRIBUTE_ORDER.map((attribute) => {
         const section = day.exercises.filter(
           (we) => attributeOf(we) === attribute,
@@ -137,7 +184,7 @@ export function DayCard({
         return (
           <DaySection
             key={attribute}
-            weekday={weekday}
+            dndIdPrefix={dndIdPrefix}
             attribute={attribute}
             exercises={section}
             day={day}
@@ -167,12 +214,12 @@ export function DayCard({
           />
         );
       })}
-    </section>
+    </>
   );
 }
 
 function DaySection({
-  weekday,
+  dndIdPrefix,
   attribute,
   exercises,
   day,
@@ -189,7 +236,7 @@ function DaySection({
   onRemoveExercise,
   onReorder,
 }: {
-  weekday: Weekday;
+  dndIdPrefix: string;
   attribute: Attribute;
   exercises: WorkoutExercise[];
   day: WorkoutDay;
@@ -249,7 +296,7 @@ function DaySection({
       </div>
 
       <DndContext
-        id={`day-dnd-${weekday}-${attribute}`}
+        id={`day-dnd-${dndIdPrefix}-${attribute}`}
         sensors={sensors}
         collisionDetection={closestCenter}
         modifiers={[restrictToVerticalAxis]}

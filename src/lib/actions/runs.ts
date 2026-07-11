@@ -64,15 +64,19 @@ const saveSessionSchema = z.object({
   sessionId: z.string(),
   entries: z.array(sessionEntrySchema),
   action: z.enum(["save", "complete", "skip"]),
+  /** Accumulated active workout time; the timer pauses between visits. */
+  durationSeconds: z.number().int().min(0).optional(),
 });
 
 export async function saveWorkoutSession(input: {
   sessionId: string;
   entries: unknown;
   action: "save" | "complete" | "skip";
+  durationSeconds?: number;
 }): Promise<{ runCompleted: boolean; programId: string | null }> {
   const user = await requireUser();
-  const { sessionId, entries, action } = saveSessionSchema.parse(input);
+  const { sessionId, entries, action, durationSeconds } =
+    saveSessionSchema.parse(input);
   const store = await getStore();
   const session = await store.getSession(sessionId);
   if (!session || session.userId !== user.id) {
@@ -85,7 +89,12 @@ export async function saveWorkoutSession(input: {
       : action === "skip"
         ? "skipped"
         : session.status;
-  await store.updateSession({ ...session, entries, status });
+  await store.updateSession({
+    ...session,
+    entries,
+    status,
+    durationSeconds: durationSeconds ?? session.durationSeconds,
+  });
 
   // Technique notes belong to the user + exercise + technique pair — remember
   // the latest so it prefills wherever that pair is picked again.

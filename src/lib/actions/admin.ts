@@ -36,7 +36,7 @@ export async function removeExercise(id: string): Promise<void> {
   await requireAdmin();
   const store = await getStore();
   const template = await store.getDefaultTemplate();
-  if (template.entries.some((e) => e.exerciseId === id)) {
+  if (template.day.exercises.some((e) => e.exerciseId === id)) {
     throw new Error(
       "This exercise is part of the default template — remove it there first",
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -11,6 +11,7 @@ import {
   Loader2,
   Plus,
   SkipForward,
+  Timer,
   Trophy,
   X,
 } from "lucide-react";
@@ -82,6 +83,25 @@ function volumeLabel(
 /** One progression-slice of a hybrid set. */
 type RawPart = { progressionId: string; reps: string };
 
+/** Digits only — the athlete may also clear the field completely. */
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/** Select the whole value on focus so typing replaces it immediately. */
+function selectAll(e: React.FocusEvent<HTMLInputElement>) {
+  e.target.select();
+}
+
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 /** Editable raw inputs: empty string = "not recorded yet". */
 type RawSet = {
   reps: string;
@@ -129,6 +149,20 @@ export function WorkoutLogger({
   const [timer, setTimer] = useState<RestTimerState | null>(null);
   const [stopwatchOpen, setStopwatchOpen] = useState(false);
   const readOnly = session.status !== "planned";
+
+  // Workout duration: accumulated seconds from previous visits (frozen at
+  // mount) plus the time this page has been open. Persisted on every save,
+  // so backgrounding the app pauses instead of losing the timer.
+  const [baseSeconds] = useState(session.durationSeconds ?? 0);
+  const [openedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(openedAt);
+  useEffect(() => {
+    if (readOnly) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [readOnly]);
+  const elapsedSeconds =
+    baseSeconds + Math.max(0, Math.floor((now - openedAt) / 1000));
 
   const exercisesById = useMemo(
     () => new Map(exercises.map((e) => [e.id, e])),
@@ -268,34 +302,32 @@ export function WorkoutLogger({
         seconds: we.restSeconds,
         nextLabel,
       }));
+      // Installed PWA: a persistent notification tracks the rest period even
+      // when the app goes to the background.
+      postToServiceWorker({
+        type: "rest-timer",
+        seconds: we.restSeconds,
+        nextLabel,
+      });
     }
   }
 
   /**
    * "save" keeps untouched inputs as null (still empty when you come back);
-   * "complete" resolves them to the suggested placeholder values.
+   * "complete" drops untouched sets entirely — only what the athlete
+   * actually recorded is registered.
    */
   function resolveEntries(action: "save" | "complete"): SessionEntry[] {
     return entries.map((entry) => {
-      const we = plannedDay.exercises.find(
-        (w) => w.id === entry.workoutExerciseId,
-      )!;
       const kind = entry.interTechniqueId
         ? TECHNIQUES_BY_ID.get(entry.interTechniqueId)?.kind
         : undefined;
-      return {
-        workoutExerciseId: entry.workoutExerciseId,
-        exerciseId: entry.exerciseId,
-        progressionId: entry.progressionId,
-        interTechniqueId: entry.interTechniqueId,
-        notes: entry.notes || undefined,
-        performedSets: entry.sets.map((s, i) => {
+      const performedSets = entry.sets
+        .map((s) => {
           if (kind === "hybrid") {
             // One set can mix several progressions; reps holds the total.
             const touched = s.parts.some((p) => p.reps !== "");
-            if (!touched && action === "save") {
-              return { reps: null };
-            }
+            if (!touched) return action === "save" ? { reps: null } : null;
             const parts = s.parts
               .map((p) => ({
                 progressionId: p.progressionId,
@@ -309,33 +341,50 @@ export function WorkoutLogger({
               parts: parts.length > 0 ? parts : undefined,
             };
           }
+          if (s.reps === "") {
+            return action === "save" ? { reps: null } : null;
+          }
           return {
-            reps:
-              s.reps === ""
-                ? action === "complete"
-                  ? placeholderFor(entry, we, i)
-                  : null
-                : Math.max(0, Number(s.reps) || 0),
+            reps: Math.max(0, Number(s.reps) || 0),
             weight: s.weight === "" ? undefined : Math.max(0, Number(s.weight)),
             eccentricReps:
               kind === "hybrid_eccentric" && s.eccentricReps !== ""
                 ? Math.max(0, Number(s.eccentricReps) || 0)
                 : undefined,
           };
-        }),
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null);
+      return {
+        workoutExerciseId: entry.workoutExerciseId,
+        exerciseId: entry.exerciseId,
+        progressionId: entry.progressionId,
+        interTechniqueId: entry.interTechniqueId,
+        notes: entry.notes || undefined,
+        performedSets,
       };
     });
+  }
+
+  /** Best-effort message to the service worker (PWA installs). */
+  function postToServiceWorker(message: Record<string, unknown>) {
+    try {
+      navigator.serviceWorker?.controller?.postMessage(message);
+    } catch {
+      // No service worker in dev — the in-page notification still fires.
+    }
   }
 
   function submit(action: "save" | "complete" | "skip") {
     setPendingAction(action);
     setTimer(null);
+    postToServiceWorker({ type: "rest-timer-cancel" });
     startTransition(async () => {
       try {
         const result = await saveWorkoutSession({
           sessionId: session.id,
           entries: action === "skip" ? [] : resolveEntries(action),
           action,
+          durationSeconds: elapsedSeconds,
         });
         if (action === "save") {
           setPendingAction(null);
@@ -352,11 +401,55 @@ export function WorkoutLogger({
     });
   }
 
+  // Autosave the draft so backgrounding the app never loses recorded values:
+  // debounced after every change, flushed immediately when the app hides.
+  const autosaveRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    autosaveRef.current = () => {
+      if (readOnly || pending) return;
+      saveWorkoutSession({
+        sessionId: session.id,
+        entries: resolveEntries("save"),
+        action: "save",
+        durationSeconds: elapsedSeconds,
+      }).catch(() => undefined);
+    };
+  });
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef = useRef(false);
+  useEffect(() => {
+    if (!dirtyRef.current) {
+      dirtyRef.current = true; // skip the initial render
+      return;
+    }
+    if (readOnly) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => autosaveRef.current(), 2500);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+  }, [entries, readOnly]);
+  useEffect(() => {
+    function onHide() {
+      if (document.visibilityState === "hidden") {
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        autosaveRef.current();
+      }
+    }
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onHide);
+    };
+  }, []);
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold">{program.name}</h1>
+      {/* Sticky header: always visible while scrolling through the workout. */}
+      <div className="sticky top-0 z-30 -mx-4 flex items-start justify-between gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-bold">{program.name}</h1>
           <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {WEEKDAY_LABELS[session.weekday]} {session.date} · week{" "}
             {session.weekIndex + 1}
@@ -374,6 +467,12 @@ export function WorkoutLogger({
             )}
             {session.status !== "planned" && (
               <Badge variant="secondary">{session.status}</Badge>
+            )}
+            {!readOnly && (
+              <span className="flex items-center gap-1 font-medium tabular-nums text-foreground">
+                <Timer className="size-4 text-primary" />
+                {formatDuration(elapsedSeconds)}
+              </span>
             )}
           </p>
         </div>
@@ -526,18 +625,19 @@ export function WorkoutLogger({
                           </span>
                           {!isHybrid && (
                             <Input
-                              type="number"
-                              min={0}
+                              type="text"
                               inputMode="numeric"
+                              pattern="[0-9]*"
                               disabled={readOnly}
                               placeholder={String(placeholderFor(entry, we, j))}
                               value={s.reps}
+                              onFocus={selectAll}
                               onChange={(e) =>
                                 updateEntry(we.id, (en) => ({
                                   ...en,
                                   sets: en.sets.map((x, k) =>
                                     k === j
-                                      ? { ...x, reps: e.target.value }
+                                      ? { ...x, reps: digitsOnly(e.target.value) }
                                       : x,
                                   ),
                                 }))
@@ -552,12 +652,13 @@ export function WorkoutLogger({
                           {isHybridEcc ? (
                             <>
                               <Input
-                                type="number"
-                                min={0}
+                                type="text"
                                 inputMode="numeric"
+                                pattern="[0-9]*"
                                 placeholder="0"
                                 disabled={readOnly}
                                 value={s.eccentricReps}
+                                onFocus={selectAll}
                                 onChange={(e) =>
                                   updateEntry(we.id, (en) => ({
                                     ...en,
@@ -565,7 +666,9 @@ export function WorkoutLogger({
                                       k === j
                                         ? {
                                             ...x,
-                                            eccentricReps: e.target.value,
+                                            eccentricReps: digitsOnly(
+                                              e.target.value,
+                                            ),
                                           }
                                         : x,
                                     ),
@@ -587,6 +690,7 @@ export function WorkoutLogger({
                                   placeholder="—"
                                   disabled={readOnly}
                                   value={s.weight}
+                                  onFocus={selectAll}
                                   onChange={(e) =>
                                     updateEntry(we.id, (en) => ({
                                       ...en,
@@ -645,13 +749,14 @@ export function WorkoutLogger({
                                   </SelectContent>
                                 </Select>
                                 <Input
-                                  type="number"
-                                  min={0}
+                                  type="text"
                                   inputMode="numeric"
+                                  pattern="[0-9]*"
                                   placeholder="0"
                                   disabled={readOnly}
                                   className="w-20 shrink-0"
                                   value={part.reps}
+                                  onFocus={selectAll}
                                   onChange={(e) =>
                                     updateEntry(we.id, (en) => ({
                                       ...en,
@@ -663,7 +768,9 @@ export function WorkoutLogger({
                                                 q === pi
                                                   ? {
                                                       ...p,
-                                                      reps: e.target.value,
+                                                      reps: digitsOnly(
+                                                        e.target.value,
+                                                      ),
                                                     }
                                                   : p,
                                               ),
@@ -894,7 +1001,10 @@ export function WorkoutLogger({
                 key={timer.id}
                 seconds={timer.seconds}
                 nextLabel={timer.nextLabel}
-                onDismiss={() => setTimer(null)}
+                onDismiss={() => {
+                  setTimer(null);
+                  postToServiceWorker({ type: "rest-timer-cancel" });
+                }}
               />
             )}
           </div>

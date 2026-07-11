@@ -72,3 +72,55 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+/* Rest-period notifications: the page posts {type: "rest-timer"} when a set
+ * is checked. We immediately show a persistent "resting" notification (so it
+ * survives the app going to the background) and replace it with "rest over"
+ * when the period ends. {type: "rest-timer-cancel"} clears everything. */
+let restTimeout = null;
+
+self.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || typeof data !== "object") return;
+
+  if (data.type === "rest-timer") {
+    const { seconds, nextLabel } = data;
+    if (restTimeout) clearTimeout(restTimeout);
+    const until = new Date(Date.now() + seconds * 1000);
+    const hhmm = `${String(until.getHours()).padStart(2, "0")}:${String(until.getMinutes()).padStart(2, "0")}:${String(until.getSeconds()).padStart(2, "0")}`;
+    self.registration.showNotification("Resting…", {
+      tag: "cali-rest-timer",
+      body: `Until ${hhmm} · next: ${nextLabel}`,
+      silent: true,
+    });
+    restTimeout = setTimeout(() => {
+      restTimeout = null;
+      self.registration.showNotification("Rest over 💪", {
+        tag: "cali-rest-timer",
+        body: nextLabel,
+        renotify: true,
+      });
+    }, seconds * 1000);
+  }
+
+  if (data.type === "rest-timer-cancel") {
+    if (restTimeout) clearTimeout(restTimeout);
+    restTimeout = null;
+    self.registration
+      .getNotifications({ tag: "cali-rest-timer" })
+      .then((notifications) => notifications.forEach((n) => n.close()));
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        const client = clients[0];
+        if (client) return client.focus();
+        return self.clients.openWindow("/");
+      }),
+  );
+});
