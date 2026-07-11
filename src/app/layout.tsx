@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/shell/sw-register";
+import { ThemeScript } from "@/components/theme/theme-script";
 
 const sans = Space_Grotesk({
   variable: "--font-sans",
@@ -38,8 +39,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // The theme script toggles the `dark` class before hydration.
+      suppressHydrationWarning
       className={`${sans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <ThemeScript />
+      </head>
       <body className="min-h-full flex flex-col bg-background">
         <ServiceWorkerRegister />
         {children}

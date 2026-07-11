@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Check,
   CheckCircle2,
+  Clock,
   History,
   Info,
   Loader2,
@@ -55,6 +56,7 @@ import {
 } from "@/components/ui/card";
 import { ExerciseSessionSheet } from "./exercise-session-sheet";
 import { RestTimer, RestTimerState } from "./rest-timer";
+import { Stopwatch } from "./stopwatch";
 import { cn } from "@/lib/utils";
 
 function unitOf(exercise: Exercise): string {
@@ -125,6 +127,7 @@ export function WorkoutLogger({
   >(null);
   const [openSheetFor, setOpenSheetFor] = useState<string | null>(null);
   const [timer, setTimer] = useState<RestTimerState | null>(null);
+  const [stopwatchOpen, setStopwatchOpen] = useState(false);
   const readOnly = session.status !== "planned";
 
   const exercisesById = useMemo(
@@ -235,7 +238,10 @@ export function WorkoutLogger({
 
   /** Tick a set: fill an empty input with its suggestion, start the rest. */
   function toggleSetDone(we: WorkoutExercise, setIndex: number, done: boolean) {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    ) {
       Notification.requestPermission().catch(() => undefined);
     }
     const entry = entries.find((e) => e.workoutExerciseId === we.id);
@@ -348,27 +354,39 @@ export function WorkoutLogger({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold">{program.name}</h1>
-        <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          {WEEKDAY_LABELS[session.weekday]} {session.date} · week{" "}
-          {session.weekIndex + 1}
-          {plannedDay.intensity && (
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                plannedDay.intensity === "high"
-                  ? "bg-orange-500/15 text-orange-600"
-                  : "bg-sky-500/15 text-sky-600",
-              )}
-            >
-              {plannedDay.intensity} volume
-            </span>
-          )}
-          {session.status !== "planned" && (
-            <Badge variant="secondary">{session.status}</Badge>
-          )}
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold">{program.name}</h1>
+          <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {WEEKDAY_LABELS[session.weekday]} {session.date} · week{" "}
+            {session.weekIndex + 1}
+            {plannedDay.intensity && (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                  plannedDay.intensity === "high"
+                    ? "bg-orange-500/15 text-orange-600"
+                    : "bg-sky-500/15 text-sky-600",
+                )}
+              >
+                {plannedDay.intensity} volume
+              </span>
+            )}
+            {session.status !== "planned" && (
+              <Badge variant="secondary">{session.status}</Badge>
+            )}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-pressed={stopwatchOpen}
+          aria-label="Toggle stopwatch"
+          title="Stopwatch — for isometric holds"
+          onClick={() => setStopwatchOpen((x) => !x)}
+        >
+          <Clock className="size-5" />
+        </Button>
       </div>
 
       {isDeload && (
@@ -381,9 +399,13 @@ export function WorkoutLogger({
         </Alert>
       )}
 
-      {sections.map(({ attribute, exercises: sectionExercises }) => (
-        <section key={attribute} className="space-y-3 pt-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      {sections.map(({ attribute, exercises: sectionExercises }, si) => (
+        <section
+          key={attribute}
+          className={cn("space-y-3", si > 0 && "border-t pt-6")}
+        >
+          {/* Tinted, well-padded header so you always know where you are. */}
+          <h2 className="rounded-xl bg-primary/10 px-4 py-3 text-sm font-bold uppercase tracking-wide">
             {ATTRIBUTE_LABELS[attribute]}
           </h2>
           {sectionExercises.map((we, i) => {
@@ -407,7 +429,8 @@ export function WorkoutLogger({
             const group = we.groupId
               ? (plannedDay.groups ?? []).find((g) => g.id === we.groupId)
               : undefined;
-            const isGroupStart = group && (!prev || prev.groupId !== we.groupId);
+            const isGroupStart =
+              group && (!prev || prev.groupId !== we.groupId);
             const unit = unitOf(ex);
             const allDone =
               entry.sets.length > 0 && entry.sets.every((s) => s.done);
@@ -427,7 +450,8 @@ export function WorkoutLogger({
                 <Card
                   className={cn(
                     "gap-3 py-4 transition-opacity",
-                    group && `border-l-4 ${GROUP_TYPE_COLORS[group.type].border}`,
+                    group &&
+                      `border-l-4 ${GROUP_TYPE_COLORS[group.type].border}`,
                     allDone && "opacity-70",
                   )}
                 >
@@ -443,11 +467,14 @@ export function WorkoutLogger({
                           <Info className="size-4 shrink-0 text-muted-foreground" />
                         </CardTitle>
                         <CardDescription className="mt-1">
-                          <span className={cn(swapped && "font-medium text-primary")}>
+                          <span
+                            className={cn(
+                              swapped && "font-medium text-primary",
+                            )}
+                          >
                             {progression?.name}
                             {swapped && " (swapped)"}
                           </span>{" "}
-                          · target {volumeLabel(we.sets, ex)}
                           {we.tempo ? ` · tempo ${we.tempo}` : ""} · rest{" "}
                           {we.restSeconds}s
                           {ex.repStyle === "cluster" &&
@@ -467,7 +494,8 @@ export function WorkoutLogger({
                       {last && (
                         <p className="flex items-center gap-1 text-xs text-primary">
                           <History className="size-3" />
-                          Last time ({last.date}): {volumeLabel(last.performedSets, ex)}
+                          Last time ({last.date}):{" "}
+                          {volumeLabel(last.performedSets, ex)}
                         </p>
                       )}
                       {max != null && (
@@ -508,7 +536,9 @@ export function WorkoutLogger({
                                 updateEntry(we.id, (en) => ({
                                   ...en,
                                   sets: en.sets.map((x, k) =>
-                                    k === j ? { ...x, reps: e.target.value } : x,
+                                    k === j
+                                      ? { ...x, reps: e.target.value }
+                                      : x,
                                   ),
                                 }))
                               }
@@ -533,7 +563,10 @@ export function WorkoutLogger({
                                     ...en,
                                     sets: en.sets.map((x, k) =>
                                       k === j
-                                        ? { ...x, eccentricReps: e.target.value }
+                                        ? {
+                                            ...x,
+                                            eccentricReps: e.target.value,
+                                          }
                                         : x,
                                     ),
                                   }))
@@ -628,7 +661,10 @@ export function WorkoutLogger({
                                               ...x,
                                               parts: x.parts.map((p, q) =>
                                                 q === pi
-                                                  ? { ...p, reps: e.target.value }
+                                                  ? {
+                                                      ...p,
+                                                      reps: e.target.value,
+                                                    }
                                                   : p,
                                               ),
                                             }
@@ -688,7 +724,8 @@ export function WorkoutLogger({
                                   }))
                                 }
                               >
-                                <Plus className="size-4" /> Progression in this set
+                                <Plus className="size-4" /> Progression in this
+                                set
                               </Button>
                             )}
                           </div>
@@ -843,13 +880,25 @@ export function WorkoutLogger({
         </div>
       )}
 
-      {timer && !readOnly && (
-        <RestTimer
-          key={timer.id}
-          seconds={timer.seconds}
-          nextLabel={timer.nextLabel}
-          onDismiss={() => setTimer(null)}
-        />
+      {(stopwatchOpen || (timer && !readOnly)) && (
+        <div
+          className="fixed inset-x-0 z-40"
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + 76px)" }}
+        >
+          <div className="mx-auto max-w-lg space-y-2 px-4">
+            {stopwatchOpen && (
+              <Stopwatch onClose={() => setStopwatchOpen(false)} />
+            )}
+            {timer && !readOnly && (
+              <RestTimer
+                key={timer.id}
+                seconds={timer.seconds}
+                nextLabel={timer.nextLabel}
+                onDismiss={() => setTimer(null)}
+              />
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

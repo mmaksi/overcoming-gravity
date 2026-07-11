@@ -9,7 +9,9 @@ import {
 } from "@/components/ui/card";
 import { AdminToggle } from "@/components/settings/admin-toggle";
 import { FeedbackForm } from "@/components/settings/feedback-form";
+import { NameForm } from "@/components/settings/name-form";
 import { SignOutButton } from "@/components/settings/sign-out-button";
+import { ThemePicker } from "@/components/settings/theme-picker";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -26,12 +28,24 @@ export default async function SettingsPage() {
             {user.email ? ` (${user.email})` : ""}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <NameForm initialName={user.name} />
           {backend === "json" ? (
             <AdminToggle isAdmin={user.isAdmin} />
           ) : (
             <SignOutButton />
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>
+            Light, dark, or follow your device.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ThemePicker />
         </CardContent>
       </Card>
       <Card>

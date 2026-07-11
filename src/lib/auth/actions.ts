@@ -31,12 +31,18 @@ export async function signInWithPassword(
 export async function signUpWithPassword(
   email: string,
   password: string,
+  name: string,
 ): Promise<AuthResult> {
   if (dataBackend() === "json") redirect("/");
 
   const { createServerSupabase } = await import("@/lib/supabase/server");
   const supabase = await createServerSupabase();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  // The handle_new_user trigger copies `name` into the profile row.
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { name: name.trim() } },
+  });
   if (error) return { error: error.message };
   // Every new signup is a normal user (profiles.is_admin defaults to false);
   // admin rights are granted manually in the database.

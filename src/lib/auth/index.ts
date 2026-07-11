@@ -17,10 +17,13 @@ export async function getCurrentUser(): Promise<Profile | null> {
   }
   const jar = await cookies();
   const isAdmin = jar.get(MOCK_ADMIN_COOKIE)?.value === "1";
+  // Read the profile so a name change in Settings shows up in dev too.
+  const { getStore } = await import("@/lib/data");
+  const profile = await (await getStore()).getProfile("dev-athlete");
   return {
     id: "dev-athlete",
-    email: "athlete@dev.local",
-    name: "Dev Athlete",
+    email: profile?.email ?? "athlete@dev.local",
+    name: profile?.name ?? "Dev Athlete",
     isAdmin,
   };
 }

@@ -65,4 +65,5 @@ export interface DataStore {
 
   // Users -----------------------------------------------------------------
   getProfile(userId: string): Promise<Profile | null>;
+  updateProfileName(userId: string, name: string): Promise<void>;
 }

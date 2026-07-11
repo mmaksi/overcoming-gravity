@@ -56,11 +56,13 @@ export function ExercisePicker({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      {/* h + max-h together: the sheet's own h-auto must never win, or the
-          list outgrows the viewport and can't scroll. */}
+      {/* The base sheet sets data-[side=bottom]:h-auto, which would make the
+          sheet grow/shrink with the result list. Override at the SAME
+          variant so tailwind-merge drops h-auto and the height stays fixed
+          no matter how many exercises match. */}
       <SheetContent
         side="bottom"
-        className="h-[85dvh] max-h-[85dvh] overflow-hidden p-0"
+        className="data-[side=bottom]:h-[85dvh] max-h-[85dvh] overflow-hidden p-0"
       >
         <div className="flex h-full min-h-0 flex-col">
           <SheetHeader className="pb-2">

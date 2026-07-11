@@ -20,7 +20,8 @@ const toExercise = (r: Row): Exercise => ({
   id: r.id,
   title: r.title,
   category: r.category,
-  attribute: r.attribute,
+  // "cardio" was removed as an attribute; treat legacy rows as warm-up.
+  attribute: r.attribute === "cardio" ? "warmup" : r.attribute,
   measurement: r.measurement ?? "reps",
   repStyle: r.rep_style ?? "standard",
   progressions: r.progressions,
@@ -342,6 +343,15 @@ class SupabaseStore implements DataStore {
       name: rows[0].name,
       isAdmin: rows[0].is_admin,
     };
+  }
+  async updateProfileName(userId: string, name: string): Promise<void> {
+    orThrow(
+      await this.db
+        .from("profiles")
+        .update({ name })
+        .eq("id", userId)
+        .select("id"),
+    );
   }
 }
 

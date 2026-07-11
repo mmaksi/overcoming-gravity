@@ -167,13 +167,14 @@ const exercises: Exercise[] = [
     ["Toes-to-bar", "Straight legs all the way to the bar, controlled down."],
   ]),
 
-  // Cardio --------------------------------------------------------------
-  ex("burpees", "Burpees", "both", "cardio", [
+  // Conditioning work lives in the warm-up section (cardio is not an
+  // attribute).
+  ex("burpees", "Burpees", "both", "warmup", [
     ["Step-back", "Step (don't jump) in and out of the plank; low impact."],
     ["Standard", "Jump back, push-up, jump forward, jump up."],
     ["Chest-to-floor", "Full chest contact each rep; highest intensity."],
   ]),
-  ex("jump-rope", "Jump Rope", "legs", "cardio", [
+  ex("jump-rope", "Jump Rope", "legs", "warmup", [
     ["Single unders", "Steady rhythm, soft knees, tall posture."],
     ["High pace", "Intervals: 40s fast / 20s easy."],
     ["Double unders", "Two rope passes per jump; wrists do the work."],

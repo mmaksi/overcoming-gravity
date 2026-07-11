@@ -32,8 +32,7 @@ async function getDb(): Promise<Low<DbData>> {
     mkdirSync(path.dirname(DB_FILE), { recursive: true });
     globalCache.__caliJsonDb = JSONFilePreset<DbData>(DB_FILE, seedData()).then(
       async (db) => {
-        // Databases created before exercise notes existed lack the key.
-        db.data.exerciseNotes ??= [];
+        normalizeLegacy(db.data);
         await db.write(); // materialize the seed on first run
         return db;
       },
@@ -42,9 +41,19 @@ async function getDb(): Promise<Low<DbData>> {
   }
   const db = await globalCache.__caliJsonDb;
   await db.read();
-  // Databases created before exercise notes existed lack the key.
-  db.data.exerciseNotes ??= [];
+  normalizeLegacy(db.data);
   return db;
+}
+
+/** Patch databases written by older app versions in place. */
+function normalizeLegacy(data: DbData): void {
+  data.exerciseNotes ??= [];
+  // "cardio" was removed as an attribute; conditioning belongs to warm-up.
+  for (const exercise of data.exercises) {
+    if ((exercise.attribute as string) === "cardio") {
+      exercise.attribute = "warmup";
+    }
+  }
 }
 
 function upsert<T extends { id: string }>(list: T[], item: T): void {
@@ -217,5 +226,12 @@ export class JsonStore implements DataStore {
   // Users -----------------------------------------------------------------
   async getProfile(userId: string): Promise<Profile | null> {
     return (await getDb()).data.profiles.find((p) => p.id === userId) ?? null;
+  }
+  async updateProfileName(userId: string, name: string): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find((p) => p.id === userId);
+    if (!profile) return;
+    profile.name = name;
+    await db.write();
   }
 }

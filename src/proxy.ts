@@ -5,7 +5,7 @@ import { createServerClient } from "@supabase/ssr";
  * In Supabase mode: refresh the auth session cookie and gate the app behind
  * /login. In JSON mode (development) this is a no-op.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const backend =
     process.env.DATA_BACKEND ??
     (process.env.NODE_ENV === "production" ? "supabase" : "json");

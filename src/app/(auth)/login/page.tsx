@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 
 export default function LoginPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -25,9 +26,10 @@ export default function LoginPage() {
     e.preventDefault();
     setMessage(null);
     startTransition(async () => {
-      const action =
-        mode === "signin" ? signInWithPassword : signUpWithPassword;
-      const result = await action(email, password);
+      const result =
+        mode === "signin"
+          ? await signInWithPassword(email, password)
+          : await signUpWithPassword(email, password, name);
       if (result?.error) setMessage(result.error);
       else if (result?.message) {
         setMessage(result.message);
@@ -50,6 +52,20 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
+            {mode === "signup" && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Your name</Label>
+                <Input
+                  id="name"
+                  autoComplete="name"
+                  required
+                  maxLength={60}
+                  placeholder="How should we greet you?"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
