@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Dumbbell, Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
@@ -7,18 +7,23 @@ import {
   PROGRAM_TYPE_LABELS,
   SPLIT_TYPE_LABELS,
 } from "@/lib/domain/types";
+import { createCustomWorkout } from "@/lib/actions/workouts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default async function ProgramsPage() {
   const user = await requireUser();
   const store = await getStore();
-  const [programs, runs] = await Promise.all([
+  const [programs, runs, customWorkouts] = await Promise.all([
     store.listPrograms(user.id),
     store.listRuns(user.id),
+    store.listCustomWorkouts(user.id),
   ]);
-  // "Active" = the one program the athlete is currently following.
-  const activeProgramId = runs.find((r) => r.status === "active")?.programId;
+  // "Active" = programs the athlete is currently following (several can run
+  // at the same time).
+  const activeProgramIds = new Set(
+    runs.filter((r) => r.status === "active").map((r) => r.programId),
+  );
 
   return (
     <div className="space-y-6">
@@ -50,7 +55,7 @@ export default async function ProgramsPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-semibold">{p.name}</span>
-                  {p.id === activeProgramId && <Badge>Active</Badge>}
+                  {activeProgramIds.has(p.id) && <Badge>Active</Badge>}
                   {p.status === "draft" && (
                     <Badge variant="outline">Draft</Badge>
                   )}
@@ -67,6 +72,45 @@ export default async function ProgramsPage() {
           ))}
         </div>
       )}
+
+      {/* Standalone workouts: a title + exercises, no goals/periodization. */}
+      <div className="space-y-5 border-t pt-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Individual workouts</h2>
+          <form action={createCustomWorkout}>
+            <Button variant="outline" size="sm" type="submit">
+              <Plus className="size-4" /> New workout
+            </Button>
+          </form>
+        </div>
+        {customWorkouts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            One-off workouts outside any program — just a bunch of exercises
+            with a title.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {customWorkouts.map((w) => (
+              <Link
+                key={w.id}
+                href={`/workouts/${w.id}`}
+                className="flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <span className="flex items-center gap-2 truncate font-semibold">
+                    <Dumbbell className="size-4 shrink-0 text-primary" />
+                    {w.title}
+                  </span>
+                  <p className="text-sm text-muted-foreground">
+                    {w.day.exercises.length} exercises
+                  </p>
+                </div>
+                <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

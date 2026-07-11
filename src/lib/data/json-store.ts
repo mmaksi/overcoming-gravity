@@ -3,6 +3,7 @@ import path from "node:path";
 import { JSONFilePreset } from "lowdb/node";
 import { Low } from "lowdb";
 import {
+  CustomWorkout,
   DefaultTemplate,
   Exercise,
   ExerciseNote,
@@ -48,6 +49,7 @@ async function getDb(): Promise<Low<DbData>> {
 /** Patch databases written by older app versions in place. */
 function normalizeLegacy(data: DbData): void {
   data.exerciseNotes ??= [];
+  data.customWorkouts ??= [];
   // "cardio" was removed as an attribute; conditioning belongs to warm-up.
   for (const exercise of data.exercises) {
     if ((exercise.attribute as string) === "cardio") {
@@ -149,11 +151,51 @@ export class JsonStore implements DataStore {
       .filter((r) => r.programId === id)
       .map((r) => r.id);
     db.data.sessions = db.data.sessions.filter(
-      (s) => !runIds.includes(s.runId),
+      (s) => s.runId === undefined || !runIds.includes(s.runId),
     );
     db.data.runs = db.data.runs.filter((r) => r.programId !== id);
     db.data.programs = db.data.programs.filter((p) => p.id !== id);
     await db.write();
+  }
+
+  // Standalone workouts ------------------------------------------------------
+  async listCustomWorkouts(userId: string): Promise<CustomWorkout[]> {
+    return (await getDb()).data.customWorkouts.filter(
+      (w) => w.userId === userId,
+    );
+  }
+  async getCustomWorkout(id: string): Promise<CustomWorkout | null> {
+    return (
+      (await getDb()).data.customWorkouts.find((w) => w.id === id) ?? null
+    );
+  }
+  async createCustomWorkout(workout: CustomWorkout): Promise<CustomWorkout> {
+    const db = await getDb();
+    db.data.customWorkouts.push(workout);
+    await db.write();
+    return workout;
+  }
+  async updateCustomWorkout(workout: CustomWorkout): Promise<CustomWorkout> {
+    const db = await getDb();
+    upsert(db.data.customWorkouts, workout);
+    await db.write();
+    return workout;
+  }
+  async deleteCustomWorkout(id: string): Promise<void> {
+    const db = await getDb();
+    db.data.sessions = db.data.sessions.filter(
+      (s) => s.customWorkoutId !== id || s.status !== "planned",
+    );
+    db.data.customWorkouts = db.data.customWorkouts.filter(
+      (w) => w.id !== id,
+    );
+    await db.write();
+  }
+  async createSession(session: WorkoutSession): Promise<WorkoutSession> {
+    const db = await getDb();
+    db.data.sessions.push(session);
+    await db.write();
+    return session;
   }
 
   async listRuns(userId: string): Promise<ProgramRun[]> {

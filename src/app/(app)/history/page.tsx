@@ -61,12 +61,14 @@ export default async function HistoryPage() {
   const user = await requireUser();
   const store = await getStore();
 
-  const [completed, exercises, programs, runs] = await Promise.all([
-    store.listCompletedSessions(user.id),
-    store.listExercises(),
-    store.listPrograms(user.id),
-    store.listRuns(user.id),
-  ]);
+  const [completed, exercises, programs, runs, customWorkouts] =
+    await Promise.all([
+      store.listCompletedSessions(user.id),
+      store.listExercises(),
+      store.listPrograms(user.id),
+      store.listRuns(user.id),
+      store.listCustomWorkouts(user.id),
+    ]);
 
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
   const programNameByRun = new Map(
@@ -75,6 +77,13 @@ export default async function HistoryPage() {
       programs.find((p) => p.id === r.programId)?.name ?? "Program",
     ]),
   );
+  const customWorkoutTitles = new Map(
+    customWorkouts.map((w) => [w.id, w.title]),
+  );
+  const sessionLabel = (session: WorkoutSession): string =>
+    session.runId
+      ? (programNameByRun.get(session.runId) ?? "Program")
+      : (customWorkoutTitles.get(session.customWorkoutId ?? "") ?? "Workout");
 
   const stats = buildVolumeStats(completed);
   // Current progression + progression method per exercise = the one used in
@@ -148,9 +157,7 @@ export default async function HistoryPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-semibold">{session.date}</span>
-                <Badge variant="secondary">
-                  {programNameByRun.get(session.runId)}
-                </Badge>
+                <Badge variant="secondary">{sessionLabel(session)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
                 {WEEKDAY_LABELS[session.weekday]}, week {session.weekIndex + 1}{" "}

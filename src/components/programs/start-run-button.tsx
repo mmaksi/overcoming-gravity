@@ -47,14 +47,11 @@ export function StartRunButton({
   programId,
   trainingDays,
   label,
-  activeRunProgramName,
   variant = "default",
 }: {
   programId: string;
   trainingDays: Weekday[];
   label: string;
-  /** Name of the program whose run is currently active, if any. */
-  activeRunProgramName?: string | null;
   variant?: "default" | "outline";
 }) {
   const [open, setOpen] = useState(false);
@@ -129,12 +126,6 @@ export function StartRunButton({
             First workout: {friendly(firstWorkout)}
           </p>
 
-          {activeRunProgramName && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Starting this ends your current run of “{activeRunProgramName}”
-              — its completed workouts stay in your history.
-            </p>
-          )}
         </div>
         <DialogFooter>
           <Button

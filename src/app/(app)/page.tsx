@@ -6,7 +6,6 @@ import { toISODate } from "@/lib/domain/schedule";
 import { WEEKDAY_LABELS } from "@/lib/domain/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { GoalsCard } from "@/components/home/goals-card";
 import {
   Card,
   CardContent,
@@ -14,15 +13,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const store = await getStore();
 
   const runs = await store.listRuns(user.id);
-  const activeRun = runs.find((r) => r.status === "active");
+  const activeRuns = runs.filter((r) => r.status === "active");
 
-  if (!activeRun) {
+  if (activeRuns.length === 0) {
     const programs = await store.listPrograms(user.id);
     return (
       <div className="flex flex-col gap-6 pt-10">
@@ -51,26 +51,35 @@ export default async function DashboardPage() {
     );
   }
 
-  const program = await store.getProgram(activeRun.programId);
-  const sessions = await store.listSessionsByRun(activeRun.id);
   const today = toISODate(new Date());
-  const todaySession = sessions.find((s) => s.date === today);
-  const nextSession = sessions.find(
-    (s) => s.status === "planned" && s.date >= today,
-  );
-  const done = sessions.filter((s) => s.status === "completed").length;
-  const pct =
-    sessions.length === 0 ? 0 : Math.round((done / sessions.length) * 100);
+  const programGoals: ProgramGoals[] = [];
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Hi, {user.name}</h1>
+  // One card per active program run — several can run in parallel.
+  const runCards = [];
+  for (const run of activeRuns) {
+    const program = await store.getProgram(run.programId);
+    const sessions = await store.listSessionsByRun(run.id);
+    if (program?.goals) {
+      programGoals.push({
+        programId: program.id,
+        programName: program.name,
+        goals: program.goals,
+      });
+    }
+    const todaySession = sessions.find((s) => s.date === today);
+    const nextSession = sessions.find(
+      (s) => s.status === "planned" && s.date >= today,
+    );
+    const done = sessions.filter((s) => s.status === "completed").length;
+    const pct =
+      sessions.length === 0 ? 0 : Math.round((done / sessions.length) * 100);
 
-      <Card>
+    runCards.push(
+      <Card key={run.id} className={todaySession ? "border-primary" : undefined}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            {program?.name ?? "Program"}
-            <Badge variant="secondary">
+            <span className="truncate">{program?.name ?? "Program"}</span>
+            <Badge variant="secondary" className="shrink-0">
               Week{" "}
               {todaySession
                 ? todaySession.weekIndex + 1
@@ -80,29 +89,21 @@ export default async function DashboardPage() {
           </CardTitle>
           <CardDescription>
             {done} of {sessions.length} workouts completed
+            {todaySession
+              ? ` · today: ${WEEKDAY_LABELS[todaySession.weekday]}`
+              : nextSession
+                ? ` · next: ${WEEKDAY_LABELS[nextSession.weekday]} ${nextSession.date}`
+                : ""}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${pct}%` }}
             />
           </div>
-        </CardContent>
-      </Card>
-
-      {todaySession ? (
-        <Card className="border-primary">
-          <CardHeader>
-            <CardTitle>Today&apos;s workout</CardTitle>
-            <CardDescription>
-              {WEEKDAY_LABELS[todaySession.weekday]}, week{" "}
-              {todaySession.weekIndex + 1}
-              {todaySession.status === "completed" && " — completed 🎉"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          {todaySession ? (
             <Button asChild className="w-full" size="lg">
               <Link href={`/workout/${todaySession.id}`}>
                 <Play className="size-4" />
@@ -113,33 +114,27 @@ export default async function DashboardPage() {
                     : "Start workout"}
               </Link>
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Rest day</CardTitle>
-            <CardDescription>
-              {nextSession
-                ? `Next workout: ${WEEKDAY_LABELS[nextSession.weekday]} ${nextSession.date}`
-                : "No upcoming workouts in this run."}
-            </CardDescription>
-          </CardHeader>
-          {nextSession && (
-            <CardContent>
+          ) : (
+            nextSession && (
               <Button asChild variant="outline" className="w-full">
                 <Link href={`/workout/${nextSession.id}`}>
                   <Play className="size-4" /> Feeling fresh? Do it today
                 </Link>
               </Button>
-            </CardContent>
+            )
           )}
-        </Card>
-      )}
+        </CardContent>
+      </Card>,
+    );
+  }
 
-      {program?.goals && (
-        <GoalsCard programId={program.id} goals={program.goals} />
-      )}
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Hi, {user.name}</h1>
+
+      {runCards}
+
+      <GoalsCard programs={programGoals} />
 
       <Button asChild variant="outline" className="w-full">
         <Link href="/calendar">

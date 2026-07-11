@@ -167,6 +167,21 @@ export const programSchema = z
   });
 export type Program = z.infer<typeof programSchema>;
 
+/**
+ * A standalone workout the user builds outside any program: a title and a
+ * bunch of exercises (same day structure as a program day) — no goals, no
+ * periodization. Doing one creates a session with `customWorkoutId` set.
+ */
+export const customWorkoutSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  title: z.string().min(1).max(80),
+  day: workoutDaySchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type CustomWorkout = z.infer<typeof customWorkoutSchema>;
+
 // ---------------------------------------------------------------------------
 // Tracking
 
@@ -222,19 +237,26 @@ export const sessionEntrySchema = z.object({
 });
 export type SessionEntry = z.infer<typeof sessionEntrySchema>;
 
-export const workoutSessionSchema = z.object({
-  id: z.string(),
-  runId: z.string(),
-  userId: z.string(),
-  /** ISO date (yyyy-mm-dd). */
-  date: z.string(),
-  weekIndex: z.number().int().min(0),
-  weekday: z.enum(WEEKDAYS),
-  status: z.enum(["planned", "completed", "skipped"]),
-  entries: z.array(sessionEntrySchema),
-  /** Active workout time in seconds (paused while the draft is closed). */
-  durationSeconds: z.number().int().min(0).optional(),
-});
+export const workoutSessionSchema = z
+  .object({
+    id: z.string(),
+    /** Set for program sessions. */
+    runId: z.string().optional(),
+    /** Set for standalone custom-workout sessions. */
+    customWorkoutId: z.string().optional(),
+    userId: z.string(),
+    /** ISO date (yyyy-mm-dd). */
+    date: z.string(),
+    weekIndex: z.number().int().min(0),
+    weekday: z.enum(WEEKDAYS),
+    status: z.enum(["planned", "completed", "skipped"]),
+    entries: z.array(sessionEntrySchema),
+    /** Active workout time in seconds (paused while the draft is closed). */
+    durationSeconds: z.number().int().min(0).optional(),
+  })
+  .refine((s) => s.runId !== undefined || s.customWorkoutId !== undefined, {
+    message: "A session belongs to a run or to a custom workout",
+  });
 export type WorkoutSession = z.infer<typeof workoutSessionSchema>;
 
 /**

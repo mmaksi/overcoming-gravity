@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { buildVolumeStats } from "@/lib/domain/volume";
-import { exerciseNoteKey } from "@/lib/domain/schemas";
+import { exerciseNoteKey, WorkoutDay } from "@/lib/domain/schemas";
 import { WorkoutLogger } from "@/components/workout/workout-logger";
 
 export default async function WorkoutPage({
@@ -17,12 +17,26 @@ export default async function WorkoutPage({
   const session = await store.getSession(sessionId);
   if (!session || session.userId !== user.id) notFound();
 
-  const run = await store.getRun(session.runId);
-  const program = run ? await store.getProgram(run.programId) : null;
-  if (!run || !program) notFound();
-
-  const week = program.mesocycle.weeks[session.weekIndex];
-  const plannedDay = week?.days[session.weekday];
+  // A session belongs to a program run or to a standalone custom workout.
+  let title: string;
+  let plannedDay: WorkoutDay | undefined;
+  let isDeload = false;
+  if (session.runId) {
+    const run = await store.getRun(session.runId);
+    const program = run ? await store.getProgram(run.programId) : null;
+    if (!run || !program) notFound();
+    const week = program.mesocycle.weeks[session.weekIndex];
+    plannedDay = week?.days[session.weekday] ?? undefined;
+    isDeload = week?.isDeload ?? false;
+    title = program.name;
+  } else {
+    const workout = session.customWorkoutId
+      ? await store.getCustomWorkout(session.customWorkoutId)
+      : null;
+    if (!workout) notFound();
+    plannedDay = workout.day;
+    title = workout.title;
+  }
   if (!plannedDay) notFound();
 
   const [exercises, completed, notes] = await Promise.all([
@@ -33,9 +47,7 @@ export default async function WorkoutPage({
 
   // Stats for every progression of every planned exercise, so swapping
   // progression mid-workout still shows the right memory instantly.
-  const stats = buildVolumeStats(
-    completed.filter((s) => s.id !== session.id),
-  );
+  const stats = buildVolumeStats(completed.filter((s) => s.id !== session.id));
   const userNotes = Object.fromEntries(
     notes.map((n) => [exerciseNoteKey(n.exerciseId, n.techniqueId), n.note]),
   );
@@ -43,9 +55,9 @@ export default async function WorkoutPage({
   return (
     <WorkoutLogger
       session={session}
-      program={program}
+      title={title}
       plannedDay={plannedDay}
-      isDeload={week.isDeload}
+      isDeload={isDeload}
       exercises={exercises}
       stats={stats}
       userNotes={userNotes}

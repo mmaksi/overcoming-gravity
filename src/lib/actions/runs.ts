@@ -28,12 +28,11 @@ export async function startRun(input: {
     throw new Error("Finish designing the program before starting a run");
   }
 
-  // One active run at a time: starting a program ends any other run and
-  // clears its not-yet-done sessions so the calendar stays honest.
+  // Several programs can run at the same time, but each program has at most
+  // one active run of its own.
   const existing = await store.listRuns(user.id);
-  for (const other of existing.filter((r) => r.status === "active")) {
-    await store.updateRun({ ...other, status: "abandoned" });
-    await store.deletePlannedSessions(other.id);
+  if (existing.some((r) => r.status === "active" && r.programId === programId)) {
+    throw new Error("This program is already running");
   }
 
   const run: ProgramRun = {
@@ -48,6 +47,35 @@ export async function startRun(input: {
   await store.createRun(run, sessions);
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+/**
+ * Restart a program from scratch: the current run is abandoned (its
+ * completed workouts stay in history and keep feeding exercise stats) and a
+ * fresh run starts today with a clean schedule.
+ */
+export async function resetRun(runId: string): Promise<void> {
+  const user = await requireUser();
+  const store = await getStore();
+  const run = await store.getRun(runId);
+  if (!run || run.userId !== user.id) throw new Error("Run not found");
+  const program = await store.getProgram(run.programId);
+  if (!program) throw new Error("Program not found");
+
+  await store.updateRun({ ...run, status: "abandoned" });
+  await store.deletePlannedSessions(run.id);
+
+  const fresh: ProgramRun = {
+    id: crypto.randomUUID(),
+    programId: program.id,
+    userId: user.id,
+    startDate: new Date().toISOString().slice(0, 10),
+    status: "active",
+    createdAt: new Date().toISOString(),
+  };
+  const sessions = generateSessions(program, fresh.id, fresh.startDate);
+  await store.createRun(fresh, sessions);
+  revalidatePath("/", "layout");
 }
 
 export async function abandonRun(runId: string): Promise<void> {
@@ -111,10 +139,11 @@ export async function saveWorkoutSession(input: {
     }
   }
 
-  // A run is finished once no planned sessions remain.
+  // A run is finished once no planned sessions remain. Custom-workout
+  // sessions have no run to complete.
   let runCompleted = false;
   let programId: string | null = null;
-  if (action !== "save") {
+  if (action !== "save" && session.runId) {
     const run = await store.getRun(session.runId);
     if (run && run.status === "active") {
       programId = run.programId;

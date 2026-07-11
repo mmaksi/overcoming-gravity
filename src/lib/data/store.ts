@@ -1,4 +1,5 @@
 import {
+  CustomWorkout,
   DefaultTemplate,
   Exercise,
   ExerciseNote,
@@ -30,6 +31,15 @@ export interface DataStore {
   createProgram(program: Program): Promise<Program>;
   updateProgram(program: Program): Promise<Program>;
   deleteProgram(id: string): Promise<void>;
+
+  // Standalone workouts outside any program.
+  listCustomWorkouts(userId: string): Promise<CustomWorkout[]>;
+  getCustomWorkout(id: string): Promise<CustomWorkout | null>;
+  createCustomWorkout(workout: CustomWorkout): Promise<CustomWorkout>;
+  updateCustomWorkout(workout: CustomWorkout): Promise<CustomWorkout>;
+  /** Also removes the workout's not-yet-done sessions. */
+  deleteCustomWorkout(id: string): Promise<void>;
+  createSession(session: WorkoutSession): Promise<WorkoutSession>;
 
   listRuns(userId: string): Promise<ProgramRun[]>;
   getRun(id: string): Promise<ProgramRun | null>;

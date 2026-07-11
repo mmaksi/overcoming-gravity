@@ -27,7 +27,6 @@ import {
 import {
   Exercise,
   exerciseNoteKey,
-  Program,
   SessionEntry,
   VolumeStats,
   WorkoutDay,
@@ -124,7 +123,7 @@ type EntryState = {
 
 export function WorkoutLogger({
   session,
-  program,
+  title,
   plannedDay,
   isDeload,
   exercises,
@@ -132,7 +131,8 @@ export function WorkoutLogger({
   userNotes = {},
 }: {
   session: WorkoutSession;
-  program: Program;
+  /** Program name or custom workout title, shown in the sticky header. */
+  title: string;
   plannedDay: WorkoutDay;
   isDeload: boolean;
   exercises: Exercise[];
@@ -449,7 +449,7 @@ export function WorkoutLogger({
       {/* Sticky header: always visible while scrolling through the workout. */}
       <div className="sticky top-0 z-30 -mx-4 flex items-start justify-between gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold">{program.name}</h1>
+          <h1 className="truncate text-xl font-bold">{title}</h1>
           <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {WEEKDAY_LABELS[session.weekday]} {session.date} · week{" "}
             {session.weekIndex + 1}

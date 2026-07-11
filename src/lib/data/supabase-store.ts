@@ -1,6 +1,7 @@
 import "server-only";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
+  CustomWorkout,
   DefaultTemplate,
   Exercise,
   ExerciseNote,
@@ -81,7 +82,8 @@ const fromRun = (r: ProgramRun): Row => ({
 
 const toSession = (r: Row): WorkoutSession => ({
   id: r.id,
-  runId: r.run_id,
+  runId: r.run_id ?? undefined,
+  customWorkoutId: r.custom_workout_id ?? undefined,
   userId: r.user_id,
   date: r.date,
   weekIndex: r.week_index,
@@ -93,7 +95,8 @@ const toSession = (r: Row): WorkoutSession => ({
 
 const fromSession = (s: WorkoutSession): Row => ({
   id: s.id,
-  run_id: s.runId,
+  run_id: s.runId ?? null,
+  custom_workout_id: s.customWorkoutId ?? null,
   user_id: s.userId,
   date: s.date,
   week_index: s.weekIndex,
@@ -101,6 +104,24 @@ const fromSession = (s: WorkoutSession): Row => ({
   status: s.status,
   entries: s.entries,
   duration_seconds: s.durationSeconds ?? null,
+});
+
+const toCustomWorkout = (r: Row): CustomWorkout => ({
+  id: r.id,
+  userId: r.user_id,
+  title: r.title,
+  day: r.day,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+const fromCustomWorkout = (w: CustomWorkout): Row => ({
+  id: w.id,
+  user_id: w.userId,
+  title: w.title,
+  day: w.day,
+  created_at: w.createdAt,
+  updated_at: w.updatedAt,
 });
 
 function orThrow<T>(result: { data: T | null; error: { message: string } | null }): T {
@@ -221,6 +242,61 @@ class SupabaseStore implements DataStore {
   async deleteProgram(id: string): Promise<void> {
     // runs and sessions cascade via foreign keys
     orThrow(await this.db.from("programs").delete().eq("id", id).select());
+  }
+
+  // Standalone workouts ------------------------------------------------------
+  async listCustomWorkouts(userId: string): Promise<CustomWorkout[]> {
+    return orThrow(
+      await this.db
+        .from("custom_workouts")
+        .select()
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+    ).map(toCustomWorkout);
+  }
+  async getCustomWorkout(id: string): Promise<CustomWorkout | null> {
+    const rows = orThrow(
+      await this.db.from("custom_workouts").select().eq("id", id),
+    );
+    return rows.length > 0 ? toCustomWorkout(rows[0]) : null;
+  }
+  async createCustomWorkout(workout: CustomWorkout): Promise<CustomWorkout> {
+    orThrow(
+      await this.db
+        .from("custom_workouts")
+        .insert(fromCustomWorkout(workout))
+        .select(),
+    );
+    return workout;
+  }
+  async updateCustomWorkout(workout: CustomWorkout): Promise<CustomWorkout> {
+    orThrow(
+      await this.db
+        .from("custom_workouts")
+        .update(fromCustomWorkout(workout))
+        .eq("id", workout.id)
+        .select(),
+    );
+    return workout;
+  }
+  async deleteCustomWorkout(id: string): Promise<void> {
+    orThrow(
+      await this.db
+        .from("sessions")
+        .delete()
+        .eq("custom_workout_id", id)
+        .eq("status", "planned")
+        .select("id"),
+    );
+    orThrow(
+      await this.db.from("custom_workouts").delete().eq("id", id).select(),
+    );
+  }
+  async createSession(session: WorkoutSession): Promise<WorkoutSession> {
+    orThrow(
+      await this.db.from("sessions").insert(fromSession(session)).select("id"),
+    );
+    return session;
   }
 
   async listRuns(userId: string): Promise<ProgramRun[]> {

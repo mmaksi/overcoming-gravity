@@ -24,6 +24,7 @@ import {
 import { StartRunButton } from "@/components/programs/start-run-button";
 import { DeleteProgramButton } from "@/components/programs/delete-program-button";
 import { GoalsEditor } from "@/components/programs/goals-editor";
+import { ResetRunButton } from "@/components/programs/reset-run-button";
 
 export default async function ProgramPage({
   params,
@@ -42,13 +43,6 @@ export default async function ProgramPage({
     .filter((r) => r.programId === id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const activeRun = runs.find((r) => r.status === "active");
-  // An active run of a DIFFERENT program (would be ended by starting this one).
-  const otherActiveRun = allRuns.find(
-    (r) => r.status === "active" && r.programId !== id,
-  );
-  const otherActiveProgram = otherActiveRun
-    ? await store.getProgram(otherActiveRun.programId)
-    : null;
   const completedRuns = runs.filter((r) => r.status === "completed");
   const justFinished = runs.length > 0 && runs[0].status === "completed";
 
@@ -143,14 +137,16 @@ export default async function ProgramPage({
         ) : (
           <>
             {activeRun ? (
-              <Button asChild className="w-full">
-                <Link href="/">Run in progress — go to dashboard</Link>
-              </Button>
+              <>
+                <Button asChild className="w-full">
+                  <Link href="/">Run in progress — go to dashboard</Link>
+                </Button>
+                <ResetRunButton runId={activeRun.id} />
+              </>
             ) : (
               <StartRunButton
                 programId={program.id}
                 trainingDays={program.trainingDays}
-                activeRunProgramName={otherActiveProgram?.name ?? null}
                 label={
                   completedRuns.length > 0 ? "Repeat program" : "Start program"
                 }

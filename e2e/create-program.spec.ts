@@ -5,6 +5,9 @@ test.beforeAll(async () => {
   await rm("data/db.e2e.json", { force: true });
 });
 
+/** Program page URL created by the first test, reused by the second. */
+let programUrl = "";
+
 test("create a program end-to-end", async ({ page }) => {
   await page.goto("/programs/new");
 
@@ -47,4 +50,38 @@ test("create a program end-to-end", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Start program" }),
   ).toBeVisible();
+  programUrl = page.url();
+});
+
+test("start, reset, and custom individual workouts", async ({ page }) => {
+  // Start the program created by the previous test.
+  await page.goto(programUrl);
+  await page.getByRole("button", { name: "Start program" }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByText("E2E Front Lever").first()).toBeVisible();
+
+  // Reset: fresh schedule, program still active.
+  await page.goto(programUrl);
+  await page.getByRole("button", { name: "Reset program" }).click();
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Reset program" }),
+  ).toBeVisible();
+
+  // Custom individual workout: create, prefilled from defaults, do it.
+  await page.goto("/programs");
+  await page.getByRole("button", { name: "New workout" }).click();
+  await expect(page.getByLabel("Workout title")).toHaveValue("My workout");
+  await expect(page.getByText("Wrist Circles & Prep").first()).toBeVisible();
+  await page.getByRole("button", { name: "Do this workout" }).click();
+  await expect(
+    page.getByRole("heading", { name: "My workout" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Complete workout/ }).click();
+  await expect(page).toHaveURL("/");
+
+  // The custom session shows up in history under its title.
+  await page.goto("/history");
+  await expect(page.getByText("My workout").first()).toBeVisible();
 });

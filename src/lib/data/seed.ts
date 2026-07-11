@@ -1,5 +1,6 @@
 import { Attribute, Category, Measurement, RepStyle } from "@/lib/domain/types";
 import {
+  CustomWorkout,
   DefaultTemplate,
   Exercise,
   ExerciseNote,
@@ -18,6 +19,7 @@ export type DbData = {
   runs: ProgramRun[];
   sessions: WorkoutSession[];
   exerciseNotes: ExerciseNote[];
+  customWorkouts: CustomWorkout[];
 };
 
 function ex(
@@ -295,5 +297,6 @@ export function seedData(): DbData {
     runs: [],
     sessions: [],
     exerciseNotes: [],
+    customWorkouts: [],
   };
 }

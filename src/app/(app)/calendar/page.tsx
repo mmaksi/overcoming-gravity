@@ -41,7 +41,13 @@ export default async function CalendarPage({
     toISODate(gridStart),
     toISODate(gridEnd),
   );
-  const sessionsByDate = new Map(sessions.map((s) => [s.date, s]));
+  // Several programs can run in parallel, so a date may hold many sessions.
+  const sessionsByDate = new Map<string, typeof sessions>();
+  for (const s of sessions) {
+    const list = sessionsByDate.get(s.date) ?? [];
+    list.push(s);
+    sessionsByDate.set(s.date, list);
+  }
 
   // Sport days of active runs (sport-mix programs).
   const runs = (await store.listRuns(user.id)).filter(
@@ -99,39 +105,48 @@ export default async function CalendarPage({
         {cells.map((date) => {
           const iso = toISODate(date);
           const inMonth = date.getMonth() === month - 1;
-          const session = sessionsByDate.get(iso);
+          const daySessions = sessionsByDate.get(iso) ?? [];
           const sport = sportByDate.get(iso);
 
-          const cell = (
+          return (
             <div
+              key={iso}
               className={cn(
                 "flex aspect-square flex-col items-center justify-start gap-0.5 rounded-lg border p-1 text-xs",
                 !inMonth && "opacity-35",
                 iso === todayISO && "border-primary ring-1 ring-primary",
-                session && "bg-muted/50",
+                daySessions.length > 0 && "bg-muted/50",
               )}
             >
               <span className={cn(iso === todayISO && "font-bold text-primary")}>
                 {date.getDate()}
               </span>
-              {session && (
-                <span
-                  className={cn(
-                    "flex size-4 items-center justify-center rounded-full",
-                    session.status === "completed" &&
-                      "bg-green-500/15 text-green-600",
-                    session.status === "skipped" &&
-                      "bg-muted text-muted-foreground",
-                    session.status === "planned" && "bg-primary/15 text-primary",
-                  )}
-                >
-                  {session.status === "completed" ? (
-                    <Check className="size-3" />
-                  ) : session.status === "skipped" ? (
-                    <X className="size-3" />
-                  ) : (
-                    <span className="size-1.5 rounded-full bg-current" />
-                  )}
+              {daySessions.length > 0 && (
+                <span className="flex flex-wrap items-center justify-center gap-0.5">
+                  {daySessions.slice(0, 3).map((session) => (
+                    <Link
+                      key={session.id}
+                      href={`/workout/${session.id}`}
+                      aria-label={`Workout on ${iso}`}
+                      className={cn(
+                        "flex size-4 items-center justify-center rounded-full",
+                        session.status === "completed" &&
+                          "bg-green-500/15 text-green-600",
+                        session.status === "skipped" &&
+                          "bg-muted text-muted-foreground",
+                        session.status === "planned" &&
+                          "bg-primary/15 text-primary",
+                      )}
+                    >
+                      {session.status === "completed" ? (
+                        <Check className="size-3" />
+                      ) : session.status === "skipped" ? (
+                        <X className="size-3" />
+                      ) : (
+                        <span className="size-1.5 rounded-full bg-current" />
+                      )}
+                    </Link>
+                  ))}
                 </span>
               )}
               {sport && (
@@ -140,14 +155,6 @@ export default async function CalendarPage({
                 </span>
               )}
             </div>
-          );
-
-          return session ? (
-            <Link key={iso} href={`/workout/${session.id}`}>
-              {cell}
-            </Link>
-          ) : (
-            <div key={iso}>{cell}</div>
           );
         })}
       </div>
