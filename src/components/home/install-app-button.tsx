@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -10,6 +10,8 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 function isStandalone() {
+  if (typeof window === "undefined") return false;
+
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     ("standalone" in window.navigator &&
@@ -18,23 +20,28 @@ function isStandalone() {
   );
 }
 
+function subscribeToInstallStatus(callback: () => void) {
+  window.addEventListener("appinstalled", callback);
+  return () => window.removeEventListener("appinstalled", callback);
+}
+
 export function InstallAppButton() {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [canInstall, setCanInstall] = useState(false);
+  const isInstalled = useSyncExternalStore(
+    subscribeToInstallStatus,
+    isStandalone,
+    () => false,
+  );
 
   useEffect(() => {
-    if (isStandalone()) return;
-
     function handleBeforeInstallPrompt(event: Event) {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
-      setCanInstall(true);
     }
 
     function handleInstalled() {
       setInstallPrompt(null);
-      setCanInstall(false);
     }
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -53,10 +60,9 @@ export function InstallAppButton() {
     await installPrompt.prompt();
     await installPrompt.userChoice;
     setInstallPrompt(null);
-    setCanInstall(false);
   }
 
-  if (!canInstall) return null;
+  if (isInstalled) return null;
 
   return (
     <Button
@@ -64,6 +70,7 @@ export function InstallAppButton() {
       variant="secondary"
       className="w-full"
       onClick={install}
+      disabled={!installPrompt}
     >
       <Download className="size-4" />
       Install app
