@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { INTER_TECHNIQUES, TECHNIQUES_BY_ID } from "@/lib/domain/types";
 import { Exercise, WorkoutExercise } from "@/lib/domain/schemas";
@@ -109,18 +110,12 @@ export function ExerciseEditor({
                   <span className="w-10 text-xs text-muted-foreground">
                     Set {i + 1}
                   </span>
-                  <Input
-                    type="number"
-                    min={1}
-                    inputMode="numeric"
-                    className="flex-1"
+                  <RepsInput
                     value={s.reps}
-                    onChange={(e) =>
+                    onValue={(reps) =>
                       set({
                         sets: value.sets.map((x, j) =>
-                          j === i
-                            ? { ...x, reps: Math.max(1, Number(e.target.value) || 1) }
-                            : x,
+                          j === i ? { ...x, reps } : x,
                         ),
                       })
                     }
@@ -329,5 +324,48 @@ export function ExerciseEditor({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/**
+ * Target-reps input that can be cleared to empty while typing (digits only)
+ * instead of snapping back to 1. The stored plan value stays a valid number:
+ * clearing keeps the last value until a new number is typed, and leaving the
+ * field empty restores the display on blur.
+ */
+function RepsInput({
+  value,
+  onValue,
+}: {
+  value: number;
+  onValue: (reps: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  // Reflect external changes (e.g. duplicating a set) by resetting the draft
+  // during render when the incoming value changes — the pattern React
+  // recommends over a synchronising effect.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setDraft(String(value));
+  }
+
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      className="flex-1"
+      value={draft}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => {
+        const digits = e.target.value.replace(/\D/g, "");
+        setDraft(digits);
+        if (digits !== "") onValue(Math.max(1, Number(digits)));
+      }}
+      onBlur={() => {
+        if (draft === "") setDraft(String(value));
+      }}
+    />
   );
 }

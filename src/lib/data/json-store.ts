@@ -258,6 +258,11 @@ export class JsonStore implements DataStore {
     await db.write();
     return session;
   }
+  async deleteSession(id: string): Promise<void> {
+    const db = await getDb();
+    db.data.sessions = db.data.sessions.filter((s) => s.id !== id);
+    await db.write();
+  }
 
   async listCompletedSessions(
     userId: string,

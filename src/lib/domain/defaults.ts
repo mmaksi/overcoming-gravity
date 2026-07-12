@@ -1,5 +1,5 @@
-import { ATTRIBUTE_ORDER, Attribute } from "./types";
-import { DefaultTemplate, Exercise, WorkoutDay } from "./schemas";
+import { ATTRIBUTE_ORDER } from "./types";
+import { DefaultTemplate, Exercise, sectionOf, WorkoutDay } from "./schemas";
 
 /**
  * Build the prefilled workout day a user starts from in the mesocycle
@@ -13,14 +13,11 @@ export function buildDefaultWorkoutDay(
   template: DefaultTemplate,
   exercisesById: Map<string, Exercise>,
 ): WorkoutDay {
-  const attributeOf = (exerciseId: string): Attribute =>
-    exercisesById.get(exerciseId)?.attribute ?? "strength";
-
   // Fresh ids per copy; remember the mapping so groups stay intact.
   const idMap = new Map<string, string>();
   const exercises = template.day.exercises
     .filter((we) => exercisesById.has(we.exerciseId))
-    .filter((we) => attributeOf(we.exerciseId) !== "strength")
+    .filter((we) => sectionOf(we, exercisesById) !== "strength")
     .map((we) => {
       const id = crypto.randomUUID();
       idMap.set(we.id, id);
@@ -29,8 +26,8 @@ export function buildDefaultWorkoutDay(
 
   exercises.sort(
     (a, b) =>
-      ATTRIBUTE_ORDER.indexOf(attributeOf(a.exerciseId)) -
-      ATTRIBUTE_ORDER.indexOf(attributeOf(b.exerciseId)),
+      ATTRIBUTE_ORDER.indexOf(sectionOf(a, exercisesById)) -
+      ATTRIBUTE_ORDER.indexOf(sectionOf(b, exercisesById)),
   );
 
   const groups = (template.day.groups ?? []).filter((g) =>

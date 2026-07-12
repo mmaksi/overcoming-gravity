@@ -3,11 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CloudUpload, Copy, Loader2 } from "lucide-react";
-import { Attribute, Weekday, WEEKDAYS } from "@/lib/domain/types";
+import {
+  Attribute,
+  WEEK_FOCUS_LABELS,
+  Weekday,
+  WEEKDAYS,
+} from "@/lib/domain/types";
 import {
   Exercise,
   Mesocycle,
   Program,
+  sectionOf,
   WorkoutExercise,
 } from "@/lib/domain/schemas";
 import { activateProgram, saveMesocycle } from "@/lib/actions/programs";
@@ -65,7 +71,10 @@ export function MesocycleDesigner({
     [program.trainingDays],
   );
   const week = meso.weeks[weekIndex];
-  const periodized = program.periodization !== "none";
+  // Light / Heavy tags individual days; Accumulation & Intensification tags
+  // whole weeks instead.
+  const dayPeriodized = program.periodization === "high_low";
+  const weekPeriodized = program.periodization === "daily_undulating";
 
   // Debounced autosave -------------------------------------------------------
   const mesoRef = useRef(meso);
@@ -169,6 +178,11 @@ export function MesocycleDesigner({
           >
             W{w.index + 1}
             {w.isDeload && <span className="ml-1 text-[10px]">deload</span>}
+            {w.focus && (
+              <span className="ml-1 text-[10px]">
+                {w.focus === "accumulation" ? "acc" : "int"}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -185,9 +199,40 @@ export function MesocycleDesigner({
 
       {/* Week toolbar */}
       <div className="flex items-center justify-between">
-        <Badge variant="outline">
-          Week {weekIndex + 1} of {meso.weeks.length}
-        </Badge>
+        <span className="flex items-center gap-2">
+          <Badge variant="outline">
+            Week {weekIndex + 1} of {meso.weeks.length}
+          </Badge>
+          {weekPeriodized && !week?.isDeload && (
+            <button
+              type="button"
+              title="Toggle accumulation/intensification"
+              onClick={() =>
+                apply({
+                  weeks: meso.weeks.map((w) =>
+                    w.index === weekIndex
+                      ? {
+                          ...w,
+                          focus:
+                            w.focus === "accumulation"
+                              ? ("intensification" as const)
+                              : ("accumulation" as const),
+                        }
+                      : w,
+                  ),
+                })
+              }
+              className={cn(
+                "rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
+                week?.focus === "intensification"
+                  ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                  : "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+              )}
+            >
+              {WEEK_FOCUS_LABELS[week?.focus ?? "accumulation"]}
+            </button>
+          )}
+        </span>
         <Button variant="outline" size="sm" onClick={() => setCopyingWeek(true)}>
           <Copy className="size-4" /> Copy week to…
         </Button>
@@ -203,7 +248,7 @@ export function MesocycleDesigner({
               key={weekday}
               weekday={weekday}
               day={day}
-              periodized={periodized}
+              periodized={dayPeriodized}
               exercisesById={exercisesById}
               onToggleIntensity={() =>
                 apply(
@@ -221,9 +266,7 @@ export function MesocycleDesigner({
                 apply(
                   updateDay(meso, weekIndex, weekday, (d) => {
                     const remaining = d.exercises.filter(
-                      (we) =>
-                        (exercisesById.get(we.exerciseId)?.attribute ??
-                          "strength") !== attribute,
+                      (we) => sectionOf(we, exercisesById) !== attribute,
                     );
                     return {
                       ...d,
@@ -276,10 +319,11 @@ export function MesocycleDesigner({
 
       {/* Sheets & dialogs */}
       <ExercisePicker
+        key={pickingFor ? `${pickingFor.weekday}-${pickingFor.attribute}` : "closed"}
         open={pickingFor !== null}
         onOpenChange={(open) => !open && setPickingFor(null)}
         exercises={exercises}
-        lockedAttribute={pickingFor?.attribute ?? null}
+        section={pickingFor?.attribute ?? null}
         onPick={(exercise) => {
           if (!pickingFor) return;
           const { weekday } = pickingFor;
@@ -293,6 +337,8 @@ export function MesocycleDesigner({
             clusterRestSeconds:
               exercise.repStyle === "cluster" ? 15 : undefined,
             progressionMethod: "intra",
+            // Stays in the section it was added to, whatever its attribute.
+            section: pickingFor.attribute,
           };
           apply(
             updateDay(meso, weekIndex, weekday, (d) => ({

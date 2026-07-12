@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  Attribute,
   ATTRIBUTES,
   CATEGORIES,
   GROUP_TYPES,
@@ -12,6 +13,7 @@ import {
   PROGRESSION_METHODS,
   REP_STYLES,
   SPLIT_TYPES,
+  WEEK_FOCUSES,
   WEEKDAYS,
 } from "./types";
 
@@ -72,8 +74,21 @@ export const workoutExerciseSchema = z.object({
   notes: z.string().optional(),
   /** When set, this exercise belongs to a group (superset/circuit/pyramid). */
   groupId: z.string().optional(),
+  /**
+   * The day section this exercise appears in. Any exercise can be added to
+   * any section; when unset it shows in its own attribute's section.
+   */
+  section: z.enum(ATTRIBUTES).optional(),
 });
 export type WorkoutExercise = z.infer<typeof workoutExerciseSchema>;
+
+/** The day section a planned exercise belongs to (see `section` above). */
+export function sectionOf(
+  we: WorkoutExercise,
+  exercisesById: Map<string, Exercise>,
+): Attribute {
+  return we.section ?? exercisesById.get(we.exerciseId)?.attribute ?? "strength";
+}
 
 export const exerciseGroupSchema = z.object({
   id: z.string(),
@@ -102,6 +117,8 @@ export type DefaultTemplate = z.infer<typeof defaultTemplateSchema>;
 export const weekSchema = z.object({
   index: z.number().int().min(0),
   isDeload: z.boolean(),
+  /** Accumulation & Intensification: the whole week's focus. */
+  focus: z.enum(WEEK_FOCUSES).optional(),
   days: z.partialRecord(z.enum(WEEKDAYS), workoutDaySchema.nullable()),
 });
 export type Week = z.infer<typeof weekSchema>;
@@ -288,6 +305,13 @@ export type ExerciseNote = z.infer<typeof exerciseNoteSchema>;
 export function exerciseNoteKey(exerciseId: string, techniqueId: string) {
   return `${exerciseId}:${techniqueId}`;
 }
+
+/**
+ * Notes are remembered per exercise (not per technique) so they show up every
+ * time that exercise is trained. They're stored under this sentinel
+ * technique id, which keeps the (user, exercise, technique) row shape intact.
+ */
+export const EXERCISE_NOTE_TECHNIQUE = "_exercise";
 
 // ---------------------------------------------------------------------------
 // Users

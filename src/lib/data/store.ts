@@ -59,6 +59,8 @@ export interface DataStore {
   ): Promise<WorkoutSession[]>;
   getSession(id: string): Promise<WorkoutSession | null>;
   updateSession(session: WorkoutSession): Promise<WorkoutSession>;
+  /** Permanently remove a session (used to delete a workout from history). */
+  deleteSession(id: string): Promise<void>;
 
   /**
    * Completed workouts, newest first. Powers history, the progress overview

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CalendarDays, TrendingUp } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
@@ -9,7 +8,7 @@ import {
   ProgressList,
   ProgressRow,
 } from "@/components/history/progress-list";
-import { Badge } from "@/components/ui/badge";
+import { WorkoutHistoryList } from "@/components/history/workout-history-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /** "Intra" or the inter-exercise technique's name — what to do next time. */
@@ -141,49 +140,15 @@ export default async function HistoryPage() {
         </TabsList>
 
         <TabsContent value="workouts" className="space-y-8 pt-3">
-          {completed.length === 0 && (
-            <div className="space-y-1 py-8 text-center">
-              <p className="font-medium">No workouts yet</p>
-              <p className="text-sm text-muted-foreground">
-                Completed workouts appear here with everything you logged.
-              </p>
-            </div>
-          )}
-          {completed.map((session) => (
-            <Link
-              key={session.id}
-              href={`/workout/${session.id}`}
-              className="block space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">{session.date}</span>
-                <Badge variant="secondary">{sessionLabel(session)}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {WEEKDAY_LABELS[session.weekday]}, week {session.weekIndex + 1}{" "}
-                · {session.entries.length} exercises
-              </p>
-              <div className="space-y-1.5">
-                {entryLabel(session, exercisesById).map((line) => (
-                  <div key={line.id} className="text-sm text-muted-foreground">
-                    <p className="flex items-center gap-1.5">
-                      <span className="font-medium text-foreground">
-                        {line.title}
-                      </span>{" "}
-                      {line.detail}
-                      <Badge
-                        variant={line.isInter ? "default" : "outline"}
-                        className="ml-auto shrink-0 text-[10px]"
-                      >
-                        {line.method}
-                      </Badge>
-                    </p>
-                    {line.notes && <p className="pl-2 italic">“{line.notes}”</p>}
-                  </div>
-                ))}
-              </div>
-            </Link>
-          ))}
+          <WorkoutHistoryList
+            sessions={completed.map((session) => ({
+              id: session.id,
+              date: session.date,
+              label: sessionLabel(session),
+              meta: `${WEEKDAY_LABELS[session.weekday]}, week ${session.weekIndex + 1} · ${session.entries.length} exercises`,
+              lines: entryLabel(session, exercisesById),
+            }))}
+          />
         </TabsContent>
 
         <TabsContent value="progress" className="space-y-4 pt-2">

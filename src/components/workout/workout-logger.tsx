@@ -16,17 +16,19 @@ import {
   X,
 } from "lucide-react";
 import {
-  Attribute,
   ATTRIBUTE_LABELS,
   ATTRIBUTE_ORDER,
   GROUP_TYPE_COLORS,
   GROUP_TYPE_LABELS,
+  INTENSITY_LABELS,
   TECHNIQUES_BY_ID,
+  WEEK_FOCUS_LABELS,
+  WeekFocus,
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
 import {
   Exercise,
-  exerciseNoteKey,
+  sectionOf,
   SessionEntry,
   VolumeStats,
   WorkoutDay,
@@ -54,12 +56,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { ExerciseSessionSheet } from "./exercise-session-sheet";
 import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
@@ -141,6 +137,7 @@ export function WorkoutLogger({
   title,
   plannedDay,
   isDeload,
+  weekFocus,
   exercises,
   stats,
   userNotes = {},
@@ -150,9 +147,11 @@ export function WorkoutLogger({
   title: string;
   plannedDay: WorkoutDay;
   isDeload: boolean;
+  /** Accumulation & Intensification programs: this week's focus. */
+  weekFocus?: WeekFocus;
   exercises: Exercise[];
   stats: Record<string, VolumeStats>;
-  /** Remembered notes keyed `${exerciseId}:${techniqueId}`. */
+  /** Remembered notes keyed by exercise id. */
   userNotes?: Record<string, string>;
 }) {
   const router = useRouter();
@@ -163,7 +162,6 @@ export function WorkoutLogger({
   const [openSheetFor, setOpenSheetFor] = useState<string | null>(null);
   const [timer, setTimer] = useState<RestTimerState | null>(null);
   const [stopwatchOpen, setStopwatchOpen] = useState(false);
-  const [timerModalOpen, setTimerModalOpen] = useState(false);
   const readOnly = session.status !== "planned";
 
   // Workout duration: accumulated seconds from previous visits (frozen at
@@ -186,14 +184,13 @@ export function WorkoutLogger({
   );
 
   // Exercises in designed order: warm-up → skill → strength → … → cool-down,
-  // one visually separated block per section.
+  // one visually separated block per section (an exercise may be planned
+  // into a section other than its own attribute).
   const sections = useMemo(() => {
-    const attributeOf = (we: WorkoutExercise): Attribute =>
-      exercisesById.get(we.exerciseId)?.attribute ?? "strength";
     return ATTRIBUTE_ORDER.map((attribute) => ({
       attribute,
       exercises: plannedDay.exercises.filter(
-        (we) => attributeOf(we) === attribute,
+        (we) => sectionOf(we, exercisesById) === attribute,
       ),
     })).filter((s) => s.exercises.length > 0);
   }, [plannedDay.exercises, exercisesById]);
@@ -239,7 +236,8 @@ export function WorkoutLogger({
         exerciseId: we.exerciseId,
         progressionId: we.progressionId,
         interTechniqueId: we.interTechniqueId,
-        notes: we.notes,
+        // Remembered note for this exercise always resurfaces.
+        notes: we.notes ?? userNotes[we.exerciseId],
         // Start empty: the placeholder shows your past max for this
         // progression (or the plan target). Empty stays empty on "save
         // progress" and resolves to the placeholder on "complete".
@@ -499,32 +497,38 @@ export function WorkoutLogger({
                     : "bg-sky-500/15 text-sky-600",
                 )}
               >
-                {plannedDay.intensity} volume
+                {INTENSITY_LABELS[plannedDay.intensity]} day
+              </span>
+            )}
+            {weekFocus && (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                  weekFocus === "intensification"
+                    ? "bg-orange-500/15 text-orange-600"
+                    : "bg-sky-500/15 text-sky-600",
+                )}
+              >
+                {WEEK_FOCUS_LABELS[weekFocus]}
               </span>
             )}
             {session.status !== "planned" && (
               <Badge variant="secondary">{session.status}</Badge>
             )}
             {!readOnly && (
-              <button
-                type="button"
-                aria-label="Show workout timer"
-                className="flex items-center gap-1 font-medium tabular-nums text-foreground"
-                onClick={() => setTimerModalOpen(true)}
-              >
+              <span className="flex items-center gap-1 font-medium tabular-nums text-foreground">
                 <Timer className="size-4 text-primary" />
                 {formatDuration(elapsedSeconds)}
-              </button>
+              </span>
             )}
           </p>
         </div>
         <Button
           variant="outline"
           size="icon"
-          aria-pressed={stopwatchOpen}
-          aria-label="Toggle stopwatch"
+          aria-label="Open stopwatch"
           title="Stopwatch — for isometric holds"
-          onClick={() => setStopwatchOpen((x) => !x)}
+          onClick={() => setStopwatchOpen(true)}
         >
           <Clock className="size-5" />
         </Button>
@@ -924,26 +928,24 @@ export function WorkoutLogger({
                         </Button>
                       </div>
                     )}
-                    {(technique?.kind === "notes" ||
-                      we.progressionMethod === "inter" ||
-                      entry.notes) && (
-                      <Textarea
-                        placeholder={
-                          technique?.prompt ??
-                          (we.progressionMethod === "inter"
-                            ? "Manual progression notes (inter-exercise progression)…"
-                            : "Notes…")
-                        }
-                        disabled={readOnly}
-                        value={entry.notes ?? ""}
-                        onChange={(e) =>
-                          updateEntry(we.id, (en) => ({
-                            ...en,
-                            notes: e.target.value,
-                          }))
-                        }
-                      />
-                    )}
+                    {/* Notes are always available and remembered per
+                        exercise, so they resurface every time you train it. */}
+                    <Textarea
+                      placeholder={
+                        technique?.prompt ??
+                        (we.progressionMethod === "inter"
+                          ? "Manual progression notes (inter-exercise progression)…"
+                          : "Notes for this exercise (remembered next time)…")
+                      }
+                      disabled={readOnly}
+                      value={entry.notes ?? ""}
+                      onChange={(e) =>
+                        updateEntry(we.id, (en) => ({
+                          ...en,
+                          notes: e.target.value,
+                        }))
+                      }
+                    />
                   </CardContent>
                 </Card>
 
@@ -966,18 +968,11 @@ export function WorkoutLogger({
                       ...(patch.notes !== undefined && { notes: patch.notes }),
                       ...(patch.interTechniqueId !== undefined && {
                         interTechniqueId: patch.interTechniqueId ?? undefined,
-                        // Prefill the remembered note for this exercise +
-                        // technique pair (never overwrite what's typed).
-                        ...(patch.interTechniqueId &&
-                          !en.notes?.trim() && {
-                            notes:
-                              userNotes[
-                                exerciseNoteKey(
-                                  en.exerciseId,
-                                  patch.interTechniqueId,
-                                )
-                              ],
-                          }),
+                        // Prefill the remembered note for this exercise if the
+                        // field is still empty (never overwrite what's typed).
+                        ...(!en.notes?.trim() && {
+                          notes: userNotes[en.exerciseId],
+                        }),
                       }),
                     }))
                   }
@@ -1029,45 +1024,28 @@ export function WorkoutLogger({
         </div>
       )}
 
-      {(stopwatchOpen || (timer && !readOnly)) && (
+      {timer && !readOnly && (
         <div
           className="fixed inset-x-0 z-40"
           style={{ bottom: "calc(env(safe-area-inset-bottom) + 76px)" }}
         >
-          <div className="mx-auto max-w-lg space-y-2 px-4">
-            {stopwatchOpen && (
-              <Stopwatch onClose={() => setStopwatchOpen(false)} />
-            )}
-            {timer && !readOnly && (
-              <RestTimer
-                key={timer.id}
-                seconds={timer.seconds}
-                nextLabel={timer.nextLabel}
-                onDismiss={() => {
-                  setTimer(null);
-                  postToServiceWorker({ type: "rest-timer-cancel" });
-                }}
-              />
-            )}
+          <div className="mx-auto max-w-lg px-4">
+            <RestTimer
+              key={timer.id}
+              seconds={timer.seconds}
+              nextLabel={timer.nextLabel}
+              onDismiss={() => {
+                setTimer(null);
+                postToServiceWorker({ type: "rest-timer-cancel" });
+              }}
+            />
           </div>
         </div>
       )}
 
-      {/* Big centered readout of the workout duration, opened from the
-          header timer. */}
-      <Dialog open={timerModalOpen} onOpenChange={setTimerModalOpen}>
-        <DialogContent className="max-w-xs">
-          <DialogHeader>
-            <DialogTitle className="text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Workout duration
-            </DialogTitle>
-          </DialogHeader>
-          <p className="flex items-center justify-center gap-3 py-8 text-6xl font-bold tabular-nums">
-            <Timer className="size-10 text-primary" />
-            {formatDuration(elapsedSeconds)}
-          </p>
-        </DialogContent>
-      </Dialog>
+      {/* Centered stopwatch modal (clock icon in the header). Always
+          mounted so it keeps running while the modal is closed. */}
+      <Stopwatch open={stopwatchOpen} onOpenChange={setStopwatchOpen} />
     </div>
   );
 }

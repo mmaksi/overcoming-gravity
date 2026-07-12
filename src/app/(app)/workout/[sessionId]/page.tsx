@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { buildVolumeStats } from "@/lib/domain/volume";
-import { exerciseNoteKey, WorkoutDay } from "@/lib/domain/schemas";
+import { WorkoutDay } from "@/lib/domain/schemas";
+import { WeekFocus } from "@/lib/domain/types";
 import { WorkoutLogger } from "@/components/workout/workout-logger";
 
 export default async function WorkoutPage({
@@ -21,6 +22,7 @@ export default async function WorkoutPage({
   let title: string;
   let plannedDay: WorkoutDay | undefined;
   let isDeload = false;
+  let weekFocus: WeekFocus | undefined;
   if (session.runId) {
     const run = await store.getRun(session.runId);
     const program = run ? await store.getProgram(run.programId) : null;
@@ -28,6 +30,7 @@ export default async function WorkoutPage({
     const week = program.mesocycle.weeks[session.weekIndex];
     plannedDay = week?.days[session.weekday] ?? undefined;
     isDeload = week?.isDeload ?? false;
+    weekFocus = week?.focus;
     title = program.name;
   } else {
     const workout = session.customWorkoutId
@@ -48,9 +51,16 @@ export default async function WorkoutPage({
   // Stats for every progression of every planned exercise, so swapping
   // progression mid-workout still shows the right memory instantly.
   const stats = buildVolumeStats(completed.filter((s) => s.id !== session.id));
-  const userNotes = Object.fromEntries(
-    notes.map((n) => [exerciseNoteKey(n.exerciseId, n.techniqueId), n.note]),
-  );
+  // One remembered note per exercise (technique-independent). If legacy
+  // per-technique rows exist, keep the most recently updated.
+  const userNotes: Record<string, string> = {};
+  const noteUpdatedAt: Record<string, string> = {};
+  for (const n of notes) {
+    if (!noteUpdatedAt[n.exerciseId] || n.updatedAt > noteUpdatedAt[n.exerciseId]) {
+      userNotes[n.exerciseId] = n.note;
+      noteUpdatedAt[n.exerciseId] = n.updatedAt;
+    }
+  }
 
   return (
     <WorkoutLogger
@@ -58,6 +68,7 @@ export default async function WorkoutPage({
       title={title}
       plannedDay={plannedDay}
       isDeload={isDeload}
+      weekFocus={weekFocus}
       exercises={exercises}
       stats={stats}
       userNotes={userNotes}

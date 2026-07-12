@@ -1,13 +1,19 @@
-import { Intensity, Periodization, Weekday, WEEKDAYS } from "./types";
+import {
+  Intensity,
+  Periodization,
+  Weekday,
+  WEEKDAYS,
+  WeekFocus,
+} from "./types";
 import { DefaultTemplate, Exercise, Mesocycle, Week } from "./schemas";
 import { buildDefaultWorkoutDay } from "./defaults";
 
 /**
  * Build the initial mesocycle a program starts with: every training day of
- * every week prefilled from the admin defaults. When a periodization
- * technique is chosen, training days alternate high/low volume (editable
- * later in the designer); the final week is the deload and is flagged low
- * across the board.
+ * every week prefilled from the admin defaults; the final week is the deload.
+ * Light / Heavy alternates day intensity within each week; Accumulation &
+ * Intensification alternates the focus of WHOLE weeks. Both are editable
+ * later in the designer.
  */
 export function buildMesocycle(opts: {
   weeks: number;
@@ -26,7 +32,7 @@ export function buildMesocycle(opts: {
     const days: Week["days"] = {};
     orderedDays.forEach((weekday, i) => {
       const day = buildDefaultWorkoutDay(template, exercisesById);
-      if (periodization !== "none") {
+      if (periodization === "high_low") {
         const intensity: Intensity = isDeload
           ? "low"
           : i % 2 === 0
@@ -36,7 +42,13 @@ export function buildMesocycle(opts: {
       }
       days[weekday] = day;
     });
-    result.push({ index: w, isDeload, days });
+    const focus: WeekFocus | undefined =
+      periodization === "daily_undulating" && !isDeload
+        ? w % 2 === 0
+          ? "accumulation"
+          : "intensification"
+        : undefined;
+    result.push({ index: w, isDeload, focus, days });
   }
   return { weeks: result };
 }

@@ -48,9 +48,9 @@ const TYPE_DESCRIPTIONS: Record<ProgramType, string> = {
 const PERIODIZATION_DESCRIPTIONS: Record<Periodization, string> = {
   none: "The same workout repeats every training day. Simple and effective — you progress by adding reps, sets or weight over the weeks.",
   daily_undulating:
-    "Intensity and volume change from workout to workout within the same week: for example Monday heavy with low reps, Wednesday light with high reps, Friday in between. You vary the stimulus day to day and train each quality more often.",
+    "Whole weeks alternate between ACCUMULATION (build volume: more sets and reps at easier intensities) and INTENSIFICATION (push intensity: harder progressions, lower reps, longer rests). Every workout shows which week you're in.",
   high_low:
-    "Days are strictly divided into demanding HIGH sessions and easy LOW sessions, with at least 48h between hard days. Fewer but harder peaks, and the low days guarantee recovery.",
+    "Days are strictly divided into demanding HEAVY sessions and easy LIGHT sessions, with at least 48h between hard days. Fewer but harder peaks, and the light days guarantee recovery.",
 };
 
 export function ProgramWizard() {

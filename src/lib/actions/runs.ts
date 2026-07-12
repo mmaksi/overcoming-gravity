@@ -6,7 +6,11 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { generateSessions } from "@/lib/domain/schedule";
-import { ProgramRun, sessionEntrySchema } from "@/lib/domain/schemas";
+import {
+  EXERCISE_NOTE_TECHNIQUE,
+  ProgramRun,
+  sessionEntrySchema,
+} from "@/lib/domain/schemas";
 
 const startRunSchema = z.object({
   programId: z.string(),
@@ -124,15 +128,15 @@ export async function saveWorkoutSession(input: {
     durationSeconds: durationSeconds ?? session.durationSeconds,
   });
 
-  // Technique notes belong to the user + exercise + technique pair — remember
-  // the latest so it prefills wherever that pair is picked again.
+  // Notes belong to the user + exercise (technique-independent) so they
+  // resurface every time that exercise is trained.
   const now = new Date().toISOString();
   for (const entry of entries) {
-    if (entry.interTechniqueId && entry.notes?.trim()) {
+    if (entry.notes?.trim()) {
       await store.saveExerciseNote({
         userId: user.id,
         exerciseId: entry.exerciseId,
-        techniqueId: entry.interTechniqueId,
+        techniqueId: EXERCISE_NOTE_TECHNIQUE,
         note: entry.notes.trim(),
         updatedAt: now,
       });
@@ -157,4 +161,16 @@ export async function saveWorkoutSession(input: {
 
   revalidatePath("/", "layout");
   return { runCompleted, programId };
+}
+
+/** Delete a logged workout from history. Does not touch the program plan. */
+export async function deleteWorkoutSession(sessionId: string): Promise<void> {
+  const user = await requireUser();
+  const store = await getStore();
+  const session = await store.getSession(sessionId);
+  if (!session || session.userId !== user.id) {
+    throw new Error("Session not found");
+  }
+  await store.deleteSession(sessionId);
+  revalidatePath("/", "layout");
 }

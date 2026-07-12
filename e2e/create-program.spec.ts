@@ -24,7 +24,7 @@ test("create a program end-to-end", async ({ page }) => {
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
   // Step 3 — periodization
-  await page.getByRole("button", { name: /High–Low/ }).click();
+  await page.getByRole("button", { name: /Light \/ Heavy/ }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
   // Step 4 — schedule
@@ -37,7 +37,7 @@ test("create a program end-to-end", async ({ page }) => {
   await expect(page.getByText("E2E Front Lever")).toBeVisible();
   await expect(page.getByRole("button", { name: /W6/ })).toBeVisible();
   await expect(page.getByText("Monday")).toBeVisible();
-  await expect(page.getByText("High volume").first()).toBeVisible();
+  await expect(page.getByText("Heavy").first()).toBeVisible();
   // default template prefill + skill work
   await expect(page.getByText("Wrist Circles & Prep").first()).toBeVisible();
   await expect(page.getByText("Front Lever").first()).toBeVisible();

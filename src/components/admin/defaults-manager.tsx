@@ -6,6 +6,7 @@ import { Attribute } from "@/lib/domain/types";
 import {
   DefaultTemplate,
   Exercise,
+  sectionOf,
   WorkoutDay,
   WorkoutExercise,
 } from "@/lib/domain/schemas";
@@ -101,9 +102,7 @@ export function DefaultsManager({
           onAddExercise={(attribute) => setPickingFor(attribute)}
           onRemoveSection={(attribute) => {
             const remaining = day.exercises.filter(
-              (we) =>
-                (exercisesById.get(we.exerciseId)?.attribute ?? "strength") !==
-                attribute,
+              (we) => sectionOf(we, exercisesById) !== attribute,
             );
             apply({
               ...day,
@@ -129,10 +128,11 @@ export function DefaultsManager({
       </div>
 
       <ExercisePicker
+        key={pickingFor ?? "closed"}
         open={pickingFor !== null}
         onOpenChange={(open) => !open && setPickingFor(null)}
         exercises={exercises}
-        lockedAttribute={pickingFor}
+        section={pickingFor}
         onPick={(exercise) => {
           const defaultValue = exercise.measurement === "time" ? 10 : 8;
           const we: WorkoutExercise = {
@@ -144,6 +144,8 @@ export function DefaultsManager({
             clusterRestSeconds:
               exercise.repStyle === "cluster" ? 15 : undefined,
             progressionMethod: "intra",
+            // Stays in the section it was added to, whatever its attribute.
+            section: pickingFor ?? undefined,
           };
           apply({ ...day, exercises: [...day.exercises, we] });
           setPickingFor(null);

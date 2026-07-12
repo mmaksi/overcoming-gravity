@@ -25,33 +25,34 @@ export function ExercisePicker({
   open,
   onOpenChange,
   exercises,
-  lockedAttribute = null,
+  section = null,
   onPick,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   exercises: Exercise[];
-  /** When set, only exercises of this section are offered. */
-  lockedAttribute?: Attribute | null;
+  /**
+   * The day section being added to. Any exercise can go into any section —
+   * this only preselects the attribute filter (clearable) and names the
+   * sheet. Remount with `key={section}` so the filter resets per section.
+   */
+  section?: Attribute | null;
   onPick: (exercise: Exercise) => void;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
-  const [attribute, setAttribute] = useState<Attribute | null>(null);
-
-  const effectiveAttribute = lockedAttribute ?? attribute;
+  const [attribute, setAttribute] = useState<Attribute | null>(section);
 
   const filtered = useMemo(
     () =>
       exercises.filter((e) => {
         if (category && e.category !== category) return false;
-        if (effectiveAttribute && e.attribute !== effectiveAttribute)
-          return false;
+        if (attribute && e.attribute !== attribute) return false;
         if (query && !e.title.toLowerCase().includes(query.toLowerCase()))
           return false;
         return true;
       }),
-    [exercises, category, effectiveAttribute, query],
+    [exercises, category, attribute, query],
   );
 
   return (
@@ -67,11 +68,16 @@ export function ExercisePicker({
         <div className="flex h-full min-h-0 flex-col">
           <SheetHeader className="pb-2">
             <SheetTitle>
-              {lockedAttribute
-                ? `Add ${ATTRIBUTE_LABELS[lockedAttribute].toLowerCase()} exercise`
+              {section
+                ? `Add to ${ATTRIBUTE_LABELS[section].toLowerCase()}`
                 : "Add exercise"}
             </SheetTitle>
-            <SheetDescription>Pick from the exercise library.</SheetDescription>
+            <SheetDescription>
+              Pick any exercise from the library
+              {section
+                ? ` — it goes into the ${ATTRIBUTE_LABELS[section].toLowerCase()} section.`
+                : "."}
+            </SheetDescription>
           </SheetHeader>
 
           <div className="space-y-2.5 px-4 pb-3">
@@ -90,18 +96,16 @@ export function ExercisePicker({
                 />
               ))}
             </div>
-            {!lockedAttribute && (
-              <div className="flex flex-wrap gap-1.5">
-                {ATTRIBUTES.map((a) => (
-                  <FilterChip
-                    key={a}
-                    label={ATTRIBUTE_LABELS[a]}
-                    active={attribute === a}
-                    onClick={() => setAttribute(attribute === a ? null : a)}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-1.5">
+              {ATTRIBUTES.map((a) => (
+                <FilterChip
+                  key={a}
+                  label={ATTRIBUTE_LABELS[a]}
+                  active={attribute === a}
+                  onClick={() => setAttribute(attribute === a ? null : a)}
+                />
+              ))}
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
@@ -124,7 +128,7 @@ export function ExercisePicker({
                       <Badge variant="outline">
                         {CATEGORY_LABELS[e.category]}
                       </Badge>
-                      {!lockedAttribute && (
+                      {attribute === null && (
                         <Badge variant="secondary">
                           {ATTRIBUTE_LABELS[e.attribute]}
                         </Badge>

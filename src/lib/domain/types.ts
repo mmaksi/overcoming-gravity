@@ -54,6 +54,23 @@ export type Periodization = (typeof PERIODIZATIONS)[number];
 export const INTENSITIES = ["high", "low"] as const;
 export type Intensity = (typeof INTENSITIES)[number];
 
+export const INTENSITY_LABELS: Record<Intensity, string> = {
+  high: "Heavy",
+  low: "Light",
+};
+
+/**
+ * Accumulation & Intensification periodization: whole WEEKS alternate between
+ * accumulation (build volume) and intensification (push intensity).
+ */
+export const WEEK_FOCUSES = ["accumulation", "intensification"] as const;
+export type WeekFocus = (typeof WEEK_FOCUSES)[number];
+
+export const WEEK_FOCUS_LABELS: Record<WeekFocus, string> = {
+  accumulation: "Accumulation",
+  intensification: "Intensification",
+};
+
 export const PROGRESSION_METHODS = ["intra", "inter"] as const;
 export type ProgressionMethod = (typeof PROGRESSION_METHODS)[number];
 
@@ -221,8 +238,8 @@ export const SPLIT_TYPE_LABELS: Record<SplitType, string> = {
 
 export const PERIODIZATION_LABELS: Record<Periodization, string> = {
   none: "No periodization",
-  daily_undulating: "Daily Undulating (DUP)",
-  high_low: "High–Low",
+  daily_undulating: "Accumulation & Intensification",
+  high_low: "Light / Heavy",
 };
 
 export const MEASUREMENT_LABELS: Record<Measurement, string> = {

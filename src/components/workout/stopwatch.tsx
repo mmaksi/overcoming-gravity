@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, RotateCcw, X } from "lucide-react";
+import { Pause, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function format(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -13,10 +19,18 @@ function format(ms: number): string {
 }
 
 /**
- * Simple stopwatch card for timing isometric holds (planks, levers…).
- * The caller positions it (fixed stack above the nav).
+ * Stopwatch for timing isometric holds (planks, levers…), shown as a
+ * centered modal. Keep it mounted and drive visibility via `open` — the
+ * stopwatch keeps running while the modal is closed, so peeking at the
+ * workout mid-hold doesn't lose the time.
  */
-export function Stopwatch({ onClose }: { onClose: () => void }) {
+export function Stopwatch({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const baseRef = useRef(0); // elapsed ms accumulated before the last start
@@ -49,34 +63,37 @@ export function Stopwatch({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border bg-background/95 p-4 shadow-lg backdrop-blur">
-      <span className="text-2xl font-bold tabular-nums">{format(elapsed)}</span>
-      <span className="flex items-center gap-1.5">
-        <Button
-          size="icon"
-          variant={running ? "secondary" : "default"}
-          aria-label={running ? "Pause stopwatch" : "Start stopwatch"}
-          onClick={toggle}
-        >
-          {running ? <Pause className="size-5" /> : <Play className="size-5" />}
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="Reset stopwatch"
-          onClick={reset}
-        >
-          <RotateCcw className="size-5" />
-        </Button>
-        <button
-          type="button"
-          aria-label="Close stopwatch"
-          className="p-1 text-muted-foreground hover:text-foreground"
-          onClick={onClose}
-        >
-          <X className="size-5" />
-        </button>
-      </span>
-    </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xs">
+        <DialogHeader>
+          <DialogTitle className="text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Stopwatch
+          </DialogTitle>
+        </DialogHeader>
+        <p className="py-6 text-center text-6xl font-bold tabular-nums">
+          {format(elapsed)}
+        </p>
+        <div className="flex justify-center gap-3 pb-2">
+          <Button
+            size="lg"
+            variant={running ? "secondary" : "default"}
+            onClick={toggle}
+          >
+            {running ? (
+              <>
+                <Pause className="size-5" /> Pause
+              </>
+            ) : (
+              <>
+                <Play className="size-5" /> Start
+              </>
+            )}
+          </Button>
+          <Button size="lg" variant="outline" onClick={reset}>
+            <RotateCcw className="size-5" /> Reset
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

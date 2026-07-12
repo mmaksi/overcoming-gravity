@@ -383,6 +383,11 @@ class SupabaseStore implements DataStore {
     );
     return session;
   }
+  async deleteSession(id: string): Promise<void> {
+    orThrow(
+      await this.db.from("sessions").delete().eq("id", id).select("id"),
+    );
+  }
 
   async listCompletedSessions(
     userId: string,

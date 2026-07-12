@@ -96,19 +96,31 @@ describe("buildMesocycle", () => {
     );
   });
 
-  it("alternates high/low across training days when periodized", () => {
-    const program = makeProgram();
+  it("alternates heavy/light across training days with Light / Heavy", () => {
+    const program = makeProgram({ periodization: "high_low" });
     const week = program.mesocycle.weeks[0];
     expect(week.days.mon?.intensity).toBe("high");
     expect(week.days.wed?.intensity).toBe("low");
     expect(week.days.fri?.intensity).toBe("high");
-    // deload week is all low
+    // deload week is all light
     const deload = program.mesocycle.weeks[5];
     expect(deload.days.mon?.intensity).toBe("low");
+  });
+
+  it("alternates week focus with Accumulation & Intensification", () => {
+    const program = makeProgram(); // daily_undulating
+    const weeks = program.mesocycle.weeks;
+    expect(weeks[0].focus).toBe("accumulation");
+    expect(weeks[1].focus).toBe("intensification");
+    expect(weeks[2].focus).toBe("accumulation");
+    // days carry no individual intensity; the deload week has no focus
+    expect(weeks[0].days.mon?.intensity).toBeUndefined();
+    expect(weeks[5].focus).toBeUndefined();
   });
 
   it("sets no intensity without periodization", () => {
     const program = makeProgram({ periodization: "none" });
     expect(program.mesocycle.weeks[0].days.mon?.intensity).toBeUndefined();
+    expect(program.mesocycle.weeks[0].focus).toBeUndefined();
   });
 });

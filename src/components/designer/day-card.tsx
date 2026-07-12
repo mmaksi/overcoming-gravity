@@ -34,10 +34,16 @@ import {
   GROUP_TYPE_LABELS,
   GroupType,
   GROUP_TYPES,
+  INTENSITY_LABELS,
   Weekday,
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
-import { Exercise, WorkoutDay, WorkoutExercise } from "@/lib/domain/schemas";
+import {
+  Exercise,
+  sectionOf,
+  WorkoutDay,
+  WorkoutExercise,
+} from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -103,7 +109,7 @@ export function DayCard({
             <button
               type="button"
               onClick={onToggleIntensity}
-              title="Toggle high/low volume"
+              title="Toggle light/heavy day"
               className={cn(
                 "rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
                 day.intensity === "high"
@@ -111,7 +117,7 @@ export function DayCard({
                   : "bg-sky-500/15 text-sky-600 dark:text-sky-400",
               )}
             >
-              {day.intensity === "high" ? "High volume" : "Low volume"}
+              {INTENSITY_LABELS[day.intensity === "high" ? "high" : "low"]}
             </button>
           )}
         </span>
@@ -172,14 +178,11 @@ export function DaySections({
   const [selecting, setSelecting] = useState<Attribute | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
 
-  const attributeOf = (we: WorkoutExercise): Attribute =>
-    exercisesById.get(we.exerciseId)?.attribute ?? "strength";
-
   return (
     <>
       {ATTRIBUTE_ORDER.map((attribute) => {
         const section = day.exercises.filter(
-          (we) => attributeOf(we) === attribute,
+          (we) => sectionOf(we, exercisesById) === attribute,
         );
         return (
           <DaySection
