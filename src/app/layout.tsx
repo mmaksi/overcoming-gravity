@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { InstallPromptScript } from "@/components/shell/install-prompt-script";
 import { ServiceWorkerRegister } from "@/components/shell/sw-register";
 import { ThemeScript } from "@/components/theme/theme-script";
 
@@ -18,6 +19,10 @@ export const metadata: Metadata = {
   title: "Cali Pro",
   description: "Build calisthenics programs, design mesocycles, track workouts.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icons/icon.svg",
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -45,6 +50,7 @@ export default function RootLayout({
     >
       <head>
         <ThemeScript />
+        <InstallPromptScript />
       </head>
       <body className="min-h-full flex flex-col bg-background">
         <ServiceWorkerRegister />
