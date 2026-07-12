@@ -54,6 +54,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ExerciseSessionSheet } from "./exercise-session-sheet";
 import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
@@ -90,6 +96,15 @@ function digitsOnly(value: string): string {
 /** Select the whole value on focus so typing replaces it immediately. */
 function selectAll(e: React.FocusEvent<HTMLInputElement>) {
   e.target.select();
+}
+
+/** Best-effort message to the service worker (PWA installs). */
+function postToServiceWorker(message: Record<string, unknown>) {
+  try {
+    navigator.serviceWorker?.controller?.postMessage(message);
+  } catch {
+    // No service worker in dev — the in-page rest bar still works.
+  }
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -148,6 +163,7 @@ export function WorkoutLogger({
   const [openSheetFor, setOpenSheetFor] = useState<string | null>(null);
   const [timer, setTimer] = useState<RestTimerState | null>(null);
   const [stopwatchOpen, setStopwatchOpen] = useState(false);
+  const [timerModalOpen, setTimerModalOpen] = useState(false);
   const readOnly = session.status !== "planned";
 
   // Workout duration: accumulated seconds from previous visits (frozen at
@@ -297,18 +313,14 @@ export function WorkoutLogger({
     }));
     if (done) {
       const nextLabel = nextUpLabel(we, entry, setIndex);
+      // Foreground rest = the in-app bar only. The service worker takes
+      // over (with a notification) only if the app goes to the background
+      // mid-rest — see the visibilitychange hand-off below.
       setTimer((prev) => ({
         id: (prev?.id ?? 0) + 1,
         seconds: we.restSeconds,
         nextLabel,
       }));
-      // Installed PWA: a persistent notification tracks the rest period even
-      // when the app goes to the background.
-      postToServiceWorker({
-        type: "rest-timer",
-        seconds: we.restSeconds,
-        nextLabel,
-      });
     }
   }
 
@@ -363,15 +375,6 @@ export function WorkoutLogger({
         performedSets,
       };
     });
-  }
-
-  /** Best-effort message to the service worker (PWA installs). */
-  function postToServiceWorker(message: Record<string, unknown>) {
-    try {
-      navigator.serviceWorker?.controller?.postMessage(message);
-    } catch {
-      // No service worker in dev — the in-page notification still fires.
-    }
   }
 
   function submit(action: "save" | "complete" | "skip") {
@@ -444,6 +447,40 @@ export function WorkoutLogger({
     };
   }, []);
 
+  // Rest-timer hand-off: while the app is visible the in-app bar is the only
+  // rest UI (no notifications). Going to the background mid-rest hands the
+  // remaining seconds to the service worker, which notifies when rest ends;
+  // coming back cancels the SW side so nothing fires twice.
+  const timerRef = useRef<RestTimerState | null>(null);
+  const restStartRef = useRef(0);
+  useEffect(() => {
+    // Stamp the start of every new rest period (timer.id bumps each time).
+    if (timer && timer !== timerRef.current) restStartRef.current = Date.now();
+    timerRef.current = timer;
+  }, [timer]);
+  useEffect(() => {
+    function onVisibility() {
+      if (document.visibilityState === "hidden") {
+        const t = timerRef.current;
+        if (!t) return;
+        const remaining =
+          t.seconds - (Date.now() - restStartRef.current) / 1000;
+        if (remaining > 1) {
+          postToServiceWorker({
+            type: "rest-timer",
+            seconds: remaining,
+            nextLabel: t.nextLabel,
+          });
+        }
+      } else {
+        postToServiceWorker({ type: "rest-timer-cancel" });
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
   return (
     <div className="space-y-5">
       {/* Sticky header: always visible while scrolling through the workout. */}
@@ -469,10 +506,15 @@ export function WorkoutLogger({
               <Badge variant="secondary">{session.status}</Badge>
             )}
             {!readOnly && (
-              <span className="flex items-center gap-1 font-medium tabular-nums text-foreground">
+              <button
+                type="button"
+                aria-label="Show workout timer"
+                className="flex items-center gap-1 font-medium tabular-nums text-foreground"
+                onClick={() => setTimerModalOpen(true)}
+              >
                 <Timer className="size-4 text-primary" />
                 {formatDuration(elapsedSeconds)}
-              </span>
+              </button>
             )}
           </p>
         </div>
@@ -1010,6 +1052,22 @@ export function WorkoutLogger({
           </div>
         </div>
       )}
+
+      {/* Big centered readout of the workout duration, opened from the
+          header timer. */}
+      <Dialog open={timerModalOpen} onOpenChange={setTimerModalOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Workout duration
+            </DialogTitle>
+          </DialogHeader>
+          <p className="flex items-center justify-center gap-3 py-8 text-6xl font-bold tabular-nums">
+            <Timer className="size-10 text-primary" />
+            {formatDuration(elapsedSeconds)}
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

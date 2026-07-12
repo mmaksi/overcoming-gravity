@@ -71,6 +71,7 @@ export async function saveCustomWorkout(input: {
   );
 }
 
+/** No redirect — callers navigate (or remove the item optimistically). */
 export async function deleteCustomWorkout(id: string): Promise<void> {
   const user = await requireUser();
   const store = await getStore();
@@ -80,7 +81,6 @@ export async function deleteCustomWorkout(id: string): Promise<void> {
   }
   await store.deleteCustomWorkout(id);
   revalidatePath("/programs");
-  redirect("/programs");
 }
 
 /**

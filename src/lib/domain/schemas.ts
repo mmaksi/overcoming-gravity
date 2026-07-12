@@ -128,15 +128,26 @@ export type GoalItem = z.infer<typeof goalItemSchema>;
  * Up to 2 goals per area, defined when the program is created. One goal in
  * total (any area) is enough.
  */
+const goalAreaSchema = z.array(goalItemSchema).max(2).default([]);
 export const goalsSchema = z
   .object({
-    skills: z.array(goalItemSchema).max(2),
-    push: z.array(goalItemSchema).max(2),
-    pull: z.array(goalItemSchema).max(2),
+    skills: goalAreaSchema,
+    push: goalAreaSchema,
+    pull: goalAreaSchema,
+    // Added later — programs stored before then simply miss these keys.
+    flexibility: goalAreaSchema,
+    other: goalAreaSchema,
   })
-  .refine((g) => g.skills.length + g.push.length + g.pull.length >= 1, {
-    message: "Define at least one goal",
-  });
+  .refine(
+    (g) =>
+      g.skills.length +
+        g.push.length +
+        g.pull.length +
+        g.flexibility.length +
+        g.other.length >=
+      1,
+    { message: "Define at least one goal" },
+  );
 export type Goals = z.infer<typeof goalsSchema>;
 
 export const programSchema = z

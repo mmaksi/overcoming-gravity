@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Check, CloudUpload, Loader2, Play, Trash2 } from "lucide-react";
 import { Attribute } from "@/lib/domain/types";
 import {
@@ -16,6 +17,15 @@ import {
 } from "@/lib/actions/workouts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { DaySections } from "@/components/designer/day-card";
 import { ExercisePicker } from "@/components/designer/exercise-picker";
 import { ExerciseEditor } from "@/components/designer/exercise-editor";
@@ -41,9 +51,12 @@ export function WorkoutEditor({
   const [title, setTitle] = useState(workout.title);
   const [day, setDay] = useState<WorkoutDay>(workout.day);
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const router = useRouter();
   const [pickingFor, setPickingFor] = useState<Attribute | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [starting, startTransition] = useTransition();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, startDeleting] = useTransition();
 
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
 
@@ -166,11 +179,42 @@ export function WorkoutEditor({
         />
       </div>
 
-      <form action={deleteCustomWorkout.bind(null, workout.id)}>
-        <Button variant="destructive" className="w-full" type="submit">
-          <Trash2 className="size-4" /> Delete workout
-        </Button>
-      </form>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogTrigger asChild>
+          <Button variant="destructive" className="w-full">
+            <Trash2 className="size-4" /> Delete workout
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this workout?</DialogTitle>
+            <DialogDescription>
+              &ldquo;{title.trim() || "My workout"}&rdquo; is removed from your
+              list. Sessions you already completed stay in your history.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={() =>
+                startDeleting(async () => {
+                  // Stop the pending autosave from resurrecting the workout.
+                  if (timerRef.current) clearTimeout(timerRef.current);
+                  await deleteCustomWorkout(workout.id);
+                  router.push("/programs");
+                })
+              }
+            >
+              {deleting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ExercisePicker
         open={pickingFor !== null}

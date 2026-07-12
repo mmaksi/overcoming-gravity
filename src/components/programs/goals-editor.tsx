@@ -27,16 +27,17 @@ export function GoalsEditor({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Record<GoalArea, string[]>>(() => ({
-    skills: goals?.skills.map((g) => g.text) ?? [],
-    push: goals?.push.map((g) => g.text) ?? [],
-    pull: goals?.pull.map((g) => g.text) ?? [],
-  }));
+  const [draft, setDraft] = useState<Record<GoalArea, string[]>>(
+    () =>
+      Object.fromEntries(
+        // Older programs may miss newer areas — treat them as empty.
+        GOAL_AREAS.map((area) => [area, goals?.[area]?.map((g) => g.text) ?? []]),
+      ) as Record<GoalArea, string[]>,
+  );
 
   const clean = (area: GoalArea) =>
     draft[area].map((g) => g.trim()).filter(Boolean).slice(0, 2);
-  const valid =
-    clean("skills").length + clean("push").length + clean("pull").length >= 1;
+  const valid = GOAL_AREAS.some((area) => clean(area).length > 0);
 
   function save() {
     setError(null);
@@ -44,9 +45,9 @@ export function GoalsEditor({
       try {
         await updateProgramGoals({
           programId,
-          skills: clean("skills"),
-          push: clean("push"),
-          pull: clean("pull"),
+          goals: Object.fromEntries(
+            GOAL_AREAS.map((area) => [area, clean(area)]),
+          ) as Record<GoalArea, string[]>,
         });
         setOpen(false);
       } catch (e) {

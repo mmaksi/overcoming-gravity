@@ -10,15 +10,25 @@ import {
 import { sportSchema } from "./schemas";
 
 /** Goals arrive from the wizard as plain strings; one in total is enough. */
+const wizardGoalAreaSchema = z.array(z.string().min(1)).max(2).default([]);
 const wizardGoalsSchema = z
   .object({
-    skills: z.array(z.string().min(1)).max(2),
-    push: z.array(z.string().min(1)).max(2),
-    pull: z.array(z.string().min(1)).max(2),
+    skills: wizardGoalAreaSchema,
+    push: wizardGoalAreaSchema,
+    pull: wizardGoalAreaSchema,
+    flexibility: wizardGoalAreaSchema,
+    other: wizardGoalAreaSchema,
   })
-  .refine((g) => g.skills.length + g.push.length + g.pull.length >= 1, {
-    message: "Define at least one goal",
-  });
+  .refine(
+    (g) =>
+      g.skills.length +
+        g.push.length +
+        g.pull.length +
+        g.flexibility.length +
+        g.other.length >=
+      1,
+    { message: "Define at least one goal" },
+  );
 
 /** What the create-program wizard collects in steps 1–4. */
 export const wizardPayloadSchema = z

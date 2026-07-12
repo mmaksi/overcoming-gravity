@@ -73,11 +73,22 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-/* Rest-period notifications: the page posts {type: "rest-timer"} when a set
- * is checked. We immediately show a persistent "resting" notification (so it
- * survives the app going to the background) and replace it with "rest over"
- * when the period ends. {type: "rest-timer-cancel"} clears everything. */
+/* Rest-period notifications — background only. While the app is visible the
+ * in-page rest bar is the whole UI (no notifications). When the app goes to
+ * the background mid-rest, the page posts {type: "rest-timer"} with the
+ * REMAINING seconds: we show a quiet "Resting…" notification and replace it
+ * with "Rest over" when the period ends. When the app becomes visible again
+ * it posts {type: "rest-timer-cancel"}, which clears the countdown and any
+ * notification — so nothing ever fires (or fires twice) in the foreground. */
 let restTimeout = null;
+let restDone = null; // resolves the waitUntil promise below
+
+function cancelRest() {
+  if (restTimeout) clearTimeout(restTimeout);
+  restTimeout = null;
+  if (restDone) restDone();
+  restDone = null;
+}
 
 self.addEventListener("message", (event) => {
   const data = event.data;
@@ -85,7 +96,7 @@ self.addEventListener("message", (event) => {
 
   if (data.type === "rest-timer") {
     const { seconds, nextLabel } = data;
-    if (restTimeout) clearTimeout(restTimeout);
+    cancelRest();
     const until = new Date(Date.now() + seconds * 1000);
     const hhmm = `${String(until.getHours()).padStart(2, "0")}:${String(until.getMinutes()).padStart(2, "0")}:${String(until.getSeconds()).padStart(2, "0")}`;
     self.registration.showNotification("Resting…", {
@@ -93,19 +104,30 @@ self.addEventListener("message", (event) => {
       body: `Until ${hhmm} · next: ${nextLabel}`,
       silent: true,
     });
-    restTimeout = setTimeout(() => {
-      restTimeout = null;
-      self.registration.showNotification("Rest over 💪", {
-        tag: "cali-rest-timer",
-        body: nextLabel,
-        renotify: true,
-      });
-    }, seconds * 1000);
+    // waitUntil keeps this worker alive for the rest period — otherwise the
+    // browser may kill it as idle and "Rest over" never fires while the app
+    // is backgrounded.
+    event.waitUntil(
+      new Promise((resolve) => {
+        restDone = resolve;
+        restTimeout = setTimeout(() => {
+          restTimeout = null;
+          restDone = null;
+          self.registration
+            .showNotification("Rest over 💪", {
+              tag: "cali-rest-timer",
+              body: nextLabel,
+              renotify: true,
+              vibrate: [200, 100, 200],
+            })
+            .then(resolve, resolve);
+        }, seconds * 1000);
+      }),
+    );
   }
 
   if (data.type === "rest-timer-cancel") {
-    if (restTimeout) clearTimeout(restTimeout);
-    restTimeout = null;
+    cancelRest();
     self.registration
       .getNotifications({ tag: "cali-rest-timer" })
       .then((notifications) => notifications.forEach((n) => n.close()));

@@ -16,10 +16,11 @@ test("create a program end-to-end", async ({ page }) => {
   await page.getByRole("button", { name: "Full Body" }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
-  // Step 2 — goals (1–2 per area: skills, push, pull)
+  // Step 2 — goals (1–2 per area: skills, push, pull, flexibility, other)
   await page.getByLabel("Skills goal 1").fill("10s front lever");
   await page.getByLabel("Push goal 1").fill("5 clean dips");
   await page.getByLabel("Pull goal 1").fill("First muscle-up");
+  await page.getByLabel("Flexibility goal 1").fill("Flat palms to floor");
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
   // Step 3 — periodization
@@ -84,4 +85,16 @@ test("start, reset, and custom individual workouts", async ({ page }) => {
   // The custom session shows up in history under its title.
   await page.goto("/history");
   await expect(page.getByText("My workout").first()).toBeVisible();
+
+  // Deleting from the list is optimistic: the row disappears immediately.
+  // (Count-based since workouts from earlier runs can accumulate.)
+  await page.goto("/programs");
+  const deleteButtons = page.getByRole("button", {
+    name: "Delete My workout",
+  });
+  await expect(deleteButtons.first()).toBeVisible(); // list has streamed in
+  const before = await deleteButtons.count();
+  await deleteButtons.first().click();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(deleteButtons).toHaveCount(before - 1);
 });

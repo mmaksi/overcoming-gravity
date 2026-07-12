@@ -37,6 +37,8 @@ export async function createProgramFromWizard(
       skills: asGoalItems(parsed.goals.skills),
       push: asGoalItems(parsed.goals.push),
       pull: asGoalItems(parsed.goals.pull),
+      flexibility: asGoalItems(parsed.goals.flexibility),
+      other: asGoalItems(parsed.goals.other),
     },
     periodization: parsed.periodization,
     weeks: parsed.weeks,
@@ -99,14 +101,19 @@ export async function activateProgram(programId: string): Promise<void> {
   redirect(`/programs/${programId}`);
 }
 
+const editGoalAreaSchema = z.array(z.string().trim().min(1)).max(2).default([]);
 const editGoalsSchema = z
   .object({
     programId: z.string(),
-    skills: z.array(z.string().trim().min(1)).max(2),
-    push: z.array(z.string().trim().min(1)).max(2),
-    pull: z.array(z.string().trim().min(1)).max(2),
+    goals: z.object({
+      skills: editGoalAreaSchema,
+      push: editGoalAreaSchema,
+      pull: editGoalAreaSchema,
+      flexibility: editGoalAreaSchema,
+      other: editGoalAreaSchema,
+    }),
   })
-  .refine((g) => g.skills.length + g.push.length + g.pull.length >= 1, {
+  .refine((g) => GOAL_AREAS.some((area) => g.goals[area].length > 0), {
     message: "Define at least one goal",
   });
 
@@ -116,9 +123,7 @@ const editGoalsSchema = z
  */
 export async function updateProgramGoals(input: {
   programId: string;
-  skills: string[];
-  push: string[];
-  pull: string[];
+  goals: Record<GoalArea, string[]>;
 }): Promise<void> {
   const user = await requireUser();
   const parsed = editGoalsSchema.parse(input);
@@ -127,19 +132,20 @@ export async function updateProgramGoals(input: {
   if (!program || program.userId !== user.id) {
     throw new Error("Program not found");
   }
-  const merge = (area: GoalArea, texts: string[]): GoalItem[] =>
-    texts.map((text, i) => ({
-      text,
-      done: program.goals?.[area][i]?.text === text
-        ? (program.goals[area][i].done ?? false)
-        : false,
-    }));
+  const merge = (area: GoalArea): GoalItem[] =>
+    parsed.goals[area].map((text, i) => {
+      // Legacy programs may miss newer areas entirely, hence the chaining.
+      const previous = program.goals?.[area]?.[i];
+      return { text, done: previous?.text === text ? previous.done : false };
+    });
   await store.updateProgram({
     ...program,
     goals: {
-      skills: merge("skills", parsed.skills),
-      push: merge("push", parsed.push),
-      pull: merge("pull", parsed.pull),
+      skills: merge("skills"),
+      push: merge("push"),
+      pull: merge("pull"),
+      flexibility: merge("flexibility"),
+      other: merge("other"),
     },
     updatedAt: new Date().toISOString(),
   });
@@ -167,7 +173,7 @@ export async function toggleProgramGoal(input: {
   if (!program || program.userId !== user.id) {
     throw new Error("Program not found");
   }
-  if (!program.goals || !program.goals[area][index]) return;
+  if (!program.goals?.[area]?.[index]) return;
   const goals = {
     ...program.goals,
     [area]: program.goals[area].map((g, i) =>

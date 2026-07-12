@@ -88,7 +88,7 @@ export default async function ProgramPage({
           {program.goals &&
             GOAL_AREAS.map(
               (area) =>
-                program.goals![area].length > 0 && (
+                (program.goals![area] ?? []).length > 0 && (
                   <Row
                     key={area}
                     label={`${GOAL_AREA_LABELS[area]} goals`}

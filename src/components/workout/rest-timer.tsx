@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Timer, X } from "lucide-react";
 
 export type RestTimerState = {
@@ -13,10 +13,11 @@ export type RestTimerState = {
 
 /**
  * Rest-countdown card: a progress bar draining over the rest period, the
- * seconds left, and what comes next. Fires a browser notification when the
- * rest is over (permission is requested by the caller when the set is
- * checked). Render with `key={timer.id}` so a new rest period starts a
- * fresh countdown; the caller positions it (fixed stack above the nav).
+ * seconds left, and what comes next. No notification in the foreground —
+ * this card IS the foreground UI; the caller hands the countdown to the
+ * service worker only when the app is backgrounded. Render with
+ * `key={timer.id}` so a new rest period starts a fresh countdown; the
+ * caller positions it (fixed stack above the nav).
  */
 export function RestTimer({
   seconds,
@@ -29,7 +30,6 @@ export function RestTimer({
 }) {
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(startedAt);
-  const notifiedRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 250);
@@ -42,22 +42,11 @@ export function RestTimer({
   const over = remaining <= 0;
 
   useEffect(() => {
-    if (!over || notifiedRef.current) return;
-    notifiedRef.current = true;
-    if (
-      typeof Notification !== "undefined" &&
-      Notification.permission === "granted"
-    ) {
-      try {
-        new Notification("Rest over 💪", { body: nextLabel });
-      } catch {
-        // Some mobile browsers only allow notifications via a service worker.
-      }
-    }
+    if (!over) return;
     // Give the athlete a moment to see "Go!", then get out of the way.
     const t = setTimeout(onDismiss, 4000);
     return () => clearTimeout(t);
-  }, [over, nextLabel, onDismiss]);
+  }, [over, onDismiss]);
 
   return (
     <div className="space-y-2 rounded-2xl border bg-background/95 p-4 shadow-lg backdrop-blur">

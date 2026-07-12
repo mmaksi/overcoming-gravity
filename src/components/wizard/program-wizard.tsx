@@ -32,6 +32,8 @@ const GOAL_PLACEHOLDERS: Record<GoalArea, string> = {
   skills: "e.g. Hold a 10s front lever",
   push: "e.g. 5 clean dips",
   pull: "e.g. First muscle-up",
+  flexibility: "e.g. Touch the floor with flat palms",
+  other: "e.g. Train 3× every week",
 };
 
 const TYPE_DESCRIPTIONS: Record<ProgramType, string> = {
@@ -70,6 +72,8 @@ export function ProgramWizard() {
     skills: [""],
     push: [""],
     pull: [""],
+    flexibility: [""],
+    other: [""],
   });
 
   // One goal in total (any area) is enough to continue.
@@ -121,6 +125,8 @@ export function ProgramWizard() {
         skills: cleanGoals("skills"),
         push: cleanGoals("push"),
         pull: cleanGoals("pull"),
+        flexibility: cleanGoals("flexibility"),
+        other: cleanGoals("other"),
       },
       periodization,
       trainingDays,

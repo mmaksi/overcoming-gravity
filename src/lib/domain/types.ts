@@ -84,7 +84,13 @@ export const GROUP_TYPES = [
 export type GroupType = (typeof GROUP_TYPES)[number];
 
 /** Areas the athlete sets goals for when creating a program. */
-export const GOAL_AREAS = ["skills", "push", "pull"] as const;
+export const GOAL_AREAS = [
+  "skills",
+  "push",
+  "pull",
+  "flexibility",
+  "other",
+] as const;
 export type GoalArea = (typeof GOAL_AREAS)[number];
 
 /**
@@ -273,4 +279,6 @@ export const GOAL_AREA_LABELS: Record<GoalArea, string> = {
   skills: "Skills",
   push: "Push",
   pull: "Pull",
+  flexibility: "Flexibility",
+  other: "Other",
 };

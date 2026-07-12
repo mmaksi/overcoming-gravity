@@ -30,7 +30,7 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
               ...p,
               goals: {
                 ...p.goals,
-                [patch.area]: p.goals[patch.area].map((g, i) =>
+                [patch.area]: (p.goals[patch.area] ?? []).map((g, i) =>
                   i === patch.index ? { ...g, done: patch.done } : g,
                 ),
               },
@@ -42,7 +42,8 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
   const showProgramName = optimistic.length > 1;
   const flat = optimistic.flatMap((p) =>
     GOAL_AREAS.flatMap((area) =>
-      p.goals[area].map((goal, index) => ({
+      // Older programs may miss newer areas entirely.
+      (p.goals[area] ?? []).map((goal, index) => ({
         programId: p.programId,
         programName: p.programName,
         area,
