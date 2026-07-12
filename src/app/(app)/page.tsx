@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { InstallAppButton } from "@/components/home/install-app-button";
 import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
 
 export default async function DashboardPage() {
@@ -36,6 +37,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2">
+          <InstallAppButton />
           <Button asChild size="lg">
             <Link href="/programs/new">
               Create a program <ArrowRight className="size-4" />
@@ -131,6 +133,8 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Hi, {user.name}</h1>
+
+      <InstallAppButton />
 
       {runCards}
 
