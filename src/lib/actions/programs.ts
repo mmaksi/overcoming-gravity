@@ -8,6 +8,7 @@ import { getStore } from "@/lib/data";
 import {
   getCachedDefaultTemplate,
   getCachedExercises,
+  userDashboardTag,
   userHistoryTag,
   userProgramsTag,
 } from "@/lib/data/cached";
@@ -70,14 +71,21 @@ export async function createProgramFromWizard(
 const saveMesocycleSchema = z.object({
   programId: z.string(),
   mesocycle: mesocycleSchema,
+  /**
+   * True only for the explicit "Finish" save. The designer's 1.2s debounced
+   * autosave passes false: it persists the draft without expiring any cache
+   * (expiring would refresh the designer mid-edit and thrash the caches).
+   */
+  final: z.boolean().optional(),
 });
 
 export async function saveMesocycle(input: {
   programId: string;
   mesocycle: unknown;
+  final?: boolean;
 }): Promise<{ savedAt: string }> {
   const user = await requireUser();
-  const { programId, mesocycle } = saveMesocycleSchema.parse(input);
+  const { programId, mesocycle, final } = saveMesocycleSchema.parse(input);
   const store = await getStore();
   const program = await store.getProgram(programId);
   if (!program || program.userId !== user.id) {
@@ -89,7 +97,11 @@ export async function saveMesocycle(input: {
     updatedAt: new Date().toISOString(),
   };
   await store.updateProgram(updated);
-  updateTag(userProgramsTag(user.id));
+  if (final) {
+    updateTag(userProgramsTag(user.id));
+    // The home cards preview upcoming exercises straight from the mesocycle.
+    updateTag(userDashboardTag(user.id));
+  }
   return { savedAt: updated.updatedAt };
 }
 
@@ -159,7 +171,8 @@ export async function updateProgramGoals(input: {
     updatedAt: new Date().toISOString(),
   });
   updateTag(userProgramsTag(user.id));
-  revalidatePath("/", "layout");
+  updateTag(userDashboardTag(user.id));
+  revalidatePath("/");
 }
 
 const toggleGoalSchema = z.object({
@@ -196,7 +209,9 @@ export async function toggleProgramGoal(input: {
     updatedAt: new Date().toISOString(),
   });
   updateTag(userProgramsTag(user.id));
-  revalidatePath("/", "layout");
+  // Goal ticks render on the home GoalsCard, fed by the dashboard cache.
+  updateTag(userDashboardTag(user.id));
+  revalidatePath("/");
 }
 
 export async function deleteProgram(programId: string): Promise<void> {
@@ -208,8 +223,10 @@ export async function deleteProgram(programId: string): Promise<void> {
   }
   await store.deleteProgram(programId);
   updateTag(userProgramsTag(user.id));
-  // Deleting a program cascades its runs' sessions out of history too.
+  // Deleting a program cascades its runs' sessions out of history too, and
+  // removes its card from the home dashboard.
   updateTag(userHistoryTag(user.id));
+  updateTag(userDashboardTag(user.id));
   revalidatePath("/programs");
   redirect("/programs");
 }

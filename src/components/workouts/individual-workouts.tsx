@@ -2,6 +2,7 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronRight,
   Dumbbell,
@@ -35,8 +36,11 @@ export function IndividualWorkouts({
 }: {
   workouts: CustomWorkout[];
 }) {
+  const router = useRouter();
   const [, startTransition] = useTransition();
-  const [creating, startCreating] = useTransition();
+  // Plain state, not a transition: the updateTag refresh the action triggers
+  // would keep a wrapping transition pending and swallow the router.push.
+  const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CustomWorkout | null>(
     null,
   );
@@ -55,7 +59,15 @@ export function IndividualWorkouts({
           variant="outline"
           size="sm"
           disabled={creating}
-          onClick={() => startCreating(() => createCustomWorkout())}
+          onClick={async () => {
+            setCreating(true);
+            try {
+              const id = await createCustomWorkout();
+              router.push(`/workouts/${id}`);
+            } catch {
+              setCreating(false);
+            }
+          }}
         >
           {creating ? (
             <Loader2 className="size-4 animate-spin" />

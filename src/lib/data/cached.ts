@@ -1,5 +1,6 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
+import { Program, ProgramRun, WorkoutSession } from "@/lib/domain/schemas";
 import { DataStore } from "./store";
 
 /**
@@ -43,6 +44,10 @@ export function getCachedDefaultTemplate(store: DataStore) {
 export const userProgramsTag = (userId: string) => `user:${userId}:programs`;
 /** Tag for a user's completed-workout history and progress overview. */
 export const userHistoryTag = (userId: string) => `user:${userId}:history`;
+/** Tag for the home dashboard's run cards (active runs + their sessions). */
+export const userDashboardTag = (userId: string) => `user:${userId}:dashboard`;
+/** Tag for the home Stats block (bodyweight entries). */
+export const userStatsTag = (userId: string) => `user:${userId}:stats`;
 
 const ONE_DAY_SECONDS = 60 * 60 * 24;
 
@@ -90,5 +95,52 @@ export function getCachedCompletedSessions(store: DataStore, userId: string) {
     () => store.listCompletedSessions(userId),
     ["user-history-full", userId],
     { revalidate: ONE_WEEK_SECONDS, tags: [userHistoryTag(userId)] },
+  )();
+}
+
+/** One active run's card data on the home dashboard. */
+export type DashboardRun = {
+  run: ProgramRun;
+  program: Program | null;
+  sessions: WorkoutSession[];
+};
+
+/**
+ * Everything the home run cards show, cached indefinitely — busted only when
+ * the schedule actually changes: an explicit workout save/complete/skip (the
+ * 2.5s draft autosave does NOT bust it), a run starting/resetting/abandoning,
+ * a mesocycle redesign, goal edits, or deleting a program/session.
+ */
+export function getCachedDashboard(
+  store: DataStore,
+  userId: string,
+): Promise<DashboardRun[]> {
+  return unstable_cache(
+    async () => {
+      const runs = (await store.listRuns(userId)).filter(
+        (r) => r.status === "active",
+      );
+      return Promise.all(
+        runs.map(async (run) => ({
+          run,
+          program: await store.getProgram(run.programId),
+          sessions: await store.listSessionsByRun(run.id),
+        })),
+      );
+    },
+    ["user-dashboard", userId],
+    { tags: [userDashboardTag(userId)] },
+  )();
+}
+
+/**
+ * Bodyweight entries for the home Stats block, cached indefinitely — busted
+ * only when the user logs/edits/deletes a weigh-in in Settings.
+ */
+export function getCachedBodyweight(store: DataStore, userId: string) {
+  return unstable_cache(
+    () => store.listBodyweightEntries(userId),
+    ["user-bodyweight", userId],
+    { tags: [userStatsTag(userId)] },
   )();
 }

@@ -2,6 +2,10 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+// Name/avatar/body-stats reads come from the per-request profile fetch in
+// requireUser (never from unstable_cache), so these actions only need to
+// refresh the visited pages — no tag busting, and NEVER the layout-wide
+// revalidatePath("/", "layout"), which would wipe every cache in the app.
 import { z } from "zod";
 import { MOCK_ADMIN_COOKIE, requireUser } from "@/lib/auth";
 import { dataBackend, getStore } from "@/lib/data";
@@ -15,7 +19,8 @@ export async function updateName(name: string): Promise<void> {
   const parsed = nameSchema.parse(name);
   const store = await getStore();
   await store.updateProfileName(user.id, parsed);
-  revalidatePath("/", "layout");
+  revalidatePath("/");
+  revalidatePath("/settings");
 }
 
 // One canonical file per user; uploading a new picture overwrites it. All
@@ -55,7 +60,8 @@ export async function uploadAvatar(formData: FormData): Promise<void> {
   const store = await getStore();
   // Cache-buster: the path is stable, so browsers would keep the old image.
   await store.updateProfileAvatar(user.id, `${url}?v=${Date.now()}`);
-  revalidatePath("/", "layout");
+  revalidatePath("/");
+  revalidatePath("/settings");
 }
 
 /** Remove the profile picture (falls back to the initial-letter avatar). */
@@ -67,7 +73,8 @@ export async function removeAvatar(): Promise<void> {
   }
   const store = await getStore();
   await store.updateProfileAvatar(user.id, null);
-  revalidatePath("/", "layout");
+  revalidatePath("/");
+  revalidatePath("/settings");
 }
 
 const bodyStatsSchema = z.object({
@@ -84,7 +91,8 @@ export async function saveBodyStats(input: {
   const parsed = bodyStatsSchema.parse(input);
   const store = await getStore();
   await store.updateProfileStats(user.id, parsed);
-  revalidatePath("/", "layout");
+  revalidatePath("/");
+  revalidatePath("/settings");
 }
 
 /** Dev-only: toggle admin rights on the mock session. */

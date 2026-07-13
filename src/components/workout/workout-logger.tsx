@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -203,10 +203,12 @@ export function WorkoutLogger({
   userNotes?: Record<string, string>;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<
     "save" | "complete" | "skip" | null
   >(null);
+  const pending = pendingAction !== null;
+  /** Last background draft save; awaited before any explicit submit. */
+  const autosaveInflight = useRef<Promise<void>>(Promise.resolve());
   const [openSheetFor, setOpenSheetFor] = useState<string | null>(null);
   const [timer, setTimer] = useState<RestTimerState | null>(null);
   const [stopwatchOpen, setStopwatchOpen] = useState(false);
@@ -432,32 +434,34 @@ export function WorkoutLogger({
     });
   }
 
-  function submit(action: "save" | "complete" | "skip") {
+  async function submit(action: "save" | "complete" | "skip") {
     setPendingAction(action);
     setTimer(null);
     clearRest(session.id);
     postToServiceWorker({ type: "rest-timer-cancel" });
-    startTransition(async () => {
-      try {
-        const result = await saveWorkoutSession({
-          sessionId: session.id,
-          entries: action === "skip" ? [] : resolveEntries(action),
-          action,
-          durationSeconds: elapsedSeconds,
-        });
-        if (action === "save") {
-          setPendingAction(null);
-          return;
-        }
-        if (result.runCompleted && result.programId) {
-          router.push(`/programs/${result.programId}`);
-        } else {
-          router.push("/");
-        }
-      } catch {
+    // No wrapping transition, and no autosave overlap: a draft action still
+    // in flight when this one navigates would swallow the navigation.
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    await autosaveInflight.current;
+    try {
+      const result = await saveWorkoutSession({
+        sessionId: session.id,
+        entries: action === "skip" ? [] : resolveEntries(action),
+        action,
+        durationSeconds: elapsedSeconds,
+      });
+      if (action === "save") {
         setPendingAction(null);
+        return;
       }
-    });
+      if (result.runCompleted && result.programId) {
+        router.push(`/programs/${result.programId}`);
+      } else {
+        router.push("/");
+      }
+    } catch {
+      setPendingAction(null);
+    }
   }
 
   // Autosave the draft so backgrounding the app never loses recorded values:
@@ -467,11 +471,13 @@ export function WorkoutLogger({
     autosaveRef.current = () => {
       if (readOnly || pending) return;
       setSaveStatus("saving");
-      saveWorkoutSession({
+      autosaveInflight.current = saveWorkoutSession({
         sessionId: session.id,
         entries: resolveEntries("save"),
         action: "save",
         durationSeconds: elapsedSeconds,
+        // Background draft: persists data without invalidating any caches.
+        draft: true,
       }).then(
         () => setSaveStatus("saved"),
         () => setSaveStatus("idle"),

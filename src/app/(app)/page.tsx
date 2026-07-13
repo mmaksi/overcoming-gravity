@@ -2,7 +2,12 @@ import Link from "next/link";
 import { ArrowRight, Dumbbell, Play } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
-import { getCachedExercises } from "@/lib/data/cached";
+import {
+  getCachedBodyweight,
+  getCachedDashboard,
+  getCachedExercises,
+  getCachedUserPrograms,
+} from "@/lib/data/cached";
 import { toISODate } from "@/lib/domain/schedule";
 import { ATTRIBUTES, WEEKDAY_LABELS } from "@/lib/domain/types";
 import {
@@ -88,11 +93,12 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const store = await getStore();
 
-  const runs = await store.listRuns(user.id);
-  const activeRuns = runs.filter((r) => r.status === "active");
+  // Cached until the schedule actually changes (explicit workout save,
+  // run/program mutations) — the draft autosave never busts this.
+  const dashboardRuns = await getCachedDashboard(store, user.id);
 
-  if (activeRuns.length === 0) {
-    const programs = await store.listPrograms(user.id);
+  if (dashboardRuns.length === 0) {
+    const { programs } = await getCachedUserPrograms(store, user.id);
     return (
       <div className="flex flex-col gap-6 pt-10">
         <div className="space-y-2 text-center">
@@ -122,8 +128,9 @@ export default async function DashboardPage() {
   }
 
   const today = toISODate(new Date());
+  // Stats are cached until a weigh-in changes in Settings.
   const [bodyweight, exercises] = await Promise.all([
-    store.listBodyweightEntries(user.id),
+    getCachedBodyweight(store, user.id),
     getCachedExercises(store),
   ]);
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
@@ -132,9 +139,7 @@ export default async function DashboardPage() {
   // One card per active program run — several can run in parallel (swipeable
   // carousel). Cards share a fixed height; the exercise list scrolls inside.
   const runCards = [];
-  for (const run of activeRuns) {
-    const program = await store.getProgram(run.programId);
-    const sessions = await store.listSessionsByRun(run.id);
+  for (const { run, program, sessions } of dashboardRuns) {
     if (program?.goals) {
       programGoals.push({
         programId: program.id,

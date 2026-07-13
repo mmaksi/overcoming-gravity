@@ -109,7 +109,12 @@ export function MesocycleDesigner({
     setFinishing(true);
     try {
       if (timerRef.current) clearTimeout(timerRef.current);
-      await saveMesocycle({ programId: program.id, mesocycle: mesoRef.current });
+      // Final save: this one busts the programs + dashboard caches.
+      await saveMesocycle({
+        programId: program.id,
+        mesocycle: mesoRef.current,
+        final: true,
+      });
       if (program.status === "draft") {
         await activateProgram(program.id);
       } else {

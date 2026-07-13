@@ -5,11 +5,13 @@ const nextConfig: NextConfig = {
     /**
      * Client router cache: re-use the RSC payload of recently visited pages
      * so tab-switching in the bottom nav is instant. Mutations still bust
-     * this via revalidatePath in the server actions.
+     * this via revalidatePath/updateTag in the server actions, so a longer
+     * window is safe — and server data is tag-cached anyway (lib/data/cached),
+     * making the eventual refetch cheap.
      */
     staleTimes: {
-      dynamic: 30,
-      static: 180,
+      dynamic: 300,
+      static: 300,
     },
   },
 };

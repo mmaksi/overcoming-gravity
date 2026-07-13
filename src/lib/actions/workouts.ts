@@ -21,10 +21,12 @@ import {
 
 /**
  * Create a standalone workout prefilled from the admin defaults (same
- * structure as a program day — no goals, no periodization) and jump into
- * its editor.
+ * structure as a program day — no goals, no periodization). Returns the new
+ * workout's id; the caller navigates to its editor (a server-side redirect
+ * here would race the immediate refresh `updateTag` triggers on /programs,
+ * the page this is invoked from).
  */
-export async function createCustomWorkout(): Promise<void> {
+export async function createCustomWorkout(): Promise<string> {
   const user = await requireUser();
   const store = await getStore();
   const [template, exercises] = await Promise.all([
@@ -46,7 +48,7 @@ export async function createCustomWorkout(): Promise<void> {
   await store.createCustomWorkout(workout);
   updateTag(userProgramsTag(user.id));
   revalidatePath("/programs");
-  redirect(`/workouts/${workout.id}`);
+  return workout.id;
 }
 
 const saveWorkoutSchema = z.object({
@@ -119,6 +121,7 @@ export async function startCustomWorkout(id: string): Promise<void> {
     entries: [],
   };
   await store.createSession(session);
-  revalidatePath("/", "layout");
+  // Custom-workout sessions never show on the home run cards, so no tags.
+  revalidatePath("/calendar");
   redirect(`/workout/${session.id}`);
 }

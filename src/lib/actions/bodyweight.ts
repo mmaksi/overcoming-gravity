@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { userStatsTag } from "@/lib/data/cached";
 import { BodyweightEntry } from "@/lib/domain/schemas";
 
 const inputSchema = z.object({
@@ -27,12 +28,16 @@ export async function saveBodyweight(input: {
     createdAt: new Date().toISOString(),
   };
   await store.saveBodyweightEntry(entry);
-  revalidatePath("/", "layout");
+  updateTag(userStatsTag(user.id));
+  revalidatePath("/");
+  revalidatePath("/settings");
 }
 
 export async function deleteBodyweight(id: string): Promise<void> {
-  await requireUser();
+  const user = await requireUser();
   const store = await getStore();
   await store.deleteBodyweightEntry(id);
-  revalidatePath("/", "layout");
+  updateTag(userStatsTag(user.id));
+  revalidatePath("/");
+  revalidatePath("/settings");
 }

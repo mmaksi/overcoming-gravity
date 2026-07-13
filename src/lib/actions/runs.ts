@@ -5,7 +5,11 @@ import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
-import { userHistoryTag, userProgramsTag } from "@/lib/data/cached";
+import {
+  userDashboardTag,
+  userHistoryTag,
+  userProgramsTag,
+} from "@/lib/data/cached";
 import { generateSessions } from "@/lib/domain/schedule";
 import {
   EXERCISE_NOTE_TECHNIQUE,
@@ -51,7 +55,8 @@ export async function startRun(input: {
   const sessions = generateSessions(program, run.id, startDate);
   await store.createRun(run, sessions);
   updateTag(userProgramsTag(user.id));
-  revalidatePath("/", "layout");
+  updateTag(userDashboardTag(user.id));
+  revalidatePath("/");
   redirect("/");
 }
 
@@ -82,7 +87,8 @@ export async function resetRun(runId: string): Promise<void> {
   const sessions = generateSessions(program, fresh.id, fresh.startDate);
   await store.createRun(fresh, sessions);
   updateTag(userProgramsTag(user.id));
-  revalidatePath("/", "layout");
+  updateTag(userDashboardTag(user.id));
+  revalidatePath("/");
 }
 
 export async function abandonRun(runId: string): Promise<void> {
@@ -93,7 +99,8 @@ export async function abandonRun(runId: string): Promise<void> {
   await store.updateRun({ ...run, status: "abandoned" });
   await store.deletePlannedSessions(run.id);
   updateTag(userProgramsTag(user.id));
-  revalidatePath("/", "layout");
+  updateTag(userDashboardTag(user.id));
+  revalidatePath("/");
 }
 
 const saveSessionSchema = z.object({
@@ -102,6 +109,13 @@ const saveSessionSchema = z.object({
   action: z.enum(["save", "complete", "skip"]),
   /** Accumulated active workout time; the timer pauses between visits. */
   durationSeconds: z.number().int().min(0).optional(),
+  /**
+   * True for the debounced background autosave. Drafts persist the data but
+   * never invalidate caches — only the logger itself reads a draft back, and
+   * it always fetches the session uncached. Explicit "Save progress" /
+   * "Complete workout" clicks pass false.
+   */
+  draft: z.boolean().optional(),
 });
 
 export async function saveWorkoutSession(input: {
@@ -109,9 +123,10 @@ export async function saveWorkoutSession(input: {
   entries: unknown;
   action: "save" | "complete" | "skip";
   durationSeconds?: number;
+  draft?: boolean;
 }): Promise<{ runCompleted: boolean; programId: string | null }> {
   const user = await requireUser();
-  const { sessionId, entries, action, durationSeconds } =
+  const { sessionId, entries, action, durationSeconds, draft } =
     saveSessionSchema.parse(input);
   const store = await getStore();
   const session = await store.getSession(sessionId);
@@ -163,12 +178,21 @@ export async function saveWorkoutSession(input: {
     }
   }
 
-  if (action !== "save") {
-    // The workout just entered (or left) the completed history.
-    updateTag(userHistoryTag(user.id));
+  // Draft autosaves (every 2.5s while logging) must not expire any data
+  // cache: the dashboard, programs and history caches only care about
+  // *finished* schedule changes. They do refresh this workout's page in the
+  // client router cache so revisiting the logger resumes the latest draft.
+  if (draft) {
+    revalidatePath(`/workout/${sessionId}`);
+  } else {
+    updateTag(userDashboardTag(user.id));
+    if (action !== "save") {
+      // The workout just entered (or left) the completed history.
+      updateTag(userHistoryTag(user.id));
+    }
+    if (runCompleted) updateTag(userProgramsTag(user.id));
+    revalidatePath("/");
   }
-  if (runCompleted) updateTag(userProgramsTag(user.id));
-  revalidatePath("/", "layout");
   return { runCompleted, programId };
 }
 
@@ -182,5 +206,7 @@ export async function deleteWorkoutSession(sessionId: string): Promise<void> {
   }
   await store.deleteSession(sessionId);
   updateTag(userHistoryTag(user.id));
-  revalidatePath("/", "layout");
+  // Completed counts / progress bars on the home cards include this session.
+  updateTag(userDashboardTag(user.id));
+  revalidatePath("/");
 }

@@ -61,24 +61,25 @@ export function WorkoutEditor({
 
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
 
-  // Debounced autosave, same rhythm as the designer pages.
+  // Debounced autosave, same rhythm as the designer pages. The in-flight
+  // save promise is kept so "Do this workout" can wait it out — an action
+  // still running when the redirect fires swallows the navigation.
   const latest = useRef({ title, day });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inflightRef = useRef<Promise<void>>(Promise.resolve());
   const schedule = useCallback(() => {
     setSaveState("dirty");
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(async () => {
+    timerRef.current = setTimeout(() => {
       setSaveState("saving");
-      try {
-        await saveCustomWorkout({
-          id: workout.id,
-          title: latest.current.title.trim() || "My workout",
-          day: latest.current.day,
-        });
-        setSaveState("saved");
-      } catch {
-        setSaveState("dirty");
-      }
+      inflightRef.current = saveCustomWorkout({
+        id: workout.id,
+        title: latest.current.title.trim() || "My workout",
+        day: latest.current.day,
+      }).then(
+        () => setSaveState("saved"),
+        () => setSaveState("dirty"),
+      );
     }, 1200);
   }, [workout.id]);
   useEffect(() => {
@@ -134,7 +135,20 @@ export function WorkoutEditor({
         className="w-full"
         size="lg"
         disabled={starting || day.exercises.length === 0}
-        onClick={() => startTransition(() => startCustomWorkout(workout.id))}
+        onClick={() =>
+          startTransition(async () => {
+            // Flush edits first so the session runs the latest plan, and so
+            // no autosave overlaps the redirecting action below.
+            if (timerRef.current) clearTimeout(timerRef.current);
+            await inflightRef.current;
+            await saveCustomWorkout({
+              id: workout.id,
+              title: latest.current.title.trim() || "My workout",
+              day: latest.current.day,
+            });
+            await startCustomWorkout(workout.id);
+          })
+        }
       >
         {starting ? (
           <Loader2 className="size-4 animate-spin" />
