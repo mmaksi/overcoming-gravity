@@ -1,13 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
   getCachedDefaultTemplate,
   getCachedExercises,
+  userProgramsTag,
 } from "@/lib/data/cached";
 import { weekdayOf, toISODate } from "@/lib/domain/schedule";
 import { buildDefaultWorkoutDay } from "@/lib/domain/defaults";
@@ -43,6 +44,7 @@ export async function createCustomWorkout(): Promise<void> {
     updatedAt: now,
   };
   await store.createCustomWorkout(workout);
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/programs");
   redirect(`/workouts/${workout.id}`);
 }
@@ -73,6 +75,7 @@ export async function saveCustomWorkout(input: {
       updatedAt: new Date().toISOString(),
     }),
   );
+  updateTag(userProgramsTag(user.id));
 }
 
 /** No redirect — callers navigate (or remove the item optimistically). */
@@ -84,6 +87,7 @@ export async function deleteCustomWorkout(id: string): Promise<void> {
     throw new Error("Workout not found");
   }
   await store.deleteCustomWorkout(id);
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/programs");
 }
 

@@ -1,5 +1,7 @@
 import { requireUser } from "@/lib/auth";
-import { dataBackend } from "@/lib/data";
+import { dataBackend, getStore } from "@/lib/data";
+import { toISODate } from "@/lib/domain/schedule";
+import { BodyStatsForm } from "@/components/settings/body-stats-form";
 import {
   Card,
   CardContent,
@@ -17,6 +19,8 @@ import { ThemePicker } from "@/components/settings/theme-picker";
 export default async function SettingsPage() {
   const user = await requireUser();
   const backend = dataBackend();
+  const store = await getStore();
+  const bodyweight = await store.listBodyweightEntries(user.id);
 
   return (
     <div className="space-y-4">
@@ -37,6 +41,23 @@ export default async function SettingsPage() {
           ) : (
             <SignOutButton />
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Body</CardTitle>
+          <CardDescription>
+            Height and target weight feed your BMI; weigh-ins draw the chart
+            on Home.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BodyStatsForm
+            initialHeightCm={user.heightCm}
+            initialTargetWeightKg={user.targetWeightKg}
+            entries={bodyweight}
+            today={toISODate(new Date())}
+          />
         </CardContent>
       </Card>
       <Card>

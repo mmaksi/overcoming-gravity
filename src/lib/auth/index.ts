@@ -25,6 +25,9 @@ export async function getCurrentUser(): Promise<Profile | null> {
     email: profile?.email ?? "athlete@dev.local",
     name: profile?.name ?? "Dev Athlete",
     isAdmin,
+    avatarUrl: profile?.avatarUrl,
+    heightCm: profile?.heightCm,
+    targetWeightKg: profile?.targetWeightKg,
   };
 }
 

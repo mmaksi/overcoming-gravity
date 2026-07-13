@@ -1,0 +1,171 @@
+import Link from "next/link";
+import {
+  Activity,
+  ChartLine,
+  Crosshair,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+import { bmiOf, BodyweightEntry } from "@/lib/domain/schemas";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+/** Simple responsive SVG line chart of weight over time. */
+function WeightChart({ entries }: { entries: BodyweightEntry[] }) {
+  const W = 320;
+  const H = 96;
+  const pad = 6;
+  const weights = entries.map((e) => e.weightKg);
+  const min = Math.min(...weights);
+  const max = Math.max(...weights);
+  const span = max - min || 1;
+
+  const points = entries.map((e, i) => {
+    const x =
+      entries.length === 1
+        ? W / 2
+        : pad + (i / (entries.length - 1)) * (W - 2 * pad);
+    const y = H - pad - ((e.weightKg - min) / span) * (H - 2 * pad);
+    return { x, y };
+  });
+  const path = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-24 w-full"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="Bodyweight over time"
+    >
+      <polyline
+        points={path}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      {points.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="var(--primary)" />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * The "Stats" block on Home: the bodyweight chart next to a BMI card
+ * (current + target). Read-only — weigh-ins, height and target weight are
+ * logged in Settings.
+ */
+export function StatsSection({
+  entries,
+  heightCm,
+  targetWeightKg,
+}: {
+  entries: BodyweightEntry[];
+  heightCm?: number;
+  targetWeightKg?: number;
+}) {
+  const latest = entries.at(-1);
+  const first = entries[0];
+  const change =
+    latest && first && entries.length > 1
+      ? latest.weightKg - first.weightKg
+      : 0;
+
+  const bmi = bmiOf(latest?.weightKg, heightCm);
+  const targetBmi = bmiOf(targetWeightKg, heightCm);
+
+  return (
+    <div className="space-y-3">
+      <h2 className="flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-primary">
+        <Activity className="size-5" /> Stats
+      </h2>
+      <div className="grid grid-cols-5 gap-3">
+        <Card className="col-span-3 gap-2 py-4">
+          <CardHeader className="px-4">
+            <CardTitle className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1.5">
+                <ChartLine className="size-4 text-primary" /> Bodyweight
+              </span>
+              {latest && (
+                <span className="font-bold tabular-nums">
+                  {latest.weightKg} kg
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 px-4">
+            {entries.length > 0 ? (
+              <>
+                <WeightChart entries={entries} />
+                {change !== 0 && (
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    {change < 0 ? (
+                      <TrendingDown className="size-3.5 text-emerald-600" />
+                    ) : (
+                      <TrendingUp className="size-3.5 text-orange-600" />
+                    )}
+                    {change > 0 ? "+" : ""}
+                    {change.toFixed(1)} kg since {first?.date}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                <Link href="/settings" className="text-primary underline">
+                  Log your weight in Settings
+                </Link>{" "}
+                to see it charted here.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-2 gap-2 py-4">
+          <CardHeader className="px-4">
+            <CardTitle className="flex items-center gap-1.5 text-sm">
+              <Crosshair className="size-4 text-primary" /> BMI
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 px-4">
+            {bmi != null ? (
+              <>
+                <div>
+                  <div className="text-2xl font-bold tabular-nums">{bmi}</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Current
+                  </div>
+                </div>
+                {targetBmi != null && (
+                  <div>
+                    <div className="text-lg font-semibold tabular-nums text-primary">
+                      {targetBmi}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Target
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                <Link href="/settings" className="text-primary underline">
+                  Add your height
+                  {latest ? "" : " and weight"}
+                </Link>{" "}
+                for BMI.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

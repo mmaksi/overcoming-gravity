@@ -1,11 +1,60 @@
-import { Exercise, VolumeStats, WorkoutSession } from "@/lib/domain/schemas";
+import {
+  CustomWorkout,
+  Exercise,
+  Program,
+  ProgramRun,
+  VolumeStats,
+  WorkoutSession,
+} from "@/lib/domain/schemas";
 import { TECHNIQUES_BY_ID, WEEKDAY_LABELS } from "@/lib/domain/types";
 import { statsKey } from "@/lib/domain/volume";
-import type {
-  HistoryItem,
-  HistoryLine,
-} from "@/components/history/workout-history-list";
 import type { ProgressRow } from "@/components/history/progress-list";
+
+/** Workouts fetched per history page (first render + each scroll load). */
+export const HISTORY_PAGE_SIZE = 3;
+
+export type HistoryLine = {
+  id: string;
+  title: string;
+  /** Compact sets summary, e.g. "3 × 8/8/6". */
+  sets: string;
+  /** Inter-exercise technique name; shown only when it's not plain "intra". */
+  method?: string;
+};
+
+export type HistoryItem = {
+  id: string;
+  date: string;
+  label: string;
+  meta: string;
+  /** Formatted workout duration (e.g. "42:10"), if recorded. */
+  duration?: string;
+  /** Total reps logged on push / pull movements. */
+  pushVolume: number;
+  pullVolume: number;
+  lines: HistoryLine[];
+};
+
+/** What to call a session in history: its program or custom-workout name. */
+export function makeSessionLabel(
+  programs: Program[],
+  runs: ProgramRun[],
+  customWorkouts: CustomWorkout[],
+): (session: WorkoutSession) => string {
+  const programNameByRun = new Map(
+    runs.map((r) => [
+      r.id,
+      programs.find((p) => p.id === r.programId)?.name ?? "Program",
+    ]),
+  );
+  const customWorkoutTitles = new Map(
+    customWorkouts.map((w) => [w.id, w.title]),
+  );
+  return (session) =>
+    session.runId
+      ? (programNameByRun.get(session.runId) ?? "Program")
+      : (customWorkoutTitles.get(session.customWorkoutId ?? "") ?? "Workout");
+}
 
 function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);

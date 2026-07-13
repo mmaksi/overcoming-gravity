@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Check, Loader2 } from "lucide-react";
-import { updateAvatar } from "@/lib/actions/settings";
+import { useRef, useState, useTransition } from "react";
+import { Camera, Check, Loader2, Trash2 } from "lucide-react";
+import { removeAvatar, uploadAvatar } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/home/user-avatar";
 
+/**
+ * Profile picture upload: picks a file from the device and sends it to the
+ * blob store (Supabase Storage in production). The instant local preview
+ * uses an object URL while the round-trip runs.
+ */
 export function AvatarForm({
   name,
   initialAvatarUrl,
@@ -15,46 +19,89 @@ export function AvatarForm({
   name: string;
   initialAvatarUrl?: string;
 }) {
-  const [url, setUrl] = useState(initialAvatarUrl ?? "");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function save() {
+  function upload(file: File) {
     setSaved(false);
     setError(null);
+    setPreview(URL.createObjectURL(file));
+    const formData = new FormData();
+    formData.set("avatar", file);
     startTransition(async () => {
       try {
-        await updateAvatar(url.trim());
+        await uploadAvatar(formData);
         setSaved(true);
       } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Enter a valid image URL, or clear it",
-        );
+        setPreview(null);
+        setError(e instanceof Error ? e.message : "Upload failed");
       }
     });
   }
 
+  function remove() {
+    setSaved(false);
+    setError(null);
+    setPreview(null);
+    startTransition(async () => {
+      try {
+        await removeAvatar();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't remove");
+      }
+    });
+  }
+
+  const shownUrl = preview ?? initialAvatarUrl;
+
   return (
     <div className="space-y-2">
-      <Label htmlFor="avatar-url">Profile picture</Label>
+      <Label htmlFor="avatar-file">Profile picture</Label>
       <div className="flex items-center gap-3">
-        <UserAvatar name={name} avatarUrl={url.trim() || undefined} />
-        <Input
-          id="avatar-url"
-          type="url"
-          inputMode="url"
-          placeholder="https://… (leave blank to remove)"
-          value={url}
+        <UserAvatar name={name} avatarUrl={shownUrl} />
+        <input
+          ref={fileRef}
+          id="avatar-file"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="sr-only"
           onChange={(e) => {
-            setUrl(e.target.value);
-            setSaved(false);
+            const file = e.target.files?.[0];
+            if (file) upload(file);
+            e.target.value = "";
           }}
         />
-        <Button className="shrink-0" disabled={pending} onClick={save}>
-          {pending ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+        <Button
+          variant="outline"
+          disabled={pending}
+          onClick={() => fileRef.current?.click()}
+        >
+          {pending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Camera className="size-4" />
+          )}{" "}
+          {shownUrl ? "Change photo" : "Upload photo"}
         </Button>
+        {shownUrl && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Remove profile picture"
+            className="text-muted-foreground hover:text-destructive"
+            disabled={pending}
+            onClick={remove}
+          >
+            <Trash2 className="size-5" />
+          </Button>
+        )}
       </div>
+      <p className="text-xs text-muted-foreground">
+        JPEG, PNG or WebP, up to 5 MB.
+      </p>
       {saved && (
         <p className="flex items-center gap-1 text-sm text-primary">
           <Check className="size-4" /> Profile picture updated

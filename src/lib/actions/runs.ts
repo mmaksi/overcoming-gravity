@@ -1,10 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { userHistoryTag, userProgramsTag } from "@/lib/data/cached";
 import { generateSessions } from "@/lib/domain/schedule";
 import {
   EXERCISE_NOTE_TECHNIQUE,
@@ -49,6 +50,7 @@ export async function startRun(input: {
   };
   const sessions = generateSessions(program, run.id, startDate);
   await store.createRun(run, sessions);
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/", "layout");
   redirect("/");
 }
@@ -79,6 +81,7 @@ export async function resetRun(runId: string): Promise<void> {
   };
   const sessions = generateSessions(program, fresh.id, fresh.startDate);
   await store.createRun(fresh, sessions);
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/", "layout");
 }
 
@@ -89,6 +92,7 @@ export async function abandonRun(runId: string): Promise<void> {
   if (!run || run.userId !== user.id) throw new Error("Run not found");
   await store.updateRun({ ...run, status: "abandoned" });
   await store.deletePlannedSessions(run.id);
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/", "layout");
 }
 
@@ -159,6 +163,11 @@ export async function saveWorkoutSession(input: {
     }
   }
 
+  if (action !== "save") {
+    // The workout just entered (or left) the completed history.
+    updateTag(userHistoryTag(user.id));
+  }
+  if (runCompleted) updateTag(userProgramsTag(user.id));
   revalidatePath("/", "layout");
   return { runCompleted, programId };
 }
@@ -172,5 +181,6 @@ export async function deleteWorkoutSession(sessionId: string): Promise<void> {
     throw new Error("Session not found");
   }
   await store.deleteSession(sessionId);
+  updateTag(userHistoryTag(user.id));
   revalidatePath("/", "layout");
 }

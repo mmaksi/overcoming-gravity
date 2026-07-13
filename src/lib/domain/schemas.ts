@@ -326,8 +326,27 @@ export const profileSchema = z.object({
   isAdmin: z.boolean(),
   /** Optional profile picture, shown on the home header. */
   avatarUrl: z.string().optional(),
+  /** Body stats for BMI: height and the weight the athlete is aiming for. */
+  heightCm: z.number().positive().max(300).optional(),
+  targetWeightKg: z.number().positive().max(1000).optional(),
 });
 export type Profile = z.infer<typeof profileSchema>;
+
+/** Body stats editable in Settings (null clears a value). */
+export type ProfileStats = {
+  heightCm: number | null;
+  targetWeightKg: number | null;
+};
+
+/** BMI from weight and height; null when either half is missing. */
+export function bmiOf(
+  weightKg: number | undefined,
+  heightCm: number | undefined,
+): number | null {
+  if (!weightKg || !heightCm) return null;
+  const m = heightCm / 100;
+  return Math.round((weightKg / (m * m)) * 10) / 10;
+}
 
 // ---------------------------------------------------------------------------
 // Bodyweight tracking

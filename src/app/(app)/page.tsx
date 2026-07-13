@@ -2,8 +2,15 @@ import Link from "next/link";
 import { ArrowRight, Dumbbell, Play } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { getCachedExercises } from "@/lib/data/cached";
 import { toISODate } from "@/lib/domain/schedule";
-import { WEEKDAY_LABELS } from "@/lib/domain/types";
+import { ATTRIBUTES, WEEKDAY_LABELS } from "@/lib/domain/types";
+import {
+  Exercise,
+  sectionOf,
+  WorkoutDay,
+  WorkoutSession,
+} from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,8 +22,67 @@ import {
 } from "@/components/ui/card";
 import { InstallAppButton } from "@/components/home/install-app-button";
 import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
-import { BodyweightCard } from "@/components/home/bodyweight-card";
+import { RunCarousel } from "@/components/home/run-carousel";
+import { StatsSection } from "@/components/home/stats-section";
 import { UserAvatar } from "@/components/home/user-avatar";
+
+/** The planned exercises of the upcoming session, in section order. */
+function UpcomingExercises({
+  day,
+  session,
+  exercisesById,
+  isToday,
+}: {
+  day: WorkoutDay;
+  session: WorkoutSession;
+  exercisesById: Map<string, Exercise>;
+  isToday: boolean;
+}) {
+  const planned = [...day.exercises].sort(
+    (a, b) =>
+      ATTRIBUTES.indexOf(sectionOf(a, exercisesById)) -
+      ATTRIBUTES.indexOf(sectionOf(b, exercisesById)),
+  );
+  if (planned.length === 0) return null;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {isToday ? "Today" : `Up next · ${WEEKDAY_LABELS[session.weekday]}`}
+      </p>
+      <ul className="min-h-0 flex-1 divide-y overflow-y-auto rounded-lg border text-sm">
+        {planned.map((we) => {
+          const exercise = exercisesById.get(we.exerciseId);
+          const progression = exercise?.progressions.find(
+            (p) => p.id === we.progressionId,
+          );
+          const unit = exercise?.measurement === "time" ? "s" : "";
+          return (
+            <li
+              key={we.id}
+              className="flex items-center justify-between gap-2 px-3 py-2"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-medium">
+                  {exercise?.title ?? "Exercise"}
+                </span>
+                {progression && (
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {progression.name}
+                  </span>
+                )}
+              </span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {we.sets.length} × {we.sets.map((s) => s.reps).join("/")}
+                {unit}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -56,10 +122,15 @@ export default async function DashboardPage() {
   }
 
   const today = toISODate(new Date());
-  const bodyweight = await store.listBodyweightEntries(user.id);
+  const [bodyweight, exercises] = await Promise.all([
+    store.listBodyweightEntries(user.id),
+    getCachedExercises(store),
+  ]);
+  const exercisesById = new Map(exercises.map((e) => [e.id, e]));
   const programGoals: ProgramGoals[] = [];
 
-  // One card per active program run — several can run in parallel.
+  // One card per active program run — several can run in parallel (swipeable
+  // carousel). Cards share a fixed height; the exercise list scrolls inside.
   const runCards = [];
   for (const run of activeRuns) {
     const program = await store.getProgram(run.programId);
@@ -79,8 +150,17 @@ export default async function DashboardPage() {
     const pct =
       sessions.length === 0 ? 0 : Math.round((done / sessions.length) * 100);
 
+    const upcoming = todaySession ?? nextSession;
+    const upcomingDay = upcoming
+      ? (program?.mesocycle.weeks[upcoming.weekIndex]?.days[upcoming.weekday] ??
+        null)
+      : null;
+
     runCards.push(
-      <Card key={run.id} className={todaySession ? "border-primary" : undefined}>
+      <Card
+        key={run.id}
+        className={`flex h-[26rem] flex-col ${todaySession ? "border-primary" : ""}`}
+      >
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="truncate">{program?.name ?? "Program"}</span>
@@ -101,33 +181,43 @@ export default async function DashboardPage() {
                 : ""}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
+          <div className="h-2 w-full shrink-0 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${pct}%` }}
             />
           </div>
-          {todaySession ? (
-            <Button asChild className="w-full" size="lg">
-              <Link href={`/workout/${todaySession.id}`}>
-                <Play className="size-4" />
-                {todaySession.status === "completed"
-                  ? "Review workout"
-                  : todaySession.entries.length > 0
-                    ? "Continue workout"
-                    : "Start workout"}
-              </Link>
-            </Button>
-          ) : (
-            nextSession && (
-              <Button asChild variant="outline" className="w-full">
-                <Link href={`/workout/${nextSession.id}`}>
-                  <Play className="size-4" /> Feeling fresh? Do it today
+          {upcoming && upcomingDay && (
+            <UpcomingExercises
+              day={upcomingDay}
+              session={upcoming}
+              exercisesById={exercisesById}
+              isToday={upcoming === todaySession}
+            />
+          )}
+          <div className="mt-auto shrink-0">
+            {todaySession ? (
+              <Button asChild className="w-full" size="lg">
+                <Link href={`/workout/${todaySession.id}`}>
+                  <Play className="size-4" />
+                  {todaySession.status === "completed"
+                    ? "Review workout"
+                    : todaySession.entries.length > 0
+                      ? "Continue workout"
+                      : "Start workout"}
                 </Link>
               </Button>
-            )
-          )}
+            ) : (
+              nextSession && (
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={`/workout/${nextSession.id}`}>
+                    <Play className="size-4" /> Feeling fresh? Do it today
+                  </Link>
+                </Button>
+              )
+            )}
+          </div>
         </CardContent>
       </Card>,
     );
@@ -142,11 +232,15 @@ export default async function DashboardPage() {
 
       <InstallAppButton />
 
-      {runCards}
+      <RunCarousel>{runCards}</RunCarousel>
+
+      <StatsSection
+        entries={bodyweight}
+        heightCm={user.heightCm}
+        targetWeightKg={user.targetWeightKg}
+      />
 
       <GoalsCard programs={programGoals} />
-
-      <BodyweightCard entries={bodyweight} today={today} />
     </div>
   );
 }

@@ -57,8 +57,8 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
 
   return (
     <div className="space-y-3">
-      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <Target className="size-4" /> Goals · {achieved}/{flat.length} achieved
+      <h2 className="flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-primary">
+        <Target className="size-5" /> Goals · {achieved}/{flat.length} achieved
       </h2>
       <div className="space-y-2.5">
         {flat.map(({ programId, programName, area, index, goal }) => (

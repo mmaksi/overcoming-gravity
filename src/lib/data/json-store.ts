@@ -10,6 +10,7 @@ import {
   ExerciseNote,
   Feedback,
   Profile,
+  ProfileStats,
   Program,
   ProgramRun,
   WorkoutSession,
@@ -271,12 +272,13 @@ export class JsonStore implements DataStore {
   async listCompletedSessions(
     userId: string,
     limit = 200,
+    offset = 0,
   ): Promise<WorkoutSession[]> {
     const db = await getDb();
     return db.data.sessions
       .filter((s) => s.userId === userId && s.status === "completed")
       .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, limit);
+      .slice(offset, offset + limit);
   }
 
   async listExerciseNotes(userId: string): Promise<ExerciseNote[]> {
@@ -317,6 +319,17 @@ export class JsonStore implements DataStore {
     const profile = db.data.profiles.find((p) => p.id === userId);
     if (!profile) return;
     profile.avatarUrl = avatarUrl ?? undefined;
+    await db.write();
+  }
+  async updateProfileStats(
+    userId: string,
+    stats: ProfileStats,
+  ): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find((p) => p.id === userId);
+    if (!profile) return;
+    profile.heightCm = stats.heightCm ?? undefined;
+    profile.targetWeightKg = stats.targetWeightKg ?? undefined;
     await db.write();
   }
 

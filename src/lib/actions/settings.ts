@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { MOCK_ADMIN_COOKIE, requireUser } from "@/lib/auth";
 import { dataBackend, getStore } from "@/lib/data";
+import { AVATARS_BUCKET, getBlobStore } from "@/lib/storage";
 
 const nameSchema = z.string().trim().min(1).max(60);
 
@@ -17,14 +18,72 @@ export async function updateName(name: string): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-const avatarSchema = z.string().trim().url().max(2000).or(z.literal(""));
+// One canonical file per user; uploading a new picture overwrites it. All
+// three extensions are cleared on change so switching formats leaves no
+// orphan behind.
+const AVATAR_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // matches the bucket limit
 
-/** Set (or clear, with "") the profile picture shown on the home header. */
-export async function updateAvatar(avatarUrl: string): Promise<void> {
+/** Upload a profile picture from the user's device (form field "avatar"). */
+export async function uploadAvatar(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const parsed = avatarSchema.parse(avatarUrl);
+  const file = formData.get("avatar");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Pick an image first");
+  }
+  const ext = AVATAR_TYPES[file.type];
+  if (!ext) throw new Error("Use a JPEG, PNG or WebP image");
+  if (file.size > AVATAR_MAX_BYTES) throw new Error("Image is over 5 MB");
+
+  const blobs = await getBlobStore();
+  for (const stale of Object.values(AVATAR_TYPES)) {
+    if (stale !== ext) {
+      await blobs.remove(AVATARS_BUCKET, `${user.id}/avatar.${stale}`);
+    }
+  }
+  const url = await blobs.put(
+    AVATARS_BUCKET,
+    `${user.id}/avatar.${ext}`,
+    new Uint8Array(await file.arrayBuffer()),
+    file.type,
+  );
+
   const store = await getStore();
-  await store.updateProfileAvatar(user.id, parsed === "" ? null : parsed);
+  // Cache-buster: the path is stable, so browsers would keep the old image.
+  await store.updateProfileAvatar(user.id, `${url}?v=${Date.now()}`);
+  revalidatePath("/", "layout");
+}
+
+/** Remove the profile picture (falls back to the initial-letter avatar). */
+export async function removeAvatar(): Promise<void> {
+  const user = await requireUser();
+  const blobs = await getBlobStore();
+  for (const ext of Object.values(AVATAR_TYPES)) {
+    await blobs.remove(AVATARS_BUCKET, `${user.id}/avatar.${ext}`);
+  }
+  const store = await getStore();
+  await store.updateProfileAvatar(user.id, null);
+  revalidatePath("/", "layout");
+}
+
+const bodyStatsSchema = z.object({
+  heightCm: z.number().positive().max(300).nullable(),
+  targetWeightKg: z.number().positive().max(1000).nullable(),
+});
+
+/** Save height and ideal target weight (BMI inputs); null clears a value. */
+export async function saveBodyStats(input: {
+  heightCm: number | null;
+  targetWeightKg: number | null;
+}): Promise<void> {
+  const user = await requireUser();
+  const parsed = bodyStatsSchema.parse(input);
+  const store = await getStore();
+  await store.updateProfileStats(user.id, parsed);
   revalidatePath("/", "layout");
 }
 

@@ -6,6 +6,7 @@ import {
   ExerciseNote,
   Feedback,
   Profile,
+  ProfileStats,
   Program,
   ProgramRun,
   WorkoutSession,
@@ -66,9 +67,14 @@ export interface DataStore {
 
   /**
    * Completed workouts, newest first. Powers history, the progress overview
-   * and intra-exercise progression memory (see domain/volume.ts).
+   * and intra-exercise progression memory (see domain/volume.ts). `offset`
+   * pages through older workouts (history infinite scroll).
    */
-  listCompletedSessions(userId: string, limit?: number): Promise<WorkoutSession[]>;
+  listCompletedSessions(
+    userId: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<WorkoutSession[]>;
 
   /**
    * A user's remembered notes per exercise + inter-technique pair. Saving
@@ -81,6 +87,8 @@ export interface DataStore {
   getProfile(userId: string): Promise<Profile | null>;
   updateProfileName(userId: string, name: string): Promise<void>;
   updateProfileAvatar(userId: string, avatarUrl: string | null): Promise<void>;
+  /** Body stats for BMI (height, target weight); null clears a value. */
+  updateProfileStats(userId: string, stats: ProfileStats): Promise<void>;
 
   // Bodyweight tracking ---------------------------------------------------
   listBodyweightEntries(userId: string): Promise<BodyweightEntry[]>;

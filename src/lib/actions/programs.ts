@@ -1,13 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
   getCachedDefaultTemplate,
   getCachedExercises,
+  userHistoryTag,
+  userProgramsTag,
 } from "@/lib/data/cached";
 import { GoalItem, mesocycleSchema, Program } from "@/lib/domain/schemas";
 import { GOAL_AREAS, GoalArea } from "@/lib/domain/types";
@@ -60,6 +62,7 @@ export async function createProgramFromWizard(
   };
 
   await store.createProgram(program);
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/programs");
   redirect(`/programs/${program.id}/design`);
 }
@@ -86,6 +89,7 @@ export async function saveMesocycle(input: {
     updatedAt: new Date().toISOString(),
   };
   await store.updateProgram(updated);
+  updateTag(userProgramsTag(user.id));
   return { savedAt: updated.updatedAt };
 }
 
@@ -101,6 +105,7 @@ export async function activateProgram(programId: string): Promise<void> {
     status: "active",
     updatedAt: new Date().toISOString(),
   });
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/programs");
   redirect(`/programs/${programId}`);
 }
@@ -153,6 +158,7 @@ export async function updateProgramGoals(input: {
     },
     updatedAt: new Date().toISOString(),
   });
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/", "layout");
 }
 
@@ -189,6 +195,7 @@ export async function toggleProgramGoal(input: {
     goals,
     updatedAt: new Date().toISOString(),
   });
+  updateTag(userProgramsTag(user.id));
   revalidatePath("/", "layout");
 }
 
@@ -200,6 +207,9 @@ export async function deleteProgram(programId: string): Promise<void> {
     throw new Error("Program not found");
   }
   await store.deleteProgram(programId);
+  updateTag(userProgramsTag(user.id));
+  // Deleting a program cascades its runs' sessions out of history too.
+  updateTag(userHistoryTag(user.id));
   revalidatePath("/programs");
   redirect("/programs");
 }

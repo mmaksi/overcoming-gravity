@@ -14,7 +14,7 @@ export async function getSupabaseUser(): Promise<Profile | null> {
   if (!user) return null;
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, name, is_admin")
+    .select("id, email, name, is_admin, avatar_url, height_cm, target_weight_kg")
     .eq("id", user.id)
     .single();
   if (!profile) {
@@ -30,5 +30,8 @@ export async function getSupabaseUser(): Promise<Profile | null> {
     email: profile.email ?? undefined,
     name: profile.name ?? user.email ?? "Athlete",
     isAdmin: profile.is_admin,
+    avatarUrl: profile.avatar_url ?? undefined,
+    heightCm: profile.height_cm ?? undefined,
+    targetWeightKg: profile.target_weight_kg ?? undefined,
   };
 }

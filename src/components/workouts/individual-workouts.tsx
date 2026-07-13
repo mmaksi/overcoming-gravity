@@ -2,7 +2,14 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronRight, Dumbbell, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronRight,
+  Dumbbell,
+  Loader2,
+  Plus,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import { CustomWorkout } from "@/lib/domain/schemas";
 import {
   createCustomWorkout,
@@ -41,7 +48,9 @@ export function IndividualWorkouts({
   return (
     <div className="space-y-5 border-t pt-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Individual workouts</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <Zap className="size-5 text-primary" /> Individual workouts
+        </h2>
         <Button
           variant="outline"
           size="sm"

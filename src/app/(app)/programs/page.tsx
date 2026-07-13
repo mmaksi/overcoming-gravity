@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight, Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { getCachedUserPrograms } from "@/lib/data/cached";
 import {
   PERIODIZATION_LABELS,
   PROGRAM_TYPE_LABELS,
@@ -15,11 +16,11 @@ import { MotivationalQuote } from "@/components/programs/motivational-quote";
 export default async function ProgramsPage() {
   const user = await requireUser();
   const store = await getStore();
-  const [programs, runs, customWorkouts] = await Promise.all([
-    store.listPrograms(user.id),
-    store.listRuns(user.id),
-    store.listCustomWorkouts(user.id),
-  ]);
+  // Cached per user for a day; program/workout/run mutations bust the tag.
+  const { programs, runs, customWorkouts } = await getCachedUserPrograms(
+    store,
+    user.id,
+  );
   // "Active" = programs the athlete is currently following (several can run
   // at the same time).
   const activeProgramIds = new Set(

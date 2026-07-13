@@ -2,7 +2,11 @@ import Link from "next/link";
 import { CalendarDays, Check, ChevronLeft, ChevronRight, TrendingUp, X } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
-import { getCachedExercises } from "@/lib/data/cached";
+import {
+  getCachedCompletedPage,
+  getCachedExercises,
+  getCachedUserPrograms,
+} from "@/lib/data/cached";
 import {
   addDays,
   parseISODate,
@@ -10,12 +14,14 @@ import {
   weekdayOf,
 } from "@/lib/domain/schedule";
 import { WEEKDAY_SHORT, WEEKDAYS } from "@/lib/domain/types";
-import { buildVolumeStats } from "@/lib/domain/volume";
-import { buildHistoryItems, buildProgressRows } from "@/lib/domain/history";
-import { WorkoutSession } from "@/lib/domain/schemas";
+import {
+  buildHistoryItems,
+  HISTORY_PAGE_SIZE,
+  makeSessionLabel,
+} from "@/lib/domain/history";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProgressList } from "@/components/history/progress-list";
-import { WorkoutHistoryList } from "@/components/history/workout-history-list";
+import { HistoryFeed } from "@/components/history/history-feed";
+import { ProgressTab } from "@/components/history/progress-tab";
 import { cn } from "@/lib/utils";
 
 const MONTHS = [
@@ -77,35 +83,19 @@ export default async function CalendarPage({
   const next = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
   const todayISO = toISODate(now);
 
-  // History + progress (moved here from the old History tab).
-  const [completed, exercises, programs, customWorkouts, allRuns] =
+  // History (moved here from the old History tab): only the newest page is
+  // fetched up front — older workouts stream in on scroll, and the Progress
+  // tab loads its rows on first visit. All three reads are cached per user.
+  const [firstPage, exercises, { programs, runs: labelRuns, customWorkouts }] =
     await Promise.all([
-      store.listCompletedSessions(user.id),
+      getCachedCompletedPage(store, user.id, 0, HISTORY_PAGE_SIZE),
       getCachedExercises(store),
-      store.listPrograms(user.id),
-      store.listCustomWorkouts(user.id),
-      store.listRuns(user.id),
+      getCachedUserPrograms(store, user.id),
     ]);
-  const exercisesById = new Map(exercises.map((e) => [e.id, e]));
-  const programNameByRun = new Map(
-    allRuns.map((r) => [
-      r.id,
-      programs.find((p) => p.id === r.programId)?.name ?? "Program",
-    ]),
-  );
-  const customWorkoutTitles = new Map(
-    customWorkouts.map((w) => [w.id, w.title]),
-  );
-  const sessionLabel = (session: WorkoutSession): string =>
-    session.runId
-      ? (programNameByRun.get(session.runId) ?? "Program")
-      : (customWorkoutTitles.get(session.customWorkoutId ?? "") ?? "Workout");
-
-  const historyItems = buildHistoryItems(completed, exercisesById, sessionLabel);
-  const progressRows = buildProgressRows(
-    exercises,
-    completed,
-    buildVolumeStats(completed),
+  const historyItems = buildHistoryItems(
+    firstPage,
+    new Map(exercises.map((e) => [e.id, e])),
+    makeSessionLabel(programs, labelRuns, customWorkouts),
   );
 
   return (
@@ -224,7 +214,11 @@ export default async function CalendarPage({
         </TabsList>
 
         <TabsContent value="workouts" className="pt-3">
-          <WorkoutHistoryList sessions={historyItems} />
+          <HistoryFeed
+            key={`${historyItems[0]?.id ?? "empty"}-${historyItems.length}`}
+            initialItems={historyItems}
+            initialHasMore={firstPage.length === HISTORY_PAGE_SIZE}
+          />
         </TabsContent>
 
         <TabsContent value="progress" className="space-y-4 pt-2">
@@ -232,7 +226,7 @@ export default async function CalendarPage({
             Your current progression, method and best set in every skill and
             strength exercise — so you know exactly what to do next workout.
           </p>
-          <ProgressList rows={progressRows} />
+          <ProgressTab />
         </TabsContent>
       </Tabs>
     </div>

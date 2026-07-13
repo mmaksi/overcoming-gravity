@@ -31,3 +31,64 @@ export function getCachedDefaultTemplate(store: DataStore) {
     { revalidate: ONE_WEEK_SECONDS, tags: [DEFAULT_TEMPLATE_TAG] },
   )();
 }
+
+// ---------------------------------------------------------------------------
+// Per-user caches. Unlike the content caches above these MUST be keyed AND
+// tagged by userId — a globally-keyed entry would leak one user's data to
+// everyone (docs/scaling-and-security.md, S4). Mutating server actions bust
+// them with `updateTag(...)` — read-your-own-writes, so the user sees their
+// change immediately.
+
+/** Tag for a user's programs, runs and custom workouts (the /programs page). */
+export const userProgramsTag = (userId: string) => `user:${userId}:programs`;
+/** Tag for a user's completed-workout history and progress overview. */
+export const userHistoryTag = (userId: string) => `user:${userId}:history`;
+
+const ONE_DAY_SECONDS = 60 * 60 * 24;
+
+/**
+ * Everything the Programs page lists, cached for a day per user and busted
+ * whenever the user adds/edits/deletes a program or workout (or a run
+ * starts/finishes, which flips the "Active" badge).
+ */
+export function getCachedUserPrograms(store: DataStore, userId: string) {
+  return unstable_cache(
+    async () => {
+      const [programs, runs, customWorkouts] = await Promise.all([
+        store.listPrograms(userId),
+        store.listRuns(userId),
+        store.listCustomWorkouts(userId),
+      ]);
+      return { programs, runs, customWorkouts };
+    },
+    ["user-programs", userId],
+    { revalidate: ONE_DAY_SECONDS, tags: [userProgramsTag(userId)] },
+  )();
+}
+
+/**
+ * One page of a user's completed workouts (newest first). History is
+ * append-mostly — old pages barely change — so pages cache well; completing
+ * or deleting a workout busts the whole tag.
+ */
+export function getCachedCompletedPage(
+  store: DataStore,
+  userId: string,
+  offset: number,
+  limit: number,
+) {
+  return unstable_cache(
+    () => store.listCompletedSessions(userId, limit, offset),
+    ["user-history", userId, String(offset), String(limit)],
+    { revalidate: ONE_WEEK_SECONDS, tags: [userHistoryTag(userId)] },
+  )();
+}
+
+/** The full completed history (progress overview + volume stats). */
+export function getCachedCompletedSessions(store: DataStore, userId: string) {
+  return unstable_cache(
+    () => store.listCompletedSessions(userId),
+    ["user-history-full", userId],
+    { revalidate: ONE_WEEK_SECONDS, tags: [userHistoryTag(userId)] },
+  )();
+}

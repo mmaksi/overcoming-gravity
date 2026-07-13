@@ -8,6 +8,7 @@ import {
   ExerciseNote,
   Feedback,
   Profile,
+  ProfileStats,
   Program,
   ProgramRun,
   WorkoutSession,
@@ -397,6 +398,7 @@ class SupabaseStore implements DataStore {
   async listCompletedSessions(
     userId: string,
     limit = 200,
+    offset = 0,
   ): Promise<WorkoutSession[]> {
     return orThrow(
       await this.db
@@ -405,7 +407,7 @@ class SupabaseStore implements DataStore {
         .eq("user_id", userId)
         .eq("status", "completed")
         .order("date", { ascending: false })
-        .limit(limit),
+        .range(offset, offset + limit - 1),
     ).map(toSession);
   }
 
@@ -448,6 +450,8 @@ class SupabaseStore implements DataStore {
       name: rows[0].name,
       isAdmin: rows[0].is_admin,
       avatarUrl: rows[0].avatar_url ?? undefined,
+      heightCm: rows[0].height_cm ?? undefined,
+      targetWeightKg: rows[0].target_weight_kg ?? undefined,
     };
   }
   async updateProfileName(userId: string, name: string): Promise<void> {
@@ -467,6 +471,18 @@ class SupabaseStore implements DataStore {
       await this.db
         .from("profiles")
         .update({ avatar_url: avatarUrl })
+        .eq("id", userId)
+        .select("id"),
+    );
+  }
+  async updateProfileStats(userId: string, stats: ProfileStats): Promise<void> {
+    orThrow(
+      await this.db
+        .from("profiles")
+        .update({
+          height_cm: stats.heightCm,
+          target_weight_kg: stats.targetWeightKg,
+        })
         .eq("id", userId)
         .select("id"),
     );

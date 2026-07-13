@@ -18,6 +18,9 @@
 # local dev database
 /data
 
+# local dev file uploads (LocalBlobStore)
+/public/uploads
+
 # next.js
 /.next/
 /out/
