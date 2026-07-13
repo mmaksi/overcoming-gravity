@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { ExerciseThumb } from "@/components/exercise/exercise-thumb";
 import { cn } from "@/lib/utils";
 
 export function ExercisePicker({
@@ -120,24 +121,27 @@ export function ExercisePicker({
                   key={e.id}
                   type="button"
                   onClick={() => onPick(e)}
-                  className="w-full rounded-xl bg-muted/50 p-4 text-left transition-colors hover:bg-muted"
+                  className="flex w-full items-start gap-3 rounded-xl bg-muted/50 p-4 text-left transition-colors hover:bg-muted"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{e.title}</span>
-                    <span className="flex gap-1">
-                      <Badge variant="outline">
-                        {CATEGORY_LABELS[e.category]}
-                      </Badge>
-                      {attribute === null && (
-                        <Badge variant="secondary">
-                          {ATTRIBUTE_LABELS[e.attribute]}
+                  <ExerciseThumb title={e.title} imageUrl={e.imageUrl} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{e.title}</span>
+                      <span className="flex gap-1">
+                        <Badge variant="outline">
+                          {CATEGORY_LABELS[e.category]}
                         </Badge>
-                      )}
-                    </span>
+                        {attribute === null && (
+                          <Badge variant="secondary">
+                            {ATTRIBUTE_LABELS[e.attribute]}
+                          </Badge>
+                        )}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {e.progressions.map((p) => p.name).join(" → ")}
+                    </p>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {e.progressions.map((p) => p.name).join(" → ")}
-                  </p>
                 </button>
               ))}
             </div>

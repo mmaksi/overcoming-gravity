@@ -3,10 +3,12 @@ import path from "node:path";
 import { JSONFilePreset } from "lowdb/node";
 import { Low } from "lowdb";
 import {
+  BodyweightEntry,
   CustomWorkout,
   DefaultTemplate,
   Exercise,
   ExerciseNote,
+  Feedback,
   Profile,
   Program,
   ProgramRun,
@@ -50,6 +52,8 @@ async function getDb(): Promise<Low<DbData>> {
 function normalizeLegacy(data: DbData): void {
   data.exerciseNotes ??= [];
   data.customWorkouts ??= [];
+  data.bodyweightEntries ??= [];
+  data.feedback ??= [];
   // "cardio" was removed as an attribute; conditioning belongs to warm-up.
   for (const exercise of data.exercises) {
     if ((exercise.attribute as string) === "cardio") {
@@ -304,5 +308,48 @@ export class JsonStore implements DataStore {
     if (!profile) return;
     profile.name = name;
     await db.write();
+  }
+  async updateProfileAvatar(
+    userId: string,
+    avatarUrl: string | null,
+  ): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find((p) => p.id === userId);
+    if (!profile) return;
+    profile.avatarUrl = avatarUrl ?? undefined;
+    await db.write();
+  }
+
+  // Bodyweight tracking ---------------------------------------------------
+  async listBodyweightEntries(userId: string): Promise<BodyweightEntry[]> {
+    const db = await getDb();
+    return db.data.bodyweightEntries
+      .filter((e) => e.userId === userId)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+  async saveBodyweightEntry(entry: BodyweightEntry): Promise<BodyweightEntry> {
+    const db = await getDb();
+    const i = db.data.bodyweightEntries.findIndex(
+      (e) => e.userId === entry.userId && e.date === entry.date,
+    );
+    if (i === -1) db.data.bodyweightEntries.push(entry);
+    else db.data.bodyweightEntries[i] = entry;
+    await db.write();
+    return entry;
+  }
+  async deleteBodyweightEntry(id: string): Promise<void> {
+    const db = await getDb();
+    db.data.bodyweightEntries = db.data.bodyweightEntries.filter(
+      (e) => e.id !== id,
+    );
+    await db.write();
+  }
+
+  // Feedback --------------------------------------------------------------
+  async createFeedback(feedback: Feedback): Promise<Feedback> {
+    const db = await getDb();
+    db.data.feedback.push(feedback);
+    await db.write();
+    return feedback;
   }
 }

@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IndividualWorkouts } from "@/components/workouts/individual-workouts";
+import { MotivationalQuote } from "@/components/programs/motivational-quote";
 
 export default async function ProgramsPage() {
   const user = await requireUser();
@@ -35,6 +36,11 @@ export default async function ProgramsPage() {
           </Link>
         </Button>
       </div>
+
+      {/* Server component: renders once per request, so reading the clock to
+          pick the day's quote is deterministic per response. */}
+      {/* eslint-disable-next-line react-hooks/purity */}
+      <MotivationalQuote seed={Math.floor(Date.now() / 86_400_000)} />
 
       {programs.length === 0 ? (
         <div className="space-y-1 py-8 text-center">

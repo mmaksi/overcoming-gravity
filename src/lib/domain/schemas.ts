@@ -3,6 +3,7 @@ import {
   Attribute,
   ATTRIBUTES,
   CATEGORIES,
+  FEEDBACK_TYPES,
   GROUP_TYPES,
   INTENSITIES,
   MAX_WEEKS,
@@ -38,6 +39,8 @@ export const exerciseSchema = z.object({
   measurement: z.enum(MEASUREMENTS).default("reps"),
   /** Cluster style marks eccentric work: rest between single reps in a set. */
   repStyle: z.enum(REP_STYLES).default("standard"),
+  /** Optional illustration shown in the picker; admin-managed. */
+  imageUrl: z.string().url().or(z.literal("")).optional(),
   progressions: z.array(progressionSchema).min(1),
 });
 export type Exercise = z.infer<typeof exerciseSchema>;
@@ -321,8 +324,36 @@ export const profileSchema = z.object({
   email: z.string().optional(),
   name: z.string(),
   isAdmin: z.boolean(),
+  /** Optional profile picture, shown on the home header. */
+  avatarUrl: z.string().optional(),
 });
 export type Profile = z.infer<typeof profileSchema>;
+
+// ---------------------------------------------------------------------------
+// Bodyweight tracking
+
+export const bodyweightEntrySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  /** ISO date (YYYY-MM-DD) the weight was recorded for. */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** Stored in kilograms. */
+  weightKg: z.number().positive().max(1000),
+  createdAt: z.string(),
+});
+export type BodyweightEntry = z.infer<typeof bodyweightEntrySchema>;
+
+// ---------------------------------------------------------------------------
+// Feedback
+
+export const feedbackSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  type: z.enum(FEEDBACK_TYPES),
+  message: z.string().min(1).max(4000),
+  createdAt: z.string(),
+});
+export type Feedback = z.infer<typeof feedbackSchema>;
 
 /** Last recorded volume for an exercise+progression (intra-exercise memory). */
 export type LastVolume = {

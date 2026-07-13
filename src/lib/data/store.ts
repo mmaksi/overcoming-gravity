@@ -1,8 +1,10 @@
 import {
+  BodyweightEntry,
   CustomWorkout,
   DefaultTemplate,
   Exercise,
   ExerciseNote,
+  Feedback,
   Profile,
   Program,
   ProgramRun,
@@ -78,4 +80,14 @@ export interface DataStore {
   // Users -----------------------------------------------------------------
   getProfile(userId: string): Promise<Profile | null>;
   updateProfileName(userId: string, name: string): Promise<void>;
+  updateProfileAvatar(userId: string, avatarUrl: string | null): Promise<void>;
+
+  // Bodyweight tracking ---------------------------------------------------
+  listBodyweightEntries(userId: string): Promise<BodyweightEntry[]>;
+  /** Upsert on (userId, date): one weigh-in per day, latest wins. */
+  saveBodyweightEntry(entry: BodyweightEntry): Promise<BodyweightEntry>;
+  deleteBodyweightEntry(id: string): Promise<void>;
+
+  // Feedback --------------------------------------------------------------
+  createFeedback(feedback: Feedback): Promise<Feedback>;
 }

@@ -103,6 +103,54 @@ function postToServiceWorker(message: Record<string, unknown>) {
   }
 }
 
+/** localStorage key for a session's in-flight rest, so it survives navigation. */
+function restKey(sessionId: string) {
+  return `cali-rest:${sessionId}`;
+}
+
+function saveRest(sessionId: string, timer: RestTimerState) {
+  try {
+    localStorage.setItem(
+      restKey(sessionId),
+      JSON.stringify({
+        seconds: timer.seconds,
+        nextLabel: timer.nextLabel,
+        startedAt: timer.startedAt,
+      }),
+    );
+  } catch {
+    // Private mode / storage full — the rest bar still works this session.
+  }
+}
+
+function clearRest(sessionId: string) {
+  try {
+    localStorage.removeItem(restKey(sessionId));
+  } catch {
+    // ignore
+  }
+}
+
+/** Restore a still-running rest for this session, or null if none/expired. */
+function loadRest(sessionId: string): RestTimerState | null {
+  try {
+    const raw = localStorage.getItem(restKey(sessionId));
+    if (!raw) return null;
+    const { seconds, nextLabel, startedAt } = JSON.parse(raw);
+    if (
+      typeof seconds !== "number" ||
+      typeof startedAt !== "number" ||
+      Date.now() - startedAt >= seconds * 1000
+    ) {
+      localStorage.removeItem(restKey(sessionId));
+      return null;
+    }
+    return { id: 1, seconds, nextLabel: nextLabel ?? "", startedAt };
+  } catch {
+    return null;
+  }
+}
+
 function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -162,6 +210,9 @@ export function WorkoutLogger({
   const [openSheetFor, setOpenSheetFor] = useState<string | null>(null);
   const [timer, setTimer] = useState<RestTimerState | null>(null);
   const [stopwatchOpen, setStopwatchOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
+    "idle",
+  );
   const readOnly = session.status !== "planned";
 
   // Workout duration: accumulated seconds from previous visits (frozen at
@@ -314,11 +365,17 @@ export function WorkoutLogger({
       // Foreground rest = the in-app bar only. The service worker takes
       // over (with a notification) only if the app goes to the background
       // mid-rest — see the visibilitychange hand-off below.
-      setTimer((prev) => ({
-        id: (prev?.id ?? 0) + 1,
-        seconds: we.restSeconds,
-        nextLabel,
-      }));
+      setTimer((prev) => {
+        const next = {
+          id: (prev?.id ?? 0) + 1,
+          seconds: we.restSeconds,
+          nextLabel,
+          startedAt: Date.now(),
+        };
+        // Persist so the rest survives leaving and returning to this page.
+        saveRest(session.id, next);
+        return next;
+      });
     }
   }
 
@@ -378,6 +435,7 @@ export function WorkoutLogger({
   function submit(action: "save" | "complete" | "skip") {
     setPendingAction(action);
     setTimer(null);
+    clearRest(session.id);
     postToServiceWorker({ type: "rest-timer-cancel" });
     startTransition(async () => {
       try {
@@ -408,12 +466,16 @@ export function WorkoutLogger({
   useEffect(() => {
     autosaveRef.current = () => {
       if (readOnly || pending) return;
+      setSaveStatus("saving");
       saveWorkoutSession({
         sessionId: session.id,
         entries: resolveEntries("save"),
         action: "save",
         durationSeconds: elapsedSeconds,
-      }).catch(() => undefined);
+      }).then(
+        () => setSaveStatus("saved"),
+        () => setSaveStatus("idle"),
+      );
     };
   });
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -450,19 +512,27 @@ export function WorkoutLogger({
   // remaining seconds to the service worker, which notifies when rest ends;
   // coming back cancels the SW side so nothing fires twice.
   const timerRef = useRef<RestTimerState | null>(null);
-  const restStartRef = useRef(0);
   useEffect(() => {
-    // Stamp the start of every new rest period (timer.id bumps each time).
-    if (timer && timer !== timerRef.current) restStartRef.current = Date.now();
     timerRef.current = timer;
   }, [timer]);
+  // Restore a rest that was still running when the page was left (the timer
+  // lives in localStorage keyed by session, so navigating away and back — or
+  // the mobile browser discarding the page — resumes from the right second).
+  useEffect(() => {
+    // Mount-only restore from localStorage: must run post-hydration (the
+    // server can't read localStorage), so setState-in-effect is intended here.
+    if (readOnly) return;
+    const restored = loadRest(session.id);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (restored) setTimer(restored);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     function onVisibility() {
       if (document.visibilityState === "hidden") {
         const t = timerRef.current;
         if (!t) return;
-        const remaining =
-          t.seconds - (Date.now() - restStartRef.current) / 1000;
+        const remaining = t.seconds - (Date.now() - t.startedAt) / 1000;
         if (remaining > 1) {
           postToServiceWorker({
             type: "rest-timer",
@@ -519,6 +589,19 @@ export function WorkoutLogger({
               <span className="flex items-center gap-1 font-medium tabular-nums text-foreground">
                 <Timer className="size-4 text-primary" />
                 {formatDuration(elapsedSeconds)}
+              </span>
+            )}
+            {!readOnly && saveStatus !== "idle" && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                {saveStatus === "saving" ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin" /> Saving…
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-3 text-primary" /> Saved
+                  </>
+                )}
               </span>
             )}
           </p>
@@ -608,13 +691,16 @@ export function WorkoutLogger({
                         onClick={() => setOpenSheetFor(we.id)}
                       >
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <span className="truncate">{ex.title}</span>
+                          <span className="truncate text-primary">
+                            {ex.title}
+                          </span>
                           <Info className="size-4 shrink-0 text-muted-foreground" />
                         </CardTitle>
                         <CardDescription className="mt-1">
                           <span
                             className={cn(
-                              swapped && "font-medium text-primary",
+                              "font-medium text-sky-600 dark:text-sky-400",
+                              swapped && "text-primary",
                             )}
                           >
                             {progression?.name}
@@ -1034,8 +1120,10 @@ export function WorkoutLogger({
               key={timer.id}
               seconds={timer.seconds}
               nextLabel={timer.nextLabel}
+              startedAt={timer.startedAt}
               onDismiss={() => {
                 setTimer(null);
+                clearRest(session.id);
                 postToServiceWorker({ type: "rest-timer-cancel" });
               }}
             />

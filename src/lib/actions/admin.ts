@@ -1,14 +1,21 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import {
+  DEFAULT_TEMPLATE_TAG,
+  EXERCISES_TAG,
+} from "@/lib/data/cached";
 import {
   defaultTemplateSchema,
   exerciseSchema,
 } from "@/lib/domain/schemas";
 
 function revalidateContent() {
+  // Bust the long-lived content cache and the pages that render it.
+  revalidateTag(EXERCISES_TAG, "max");
+  revalidateTag(DEFAULT_TEMPLATE_TAG, "max");
   revalidatePath("/admin", "layout");
   revalidatePath("/programs", "layout");
 }

@@ -74,6 +74,15 @@ export const WEEK_FOCUS_LABELS: Record<WeekFocus, string> = {
 export const PROGRESSION_METHODS = ["intra", "inter"] as const;
 export type ProgressionMethod = (typeof PROGRESSION_METHODS)[number];
 
+export const FEEDBACK_TYPES = ["bug", "idea", "praise", "other"] as const;
+export type FeedbackType = (typeof FEEDBACK_TYPES)[number];
+export const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
+  bug: "Something's broken",
+  idea: "Idea or request",
+  praise: "Praise",
+  other: "Other",
+};
+
 /** How an exercise is measured: repetitions, or seconds of hold. */
 export const MEASUREMENTS = ["reps", "time"] as const;
 export type Measurement = (typeof MEASUREMENTS)[number];

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Dumbbell, Play } from "lucide-react";
+import { ArrowRight, Dumbbell, Play } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { toISODate } from "@/lib/domain/schedule";
@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/card";
 import { InstallAppButton } from "@/components/home/install-app-button";
 import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
+import { BodyweightCard } from "@/components/home/bodyweight-card";
+import { UserAvatar } from "@/components/home/user-avatar";
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -54,6 +56,7 @@ export default async function DashboardPage() {
   }
 
   const today = toISODate(new Date());
+  const bodyweight = await store.listBodyweightEntries(user.id);
   const programGoals: ProgramGoals[] = [];
 
   // One card per active program run — several can run in parallel.
@@ -132,7 +135,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Hi, {user.name}</h1>
+      <div className="flex items-center gap-3">
+        <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
+        <h1 className="text-2xl font-bold">Hi, {user.name}</h1>
+      </div>
 
       <InstallAppButton />
 
@@ -140,11 +146,7 @@ export default async function DashboardPage() {
 
       <GoalsCard programs={programGoals} />
 
-      <Button asChild variant="outline" className="w-full">
-        <Link href="/calendar">
-          <CalendarDays className="size-4" /> View calendar
-        </Link>
-      </Button>
+      <BodyweightCard entries={bodyweight} today={today} />
     </div>
   );
 }

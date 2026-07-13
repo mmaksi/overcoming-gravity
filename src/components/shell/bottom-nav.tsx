@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   CalendarDays,
   Dumbbell,
-  History,
   Home,
   Settings,
   ShieldCheck,
@@ -16,7 +15,6 @@ const items = [
   { href: "/", label: "Home", icon: Home },
   { href: "/programs", label: "Programs", icon: Dumbbell },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -32,19 +30,27 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
         {navItems.map(({ href, label, icon: Icon }) => {
           const active =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
+          // Icon-forward: the active tab also shows its label, inactive tabs
+          // are icon-only. The bar is taller with larger touch targets.
           return (
             <Link
               key={href}
               href={href}
+              aria-label={label}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors",
+                "flex flex-1 flex-col items-center justify-center gap-1 py-4 transition-colors",
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Icon className="size-6" strokeWidth={active ? 2.4 : 1.8} />
-              {label}
+              <Icon className="size-7" strokeWidth={active ? 2.4 : 1.8} />
+              {active && (
+                <span className="text-[13px] font-semibold leading-none">
+                  {label}
+                </span>
+              )}
             </Link>
           );
         })}

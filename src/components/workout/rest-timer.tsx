@@ -9,6 +9,8 @@ export type RestTimerState = {
   seconds: number;
   /** What to do when the rest is over, e.g. "Set 3 · Pull-up". */
   nextLabel: string;
+  /** Epoch ms the rest began — lets it resume after navigating away. */
+  startedAt: number;
 };
 
 /**
@@ -22,14 +24,17 @@ export type RestTimerState = {
 export function RestTimer({
   seconds,
   nextLabel,
+  startedAt: startedAtProp,
   onDismiss,
 }: {
   seconds: number;
   nextLabel: string;
+  /** When the rest began; defaults to now. Set it to resume a running rest. */
+  startedAt?: number;
   onDismiss: () => void;
 }) {
-  const [startedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(startedAt);
+  const [startedAt] = useState(() => startedAtProp ?? Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 250);

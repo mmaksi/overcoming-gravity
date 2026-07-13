@@ -82,8 +82,8 @@ test("start, reset, and custom individual workouts", async ({ page }) => {
   await page.getByRole("button", { name: /Complete workout/ }).click();
   await expect(page).toHaveURL("/");
 
-  // The custom session shows up in history under its title.
-  await page.goto("/history");
+  // The custom session shows up in history (now inside the Calendar page).
+  await page.goto("/calendar");
   await expect(page.getByText("My workout").first()).toBeVisible();
 
   // Deleting from the list is optimistic: the row disappears immediately.

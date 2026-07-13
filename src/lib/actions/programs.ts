@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import {
+  getCachedDefaultTemplate,
+  getCachedExercises,
+} from "@/lib/data/cached";
 import { GoalItem, mesocycleSchema, Program } from "@/lib/domain/schemas";
 import { GOAL_AREAS, GoalArea } from "@/lib/domain/types";
 import { buildMesocycle } from "@/lib/domain/build";
@@ -21,8 +25,8 @@ export async function createProgramFromWizard(
   const store = await getStore();
 
   const [template, exercises] = await Promise.all([
-    store.getDefaultTemplate(),
-    store.listExercises(),
+    getCachedDefaultTemplate(store),
+    getCachedExercises(store),
   ]);
 
   const now = new Date().toISOString();

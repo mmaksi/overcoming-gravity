@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, TrendingUp, X } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { getCachedExercises } from "@/lib/data/cached";
 import {
   addDays,
   parseISODate,
@@ -9,6 +10,12 @@ import {
   weekdayOf,
 } from "@/lib/domain/schedule";
 import { WEEKDAY_SHORT, WEEKDAYS } from "@/lib/domain/types";
+import { buildVolumeStats } from "@/lib/domain/volume";
+import { buildHistoryItems, buildProgressRows } from "@/lib/domain/history";
+import { WorkoutSession } from "@/lib/domain/schemas";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProgressList } from "@/components/history/progress-list";
+import { WorkoutHistoryList } from "@/components/history/workout-history-list";
 import { cn } from "@/lib/utils";
 
 const MONTHS = [
@@ -69,6 +76,37 @@ export default async function CalendarPage({
   const prev = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
   const next = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
   const todayISO = toISODate(now);
+
+  // History + progress (moved here from the old History tab).
+  const [completed, exercises, programs, customWorkouts, allRuns] =
+    await Promise.all([
+      store.listCompletedSessions(user.id),
+      getCachedExercises(store),
+      store.listPrograms(user.id),
+      store.listCustomWorkouts(user.id),
+      store.listRuns(user.id),
+    ]);
+  const exercisesById = new Map(exercises.map((e) => [e.id, e]));
+  const programNameByRun = new Map(
+    allRuns.map((r) => [
+      r.id,
+      programs.find((p) => p.id === r.programId)?.name ?? "Program",
+    ]),
+  );
+  const customWorkoutTitles = new Map(
+    customWorkouts.map((w) => [w.id, w.title]),
+  );
+  const sessionLabel = (session: WorkoutSession): string =>
+    session.runId
+      ? (programNameByRun.get(session.runId) ?? "Program")
+      : (customWorkoutTitles.get(session.customWorkoutId ?? "") ?? "Workout");
+
+  const historyItems = buildHistoryItems(completed, exercisesById, sessionLabel);
+  const progressRows = buildProgressRows(
+    exercises,
+    completed,
+    buildVolumeStats(completed),
+  );
 
   return (
     <div className="space-y-4">
@@ -173,6 +211,30 @@ export default async function CalendarPage({
           <span className="size-2 rounded bg-violet-500/40" /> sport day
         </span>
       </div>
+
+      {/* History + progress, merged in from the old separate History tab. */}
+      <Tabs defaultValue="workouts" className="pt-2">
+        <TabsList className="w-full">
+          <TabsTrigger value="workouts" className="flex-1">
+            <CalendarDays className="size-4" /> Workouts
+          </TabsTrigger>
+          <TabsTrigger value="progress" className="flex-1">
+            <TrendingUp className="size-4" /> Progress
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="workouts" className="pt-3">
+          <WorkoutHistoryList sessions={historyItems} />
+        </TabsContent>
+
+        <TabsContent value="progress" className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Your current progression, method and best set in every skill and
+            strength exercise — so you know exactly what to do next workout.
+          </p>
+          <ProgressList rows={progressRows} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

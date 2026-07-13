@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { getCachedExercises } from "@/lib/data/cached";
 import { WorkoutEditor } from "@/components/workouts/workout-editor";
 
 export default async function CustomWorkoutPage({
@@ -15,7 +16,7 @@ export default async function CustomWorkoutPage({
   const workout = await store.getCustomWorkout(id);
   if (!workout || workout.userId !== user.id) notFound();
 
-  const exercises = await store.listExercises();
+  const exercises = await getCachedExercises(store);
 
   return <WorkoutEditor workout={workout} exercises={exercises} />;
 }

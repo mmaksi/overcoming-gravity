@@ -1,10 +1,12 @@
 import "server-only";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
+  BodyweightEntry,
   CustomWorkout,
   DefaultTemplate,
   Exercise,
   ExerciseNote,
+  Feedback,
   Profile,
   Program,
   ProgramRun,
@@ -25,6 +27,7 @@ const toExercise = (r: Row): Exercise => ({
   attribute: r.attribute === "cardio" ? "warmup" : r.attribute,
   measurement: r.measurement ?? "reps",
   repStyle: r.rep_style ?? "standard",
+  imageUrl: r.image_url ?? undefined,
   progressions: r.progressions,
 });
 
@@ -149,6 +152,7 @@ class SupabaseStore implements DataStore {
         attribute: exercise.attribute,
         measurement: exercise.measurement,
         rep_style: exercise.repStyle,
+        image_url: exercise.imageUrl || null,
         progressions: exercise.progressions,
       }).select(),
     );
@@ -164,6 +168,7 @@ class SupabaseStore implements DataStore {
           attribute: exercise.attribute,
           measurement: exercise.measurement,
           rep_style: exercise.repStyle,
+          image_url: exercise.imageUrl || null,
           progressions: exercise.progressions,
         })
         .eq("id", exercise.id)
@@ -442,6 +447,7 @@ class SupabaseStore implements DataStore {
       email: rows[0].email ?? undefined,
       name: rows[0].name,
       isAdmin: rows[0].is_admin,
+      avatarUrl: rows[0].avatar_url ?? undefined,
     };
   }
   async updateProfileName(userId: string, name: string): Promise<void> {
@@ -452,6 +458,75 @@ class SupabaseStore implements DataStore {
         .eq("id", userId)
         .select("id"),
     );
+  }
+  async updateProfileAvatar(
+    userId: string,
+    avatarUrl: string | null,
+  ): Promise<void> {
+    orThrow(
+      await this.db
+        .from("profiles")
+        .update({ avatar_url: avatarUrl })
+        .eq("id", userId)
+        .select("id"),
+    );
+  }
+
+  // Bodyweight tracking ---------------------------------------------------
+  async listBodyweightEntries(userId: string): Promise<BodyweightEntry[]> {
+    return orThrow(
+      await this.db
+        .from("bodyweight_entries")
+        .select()
+        .eq("user_id", userId)
+        .order("date", { ascending: true }),
+    ).map((r: Row) => ({
+      id: r.id,
+      userId: r.user_id,
+      date: r.date,
+      weightKg: r.weight_kg,
+      createdAt: r.created_at,
+    }));
+  }
+  async saveBodyweightEntry(entry: BodyweightEntry): Promise<BodyweightEntry> {
+    orThrow(
+      await this.db
+        .from("bodyweight_entries")
+        .upsert(
+          {
+            id: entry.id,
+            user_id: entry.userId,
+            date: entry.date,
+            weight_kg: entry.weightKg,
+            created_at: entry.createdAt,
+          },
+          { onConflict: "user_id,date" },
+        )
+        .select(),
+    );
+    return entry;
+  }
+  async deleteBodyweightEntry(id: string): Promise<void> {
+    orThrow(
+      await this.db.from("bodyweight_entries").delete().eq("id", id).select(),
+    );
+  }
+
+  // Feedback --------------------------------------------------------------
+  async createFeedback(feedback: Feedback): Promise<Feedback> {
+    orThrow(
+      await this.db
+        .from("feedback")
+        .insert({
+          id: feedback.id,
+          user_id: feedback.userId,
+          type: feedback.type,
+          message: feedback.message,
+          created_at: feedback.createdAt,
+        })
+        .select(),
+    );
+    return feedback;
   }
 }
 

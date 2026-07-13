@@ -24,6 +24,7 @@ import {
 } from "@/lib/domain/types";
 import { Exercise } from "@/lib/domain/schemas";
 import { removeExercise, saveExercise } from "@/lib/actions/admin";
+import { ExerciseThumb } from "@/components/exercise/exercise-thumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ type Draft = {
   attribute: Attribute;
   measurement: Measurement;
   repStyle: RepStyle;
+  imageUrl: string;
   progressions: { id: string; name: string; order: number; description: string }[];
 };
 
@@ -150,6 +152,7 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
               attribute: "strength",
               measurement: "reps",
               repStyle: "standard",
+              imageUrl: "",
               progressions: [
                 { id: crypto.randomUUID(), name: "", order: 0, description: "" },
               ],
@@ -185,7 +188,9 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
             key={e.id}
             className="flex items-center justify-between rounded-lg border p-3"
           >
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-3">
+              <ExerciseThumb title={e.title} imageUrl={e.imageUrl} />
+              <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="truncate font-medium">{e.title}</span>
                 <Badge variant="outline" className="text-[10px]">
@@ -198,6 +203,7 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
               <p className="text-xs text-muted-foreground">
                 {e.progressions.map((p) => p.name).join(" → ")}
               </p>
+              </div>
             </div>
             <div className="flex shrink-0 gap-1">
               <Button
@@ -211,6 +217,7 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                     attribute: e.attribute,
                     measurement: e.measurement ?? "reps",
                     repStyle: e.repStyle ?? "standard",
+                    imageUrl: e.imageUrl ?? "",
                     progressions: e.progressions.map((p) => ({
                       ...p,
                       description: p.description ?? "",
@@ -277,6 +284,30 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                     ))}
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ex-image">Image URL (optional)</Label>
+                <div className="flex items-center gap-3">
+                  <ExerciseThumb
+                    title={draft.title || "?"}
+                    imageUrl={draft.imageUrl}
+                  />
+                  <Input
+                    id="ex-image"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://…"
+                    value={draft.imageUrl}
+                    onChange={(e) =>
+                      setDraft({ ...draft, imageUrl: e.target.value })
+                    }
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Shown in the exercise picker. Leave blank to use the first
+                  letter of the title.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

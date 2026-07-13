@@ -20,9 +20,9 @@ function format(ms: number): string {
 
 /**
  * Stopwatch for timing isometric holds (planks, levers…), shown as a
- * centered modal. Keep it mounted and drive visibility via `open` — the
- * stopwatch keeps running while the modal is closed, so peeking at the
- * workout mid-hold doesn't lose the time.
+ * centered modal. Closing the modal stops and resets it — exiting the
+ * stopwatch means you're done timing, so it never keeps ticking in the
+ * background.
  */
 export function Stopwatch({
   open,
@@ -45,6 +45,17 @@ export function Stopwatch({
     return () => clearInterval(interval);
   }, [running]);
 
+  // Closing the modal stops the stopwatch and clears it back to zero, so it
+  // never keeps ticking in the background once you've exited it.
+  function handleOpenChange(next: boolean) {
+    if (!next) {
+      setRunning(false);
+      baseRef.current = 0;
+      setElapsed(0);
+    }
+    onOpenChange(next);
+  }
+
   function toggle() {
     if (running) {
       baseRef.current = baseRef.current + (Date.now() - startRef.current);
@@ -63,7 +74,7 @@ export function Stopwatch({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-xs">
         <DialogHeader>
           <DialogTitle className="text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { getCachedExercises } from "@/lib/data/cached";
 import { buildVolumeStats } from "@/lib/domain/volume";
 import { WorkoutDay } from "@/lib/domain/schemas";
 import { WeekFocus } from "@/lib/domain/types";
@@ -43,7 +44,7 @@ export default async function WorkoutPage({
   if (!plannedDay) notFound();
 
   const [exercises, completed, notes] = await Promise.all([
-    store.listExercises(),
+    getCachedExercises(store),
     store.listCompletedSessions(user.id),
     store.listExerciseNotes(user.id),
   ]);

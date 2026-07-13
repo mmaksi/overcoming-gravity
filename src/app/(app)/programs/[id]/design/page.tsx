@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { getCachedExercises } from "@/lib/data/cached";
 import { MesocycleDesigner } from "@/components/designer/mesocycle-designer";
 
 export default async function DesignPage({
@@ -15,7 +16,7 @@ export default async function DesignPage({
   const program = await store.getProgram(id);
   if (!program || program.userId !== user.id) notFound();
 
-  const exercises = await store.listExercises();
+  const exercises = await getCachedExercises(store);
 
   return <MesocycleDesigner program={program} exercises={exercises} />;
 }

@@ -17,6 +17,17 @@ export async function updateName(name: string): Promise<void> {
   revalidatePath("/", "layout");
 }
 
+const avatarSchema = z.string().trim().url().max(2000).or(z.literal(""));
+
+/** Set (or clear, with "") the profile picture shown on the home header. */
+export async function updateAvatar(avatarUrl: string): Promise<void> {
+  const user = await requireUser();
+  const parsed = avatarSchema.parse(avatarUrl);
+  const store = await getStore();
+  await store.updateProfileAvatar(user.id, parsed === "" ? null : parsed);
+  revalidatePath("/", "layout");
+}
+
 /** Dev-only: toggle admin rights on the mock session. */
 export async function setAdminMode(enabled: boolean): Promise<void> {
   if (dataBackend() === "supabase") {
