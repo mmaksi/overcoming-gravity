@@ -16,33 +16,31 @@ const QUOTES: Quote[] = [
     text: "The successful warrior is the average man, with laser-like focus.",
     author: "Bruce Lee",
     image:
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Bruce_Lee_1973.jpg/240px-Bruce_Lee_1973.jpg",
+      "https://californiamuseum.org/wp-content/uploads/brucelee_cahalloffameinductee-1.png",
   },
   {
-    text: "It's not about perfect. It's about effort.",
-    author: "Jillian Michaels",
-  },
-  {
-    text: "Strength does not come from the physical capacity. It comes from an indomitable will.",
-    author: "Mahatma Gandhi",
+    text: "If you think you are only strong if you can lift a certain number, whatever that number is, you will feel pretty weak most of the time. Strength is not a data point; it's not a number. It's an attitude.",
+    author: "Pavel Tsatsouline",
     image:
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Mahatma-Gandhi%2C_studio%2C_1931.jpg/240px-Mahatma-Gandhi%2C_studio%2C_1931.jpg",
+      "https://cdn.prod.website-files.com/64751ad903a904b42aa4adc1/67a96f8755e2cc7d8d6a3810_SITE_PT_L1000774.webp",
   },
   {
     text: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.",
     author: "Aristotle",
+    image:
+      "https://wordsworth-editions.com/cms/wp-content/uploads/2022/05/Aristole-Author.jpg",
   },
   {
-    text: "The body achieves what the mind believes.",
-    author: "Napoleon Hill",
+    text: "Every man is the builder of a temple, called his body, to the god he worships, after a style purely his own, nor can he get off by hammering marble instead. We are all sculptors and painters, and our material is our own flesh and blood and bones. Any nobleness begins at once to refine a man's features, any meanness or sensuality to imbrute them.",
+    author: "Henry D. Thoreau",
+    image:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Henry_David_Thoreau_2.jpg/250px-Henry_David_Thoreau_2.jpg?utm_source=de.wikisource.org&utm_campaign=parser&utm_content=thumbnail",
   },
   {
-    text: "Take care of your body. It's the only place you have to live.",
-    author: "Jim Rohn",
-  },
-  {
-    text: "Discipline is the bridge between goals and accomplishment.",
-    author: "Jim Rohn",
+    text: "I hated every minute of training, but I said, 'Don't quit. Suffer now and live the rest of your life as a champion.'",
+    author: "Muhammad Ali",
+    image:
+      "https://img.olympics.com/images/image/private/t_1-1_300/f_auto/primary/mn3mqf9td4yupcdzyvlq",
   },
 ];
 

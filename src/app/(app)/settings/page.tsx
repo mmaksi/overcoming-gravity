@@ -46,10 +46,7 @@ export default async function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Body</CardTitle>
-          <CardDescription>
-            Height and target weight feed your BMI; weigh-ins draw the chart
-            on Home.
-          </CardDescription>
+          <CardDescription>Track your weight and BMI.</CardDescription>
         </CardHeader>
         <CardContent>
           <BodyStatsForm
@@ -63,9 +60,6 @@ export default async function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
-          <CardDescription>
-            Light, dark, or follow your device.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <ThemePicker />
@@ -74,17 +68,11 @@ export default async function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Feedback</CardTitle>
-          <CardDescription>
-            Something broken or missing? We read every message.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <FeedbackForm />
         </CardContent>
       </Card>
-      <p className="text-xs text-muted-foreground">
-        Data backend: {backend === "json" ? "local JSON (development)" : "Supabase"}
-      </p>
     </div>
   );
 }

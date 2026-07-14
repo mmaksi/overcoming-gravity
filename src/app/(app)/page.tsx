@@ -179,11 +179,6 @@ export default async function DashboardPage() {
           </CardTitle>
           <CardDescription>
             {done} of {sessions.length} workouts completed
-            {todaySession
-              ? ` · today: ${WEEKDAY_LABELS[todaySession.weekday]}`
-              : nextSession
-                ? ` · next: ${WEEKDAY_LABELS[nextSession.weekday]} ${nextSession.date}`
-                : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">

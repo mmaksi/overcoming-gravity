@@ -83,13 +83,13 @@ export function IndividualWorkouts({
           ) : (
             <Plus className="size-4" />
           )}{" "}
-          New workout
+          New
         </Button>
       </div>
       {optimistic.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          One-off workouts outside any program — just a bunch of exercises
-          with a title.
+          Want to have a quick workout outside your program? Create a new one
+          here.
         </p>
       ) : (
         <div className="space-y-4">
