@@ -1,53 +1,87 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Check, Loader2 } from "lucide-react";
+import { Check, CloudUpload, Loader2 } from "lucide-react";
 import { updateName } from "@/lib/actions/settings";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type SaveState = "idle" | "dirty" | "saving" | "saved";
+
+/**
+ * Name field with debounced autosave — no Save button. The write fires ~800ms
+ * after the user stops typing (and never for an empty or unchanged name).
+ */
 export function NameForm({ initialName }: { initialName: string }) {
   const [name, setName] = useState(initialName);
-  const [saved, setSaved] = useState(false);
-  const saveMutation = useMutation({
-    mutationFn: () => updateName(name.trim()),
-    onSuccess: () => setSaved(true),
-  });
-  const pending = saveMutation.isPending;
+  const [state, setState] = useState<SaveState>("idle");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(initialName);
+  const savedValue = useRef(initialName.trim());
 
-  function save() {
-    setSaved(false);
-    saveMutation.mutate();
+  const saveMutation = useMutation({
+    mutationFn: (value: string) => updateName(value),
+    onMutate: () => setState("saving"),
+    onSuccess: (_r, value) => {
+      savedValue.current = value;
+      setState("saved");
+    },
+    onError: () => setState("dirty"),
+  });
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  function onChange(value: string) {
+    setName(value);
+    latest.current = value;
+    if (timer.current) clearTimeout(timer.current);
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === savedValue.current) {
+      setState("idle");
+      return;
+    }
+    setState("dirty");
+    timer.current = setTimeout(() => {
+      const next = latest.current.trim();
+      if (next && next !== savedValue.current) saveMutation.mutate(next);
+      else setState("idle");
+    }, 800);
   }
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="display-name">Your name</Label>
-      <div className="flex gap-2">
-        <Input
-          id="display-name"
-          value={name}
-          maxLength={60}
-          onChange={(e) => {
-            setName(e.target.value);
-            setSaved(false);
-          }}
-        />
-        <Button
-          className="shrink-0"
-          disabled={pending || !name.trim() || name.trim() === initialName.trim()}
-          onClick={save}
-        >
-          {pending ? <Loader2 className="size-4 animate-spin" /> : "Save"}
-        </Button>
+      <div className="flex items-center justify-between">
+        <Label htmlFor="display-name">Your name</Label>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          {state === "saving" && (
+            <>
+              <Loader2 className="size-3 animate-spin" /> Saving…
+            </>
+          )}
+          {state === "dirty" && (
+            <>
+              <CloudUpload className="size-3" /> Unsaved…
+            </>
+          )}
+          {state === "saved" && (
+            <>
+              <Check className="size-3 text-primary" /> Saved
+            </>
+          )}
+        </span>
       </div>
-      {saved && (
-        <p className="flex items-center gap-1 text-sm text-primary">
-          <Check className="size-4" /> Name updated
-        </p>
-      )}
+      <Input
+        id="display-name"
+        value={name}
+        maxLength={60}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   );
 }

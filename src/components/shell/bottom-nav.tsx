@@ -3,25 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CalendarDays,
-  Dumbbell,
-  Home,
-  Settings,
-  ShieldCheck,
-} from "lucide-react";
+  CalendarIcon,
+  HomeIcon,
+  ProgramsIcon,
+  ShieldIcon,
+} from "@/components/shell/nav-icons";
 import { cn } from "@/lib/utils";
 
+// Settings lives at the home top-right corner, not in the nav bar.
 const items = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/programs", label: "Programs", icon: Dumbbell },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/programs", label: "Programs", icon: ProgramsIcon },
+  { href: "/calendar", label: "Calendar", icon: CalendarIcon },
 ];
 
 export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const navItems = isAdmin
-    ? [...items, { href: "/admin", label: "Admin", icon: ShieldCheck }]
+    ? [...items, { href: "/admin", label: "Admin", icon: ShieldIcon }]
     : items;
 
   return (

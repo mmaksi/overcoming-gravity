@@ -1,16 +1,14 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { Logo } from "@/components/shell/logo";
 
-/** Generic page skeleton shown instantly while any (app) route loads. */
+/**
+ * Branded splash shown while an app route loads. With the long router-cache
+ * window this mainly appears on the cold load of the home screen, giving the
+ * app a proper launch moment.
+ */
 export default function Loading() {
   return (
-    <div className="space-y-6">
-      <Skeleton className="h-8 w-40" />
-      <div className="space-y-3">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
-      </div>
-      <Skeleton className="h-12 w-full" />
+    <div className="flex min-h-[70dvh] flex-col items-center justify-center">
+      <Logo className="size-24 animate-pulse" />
     </div>
   );
 }

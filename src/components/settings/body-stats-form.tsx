@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Check, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, CloudUpload, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { BodyweightEntry } from "@/lib/domain/schemas";
 import { deleteBodyweight, saveBodyweight } from "@/lib/actions/bodyweight";
 import { saveBodyStats } from "@/lib/actions/settings";
@@ -10,10 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type SaveState = "idle" | "dirty" | "saving" | "saved";
+
 /**
- * Body measurements, all editable in Settings: height and target weight
- * (the BMI inputs), plus the bodyweight log — any date, including past days;
- * logging an already-logged date overwrites that day's entry.
+ * Body measurements, all editable in Settings. Height and target weight (the
+ * BMI inputs) **autosave** ~800ms after you stop typing — no Save button. The
+ * bodyweight log stays an explicit add (a discrete dated data point, not a
+ * field edit): typing a weight and pressing Log upserts that day's entry.
  */
 export function BodyStatsForm({
   initialHeightCm,
@@ -32,25 +35,72 @@ export function BodyStatsForm({
   const [target, setTarget] = useState(
     initialTargetWeightKg != null ? String(initialTargetWeightKg) : "",
   );
-  const [statsSaved, setStatsSaved] = useState(false);
+  const [statsState, setStatsState] = useState<SaveState>("idle");
+  const statsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestStats = useRef({
+    height: initialHeightCm != null ? String(initialHeightCm) : "",
+    target: initialTargetWeightKg != null ? String(initialTargetWeightKg) : "",
+  });
 
   const [date, setDate] = useState(today);
   const [weight, setWeight] = useState("");
-
   const [error, setError] = useState<string | null>(null);
 
-  // All three writes refresh the home Stats block server-side (userStatsTag);
-  // there is no client-cached read to invalidate here.
+  // Height + target autosave together. Both refresh the home Stats block
+  // server-side (userStatsTag); there is no client-cached read to invalidate.
   const statsMutation = useMutation({
     mutationFn: () =>
       saveBodyStats({
-        heightCm: height.trim() === "" ? null : Number(height),
-        targetWeightKg: target.trim() === "" ? null : Number(target),
+        heightCm:
+          latestStats.current.height.trim() === ""
+            ? null
+            : Number(latestStats.current.height),
+        targetWeightKg:
+          latestStats.current.target.trim() === ""
+            ? null
+            : Number(latestStats.current.target),
       }),
-    onSuccess: () => setStatsSaved(true),
-    onError: (e) => setError(e instanceof Error ? e.message : "Couldn't save"),
+    onMutate: () => setStatsState("saving"),
+    onSuccess: () => setStatsState("saved"),
+    onError: (e) => {
+      setStatsState("dirty");
+      setError(e instanceof Error ? e.message : "Couldn't save");
+    },
   });
-  const statsPending = statsMutation.isPending;
+
+  useEffect(
+    () => () => {
+      if (statsTimer.current) clearTimeout(statsTimer.current);
+    },
+    [],
+  );
+
+  function scheduleStatsSave() {
+    setError(null);
+    setStatsState("dirty");
+    if (statsTimer.current) clearTimeout(statsTimer.current);
+    statsTimer.current = setTimeout(() => {
+      const h = latestStats.current.height.trim();
+      const t = latestStats.current.target.trim();
+      // Wait for valid input (empty clears it; otherwise a positive number).
+      if ((h !== "" && !(Number(h) > 0)) || (t !== "" && !(Number(t) > 0))) {
+        setStatsState("dirty");
+        return;
+      }
+      statsMutation.mutate();
+    }, 800);
+  }
+
+  function onHeightChange(v: string) {
+    setHeight(v);
+    latestStats.current = { ...latestStats.current, height: v };
+    scheduleStatsSave();
+  }
+  function onTargetChange(v: string) {
+    setTarget(v);
+    latestStats.current = { ...latestStats.current, target: v };
+    scheduleStatsSave();
+  }
 
   const logMutation = useMutation({
     mutationFn: (weightKg: number) => saveBodyweight({ date, weightKg }),
@@ -61,12 +111,6 @@ export function BodyStatsForm({
     mutationFn: (id: string) => deleteBodyweight(id),
   });
   const logPending = logMutation.isPending || deleteMutation.isPending;
-
-  function saveStats() {
-    setStatsSaved(false);
-    setError(null);
-    statsMutation.mutate();
-  }
 
   function logWeight() {
     const weightKg = Number(weight);
@@ -81,9 +125,31 @@ export function BodyStatsForm({
   return (
     <div className="space-y-5">
       <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">Height & target weight</Label>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            {statsState === "saving" && (
+              <>
+                <Loader2 className="size-3 animate-spin" /> Saving…
+              </>
+            )}
+            {statsState === "dirty" && (
+              <>
+                <CloudUpload className="size-3" /> Unsaved…
+              </>
+            )}
+            {statsState === "saved" && (
+              <>
+                <Check className="size-3 text-primary" /> Saved
+              </>
+            )}
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="height-cm">Height (cm)</Label>
+            <Label htmlFor="height-cm" className="text-xs text-muted-foreground">
+              Height (cm)
+            </Label>
             <Input
               id="height-cm"
               type="number"
@@ -91,14 +157,16 @@ export function BodyStatsForm({
               min={0}
               placeholder="175"
               value={height}
-              onChange={(e) => {
-                setHeight(e.target.value);
-                setStatsSaved(false);
-              }}
+              onChange={(e) => onHeightChange(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="target-weight">Target weight (kg)</Label>
+            <Label
+              htmlFor="target-weight"
+              className="text-xs text-muted-foreground"
+            >
+              Target weight (kg)
+            </Label>
             <Input
               id="target-weight"
               type="number"
@@ -107,29 +175,10 @@ export function BodyStatsForm({
               min={0}
               placeholder="72.0"
               value={target}
-              onChange={(e) => {
-                setTarget(e.target.value);
-                setStatsSaved(false);
-              }}
+              onChange={(e) => onTargetChange(e.target.value)}
             />
           </div>
         </div>
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={statsPending}
-          onClick={saveStats}
-        >
-          {statsPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : statsSaved ? (
-            <>
-              <Check className="size-4" /> Saved
-            </>
-          ) : (
-            "Save height & target"
-          )}
-        </Button>
       </div>
 
       <div className="space-y-2">
@@ -168,9 +217,6 @@ export function BodyStatsForm({
             )}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Pick any date to add or correct a past weigh-in — one entry per day.
-        </p>
       </div>
 
       {recent.length > 0 && (

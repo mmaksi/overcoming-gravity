@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const tabs = [
   { href: "/admin", label: "Exercises" },
   { href: "/admin/defaults", label: "Defaults" },
+  { href: "/admin/feedback", label: "Feedback" },
 ];
 
 export function AdminTabs() {

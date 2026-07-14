@@ -46,7 +46,6 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
       ),
   );
 
-  const showProgramName = optimistic.length > 1;
   // Group every active program's goals by area, keeping the fixed GOAL_AREAS
   // order. Areas with no goals are dropped so empty categories don't render.
   const byArea = GOAL_AREAS.map((area) => ({
@@ -55,7 +54,6 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
       // Older programs may miss newer areas entirely.
       (p.goals[area] ?? []).map((goal, index) => ({
         programId: p.programId,
-        programName: p.programName,
         index,
         goal,
       })),
@@ -70,58 +68,54 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <h2 className="flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-primary">
         <Target className="size-5" /> Goals · {achieved}/{total} achieved
       </h2>
-      {byArea.map(({ area, items }) => (
-        <div key={area} className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {GOAL_AREA_LABELS[area]}
-          </h3>
-          <div className="space-y-2.5">
-            {items.map(({ programId, programName, index, goal }) => (
-              <label
-                key={`${programId}-${area}-${index}`}
-                className="flex min-h-11 cursor-pointer items-center gap-3"
-              >
-                <input
-                  type="checkbox"
-                  className="size-5 shrink-0 accent-primary"
-                  checked={goal.done}
-                  onChange={(e) => {
-                    const done = e.target.checked;
-                    startTransition(async () => {
-                      applyOptimistic({ programId, area, index, done });
-                      await toggleMutation.mutateAsync({
-                        programId,
-                        area,
-                        index,
-                        done,
+      {/* Tight within a category (grouped), roomy between categories. */}
+      <div className="space-y-6">
+        {byArea.map(({ area, items }) => (
+          <div key={area} className="space-y-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {GOAL_AREA_LABELS[area]}
+            </h3>
+            <div className="space-y-0.5">
+              {items.map(({ programId, index, goal }) => (
+                <label
+                  key={`${programId}-${area}-${index}`}
+                  className="flex min-h-9 cursor-pointer items-center gap-3"
+                >
+                  <input
+                    type="checkbox"
+                    className="size-5 shrink-0 accent-primary"
+                    checked={goal.done}
+                    onChange={(e) => {
+                      const done = e.target.checked;
+                      startTransition(async () => {
+                        applyOptimistic({ programId, area, index, done });
+                        await toggleMutation.mutateAsync({
+                          programId,
+                          area,
+                          index,
+                          done,
+                        });
                       });
-                    });
-                  }}
-                />
-                <span className="min-w-0">
+                    }}
+                  />
                   <span
                     className={cn(
-                      "block truncate",
+                      "min-w-0 truncate",
                       goal.done && "text-muted-foreground line-through",
                     )}
                   >
                     {goal.text}
                   </span>
-                  {showProgramName && (
-                    <span className="text-xs text-muted-foreground">
-                      {programName}
-                    </span>
-                  )}
-                </span>
-              </label>
-            ))}
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

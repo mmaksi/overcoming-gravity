@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Dumbbell, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { signInWithGoogle } from "@/lib/auth/actions";
+import { Logo } from "@/components/shell/logo";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,10 +53,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4">
-      <Card>
+    <div className="relative flex min-h-dvh w-full flex-col items-center justify-center px-4">
+      {/* Full-bleed hero photo with a legibility scrim behind the card. */}
+      <div
+        className="absolute inset-0 -z-10 bg-cover bg-center"
+        style={{ backgroundImage: "url('/handstand.jpg')" }}
+      />
+      <div className="absolute inset-0 -z-10 bg-black/60" />
+
+      <Card className="w-full max-w-md border-border/50 bg-card/90 backdrop-blur">
         <CardHeader className="text-center">
-          <Dumbbell className="mx-auto size-10 text-primary" />
+          <Logo className="mx-auto size-20" />
           <CardTitle className="text-xl">Cali Pro</CardTitle>
           <CardDescription>
             Sign in to build and track your calisthenics programs.

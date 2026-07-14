@@ -98,6 +98,18 @@ export function getCachedCompletedSessions(store: DataStore, userId: string) {
   )();
 }
 
+/**
+ * Finished schedule slots (completed + skipped, oldest first) for the home
+ * streak. Same tag as history — completing or skipping a workout busts it.
+ */
+export function getCachedFinishedSessions(store: DataStore, userId: string) {
+  return unstable_cache(
+    () => store.listFinishedSessions(userId),
+    ["user-finished-sessions", userId],
+    { revalidate: ONE_WEEK_SECONDS, tags: [userHistoryTag(userId)] },
+  )();
+}
+
 /** One active run's card data on the home dashboard. */
 export type DashboardRun = {
   run: ProgramRun;

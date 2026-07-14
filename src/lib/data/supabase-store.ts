@@ -411,6 +411,17 @@ class SupabaseStore implements DataStore {
     ).map(toSession);
   }
 
+  async listFinishedSessions(userId: string): Promise<WorkoutSession[]> {
+    return orThrow(
+      await this.db
+        .from("sessions")
+        .select()
+        .eq("user_id", userId)
+        .in("status", ["completed", "skipped"])
+        .order("date", { ascending: true }),
+    ).map(toSession);
+  }
+
   async listExerciseNotes(userId: string): Promise<ExerciseNote[]> {
     return orThrow(
       await this.db.from("exercise_notes").select().eq("user_id", userId),
@@ -543,6 +554,21 @@ class SupabaseStore implements DataStore {
         .select(),
     );
     return feedback;
+  }
+
+  async listFeedback(): Promise<Feedback[]> {
+    return orThrow(
+      await this.db
+        .from("feedback")
+        .select()
+        .order("created_at", { ascending: false }),
+    ).map((r: Row) => ({
+      id: r.id,
+      userId: r.user_id,
+      type: r.type as Feedback["type"],
+      message: r.message,
+      createdAt: r.created_at,
+    }));
   }
 }
 

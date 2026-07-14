@@ -4,14 +4,7 @@ import { useOptimistic, useState, useTransition } from "react";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ChevronRight,
-  Dumbbell,
-  Loader2,
-  Plus,
-  Trash2,
-  Zap,
-} from "lucide-react";
+import { ChevronRight, Loader2, Plus, Trash2, Zap } from "lucide-react";
 import { CustomWorkout } from "@/lib/domain/schemas";
 import {
   createCustomWorkout,
@@ -68,30 +61,35 @@ export function IndividualWorkouts({
 
   return (
     <div className="space-y-5 border-t pt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Zap className="size-5 text-primary" /> Individual workouts
-        </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={createMutation.isPending}
-          onClick={createWorkout}
-        >
+      <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <Zap className="size-5 text-primary" /> Individual workouts
+      </h2>
+
+      {/* Same inviting placeholder as "Create a program". It's a button (not a
+          link) because creating goes through a server action, then navigates. */}
+      <button
+        type="button"
+        disabled={createMutation.isPending}
+        onClick={createWorkout}
+        className="group flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-left transition-colors hover:border-primary hover:bg-primary/10 disabled:opacity-70"
+      >
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary transition-transform group-hover:scale-105">
           {createMutation.isPending ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader2 className="size-5 animate-spin" />
           ) : (
-            <Plus className="size-4" />
-          )}{" "}
-          New
-        </Button>
-      </div>
-      {optimistic.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Want to have a quick workout outside your program? Create a new one
-          here.
-        </p>
-      ) : (
+            <Plus className="size-6" />
+          )}
+        </span>
+        <span className="min-w-0">
+          <span className="block font-semibold">Create a workout</span>
+          <span className="block text-sm text-muted-foreground">
+            A one-off session outside any program — just pick exercises.
+          </span>
+        </span>
+        <ChevronRight className="ml-auto size-5 shrink-0 text-muted-foreground" />
+      </button>
+
+      {optimistic.length > 0 && (
         <div className="space-y-4">
           {optimistic.map((w) => (
             <div key={w.id} className="flex items-center gap-1">
@@ -100,8 +98,7 @@ export function IndividualWorkouts({
                 className="flex min-w-0 flex-1 items-center justify-between gap-3"
               >
                 <div className="min-w-0">
-                  <span className="flex items-center gap-2 truncate font-semibold">
-                    <Dumbbell className="size-4 shrink-0 text-primary" />
+                  <span className="block truncate font-semibold">
                     {w.title}
                   </span>
                   <p className="text-sm text-muted-foreground">

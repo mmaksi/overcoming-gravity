@@ -3,6 +3,7 @@ import {
   Activity,
   ChartLine,
   Crosshair,
+  Flame,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -59,18 +60,22 @@ function WeightChart({ entries }: { entries: BodyweightEntry[] }) {
 }
 
 /**
- * The "Stats" block on Home: the bodyweight chart next to a BMI card
- * (current + target). Read-only — weigh-ins, height and target weight are
- * logged in Settings.
+ * The "Stats" block on Home: the workout streak on top, then the bodyweight
+ * chart and BMI card side by side as two equal cards. Read-only — weigh-ins,
+ * height and target weight are logged in Settings.
  */
 export function StatsSection({
   entries,
   heightCm,
   targetWeightKg,
+  streak,
+  totalWorkouts,
 }: {
   entries: BodyweightEntry[];
   heightCm?: number;
   targetWeightKg?: number;
+  streak: number;
+  totalWorkouts: number;
 }) {
   const latest = entries.at(-1);
   const first = entries[0];
@@ -87,8 +92,31 @@ export function StatsSection({
       <h2 className="flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-primary">
         <Activity className="size-5" /> Stats
       </h2>
-      <div className="grid grid-cols-5 gap-3">
-        <Card className="col-span-3 gap-2 py-4">
+
+      {/* Streak sits on top, same card design as the two below it. */}
+      <Card className="gap-2 py-4">
+        <CardHeader className="px-4">
+          <CardTitle className="flex items-center gap-1.5 text-sm">
+            <Flame className="size-4 text-primary" /> Streak
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-3xl font-bold tabular-nums">{streak}</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              {streak === 1 ? "workout" : "workouts"} in a row
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {streak === 0
+              ? "Complete your next workout to start a streak — skipping one resets it."
+              : `${totalWorkouts} workout${totalWorkouts === 1 ? "" : "s"} completed all-time`}
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="gap-2 py-4">
           <CardHeader className="px-4">
             <CardTitle className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-1.5">
@@ -128,7 +156,7 @@ export function StatsSection({
           </CardContent>
         </Card>
 
-        <Card className="col-span-2 gap-2 py-4">
+        <Card className="gap-2 py-4">
           <CardHeader className="px-4">
             <CardTitle className="flex items-center gap-1.5 text-sm">
               <Crosshair className="size-4 text-primary" /> BMI

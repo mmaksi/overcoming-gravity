@@ -281,6 +281,17 @@ export class JsonStore implements DataStore {
       .slice(offset, offset + limit);
   }
 
+  async listFinishedSessions(userId: string): Promise<WorkoutSession[]> {
+    const db = await getDb();
+    return db.data.sessions
+      .filter(
+        (s) =>
+          s.userId === userId &&
+          (s.status === "completed" || s.status === "skipped"),
+      )
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   async listExerciseNotes(userId: string): Promise<ExerciseNote[]> {
     return (await getDb()).data.exerciseNotes.filter(
       (n) => n.userId === userId,
@@ -364,5 +375,12 @@ export class JsonStore implements DataStore {
     db.data.feedback.push(feedback);
     await db.write();
     return feedback;
+  }
+
+  async listFeedback(): Promise<Feedback[]> {
+    const db = await getDb();
+    return [...db.data.feedback].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
   }
 }

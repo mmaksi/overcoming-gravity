@@ -204,12 +204,18 @@ export default async function CalendarPage({
 
       {/* History + progress, merged in from the old separate History tab. */}
       <Tabs defaultValue="workouts" className="pt-2">
-        <TabsList className="w-full">
-          <TabsTrigger value="workouts" className="flex-1">
-            <CalendarDays className="size-4" /> Workouts
+        <TabsList className="h-auto w-full p-1">
+          <TabsTrigger
+            value="workouts"
+            className="flex-1 gap-2 py-3 text-base [&_svg:not([class*='size-'])]:size-5"
+          >
+            <CalendarDays /> Workouts
           </TabsTrigger>
-          <TabsTrigger value="progress" className="flex-1">
-            <TrendingUp className="size-4" /> Progress
+          <TabsTrigger
+            value="progress"
+            className="flex-1 gap-2 py-3 text-base [&_svg:not([class*='size-'])]:size-5"
+          >
+            <TrendingUp /> Progress
           </TabsTrigger>
         </TabsList>
 

@@ -3,12 +3,22 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Check, Loader2, Send } from "lucide-react";
-import { FEEDBACK_TYPE_LABELS, FEEDBACK_TYPES, FeedbackType } from "@/lib/domain/types";
+import {
+  FEEDBACK_TYPE_LABELS,
+  FEEDBACK_TYPES,
+  FeedbackType,
+} from "@/lib/domain/types";
 import { submitFeedback } from "@/lib/actions/feedback";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** Sends feedback to the database (tagged by type) — no mail app needed. */
 export function FeedbackForm() {
@@ -43,25 +53,22 @@ export function FeedbackForm() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <Label>Type</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {FEEDBACK_TYPES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              aria-pressed={type === t}
-              className={cn(
-                "rounded-lg border py-2 text-sm font-medium transition-colors",
-                type === t
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "hover:border-foreground/30",
-              )}
-            >
-              {FEEDBACK_TYPE_LABELS[t]}
-            </button>
-          ))}
-        </div>
+        <Label htmlFor="feedback-type">Type</Label>
+        <Select
+          value={type}
+          onValueChange={(v) => setType(v as FeedbackType)}
+        >
+          <SelectTrigger id="feedback-type" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FEEDBACK_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {FEEDBACK_TYPE_LABELS[t]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-2">
         <Label htmlFor="feedback">Tell us what to improve</Label>

@@ -77,6 +77,12 @@ export interface DataStore {
   ): Promise<WorkoutSession[]>;
 
   /**
+   * Every finished schedule slot — completed **and** skipped — oldest first.
+   * Powers the workout streak (consecutive completions, broken by a skip).
+   */
+  listFinishedSessions(userId: string): Promise<WorkoutSession[]>;
+
+  /**
    * A user's remembered notes per exercise + inter-technique pair. Saving
    * upserts on (userId, exerciseId, techniqueId).
    */
@@ -98,4 +104,6 @@ export interface DataStore {
 
   // Feedback --------------------------------------------------------------
   createFeedback(feedback: Feedback): Promise<Feedback>;
+  /** All feedback, newest first — the admin inbox. */
+  listFeedback(): Promise<Feedback[]>;
 }

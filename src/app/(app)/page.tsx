@@ -4,12 +4,13 @@ import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
   getCachedBodyweight,
-  getCachedCompletedSessions,
   getCachedDashboard,
   getCachedExercises,
+  getCachedFinishedSessions,
   getCachedUserPrograms,
 } from "@/lib/data/cached";
 import { toISODate } from "@/lib/domain/schedule";
+import { workoutStreak } from "@/lib/domain/streak";
 import { ATTRIBUTES, WEEKDAY_LABELS } from "@/lib/domain/types";
 import {
   Exercise,
@@ -30,7 +31,6 @@ import { InstallAppButton } from "@/components/home/install-app-button";
 import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
 import { RunCarousel } from "@/components/home/run-carousel";
 import { StatsSection } from "@/components/home/stats-section";
-import { StreakCard } from "@/components/home/streak-card";
 import { UserAvatar } from "@/components/home/user-avatar";
 
 /** The planned exercises of the upcoming session, in section order. */
@@ -130,13 +130,17 @@ export default async function DashboardPage() {
   }
 
   const today = toISODate(new Date());
-  // Stats are cached until a weigh-in changes in Settings; completed history
-  // (the streak) is cached until a workout is completed/deleted.
-  const [bodyweight, exercises, completed] = await Promise.all([
+  // Stats are cached until a weigh-in changes in Settings; finished sessions
+  // (the streak) are cached until a workout is completed/skipped/deleted.
+  const [bodyweight, exercises, finished] = await Promise.all([
     getCachedBodyweight(store, user.id),
     getCachedExercises(store),
-    getCachedCompletedSessions(store, user.id),
+    getCachedFinishedSessions(store, user.id),
   ]);
+  const streak = workoutStreak(finished);
+  const totalWorkouts = finished.filter(
+    (s) => s.status === "completed",
+  ).length;
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
   const programGoals: ProgramGoals[] = [];
 
@@ -247,12 +251,12 @@ export default async function DashboardPage() {
 
       <RunCarousel>{runCards}</RunCarousel>
 
-      <StreakCard dates={completed.map((s) => s.date)} today={today} />
-
       <StatsSection
         entries={bodyweight}
         heightCm={user.heightCm}
         targetWeightKg={user.targetWeightKg}
+        streak={streak}
+        totalWorkouts={totalWorkouts}
       />
 
       <GoalsCard programs={programGoals} />

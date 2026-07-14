@@ -78,6 +78,17 @@ export function ExerciseSessionSheet({
         </SheetHeader>
 
         <div className="space-y-5 px-4">
+          {exercise.imageUrl && (
+            <div className="flex justify-center overflow-hidden rounded-lg border bg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={exercise.imageUrl}
+                alt={exercise.title}
+                className="max-h-64 w-full object-contain"
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Progression — tap to use a different one today</Label>
             <div className="space-y-2">
