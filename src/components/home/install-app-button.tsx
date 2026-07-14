@@ -45,10 +45,10 @@ function isIOS() {
 
 function subscribeToInstallStatus(callback: () => void) {
   window.addEventListener("appinstalled", callback);
-  window.addEventListener("cali-install-ready", callback);
+  window.addEventListener("strong-journal-install-ready", callback);
   return () => {
     window.removeEventListener("appinstalled", callback);
-    window.removeEventListener("cali-install-ready", callback);
+    window.removeEventListener("strong-journal-install-ready", callback);
   };
 }
 
@@ -74,7 +74,7 @@ export function InstallAppButton() {
       // A used prompt can't be reused — drop it (Chrome may fire a fresh
       // beforeinstallprompt later, which the head script will re-stash).
       window.caliInstallPrompt = undefined;
-      window.dispatchEvent(new Event("cali-install-ready"));
+      window.dispatchEvent(new Event("strong-journal-install-ready"));
       return;
     }
     // No native prompt (iOS, or the browser hasn't offered one): show steps.
@@ -98,10 +98,10 @@ export function InstallAppButton() {
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Install Cali Pro</DialogTitle>
+            <DialogTitle>Install Strong Journal</DialogTitle>
             <DialogDescription>
-              Add the app to your home screen for the full experience — it
-              opens full-screen and rest notifications work in the background.
+              Add the app to your home screen for the full experience — it opens
+              full-screen and rest notifications work in the background.
             </DialogDescription>
           </DialogHeader>
           {isIOS() ? (
@@ -130,7 +130,7 @@ export function InstallAppButton() {
                   3
                 </span>
                 <span>
-                  Tap <strong>Add</strong> — Cali Pro appears on your home
+                  Tap <strong>Add</strong> — Strong Journal appears on your home
                   screen.
                 </span>
               </li>
@@ -143,8 +143,8 @@ export function InstallAppButton() {
                 </span>
                 <span>
                   Open the browser menu{" "}
-                  <EllipsisVertical className="inline size-4" aria-hidden />{" "}
-                  (or look for an install icon in the address bar).
+                  <EllipsisVertical className="inline size-4" aria-hidden /> (or
+                  look for an install icon in the address bar).
                 </span>
               </li>
               <li className="flex items-center gap-3">

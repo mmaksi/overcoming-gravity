@@ -8,11 +8,11 @@ const INSTALL_PROMPT_SCRIPT = `
 window.addEventListener("beforeinstallprompt", function (e) {
   e.preventDefault();
   window.caliInstallPrompt = e;
-  window.dispatchEvent(new Event("cali-install-ready"));
+  window.dispatchEvent(new Event("strong-journal-install-ready"));
 });
 window.addEventListener("appinstalled", function () {
   window.caliInstallPrompt = undefined;
-  window.dispatchEvent(new Event("cali-install-ready"));
+  window.dispatchEvent(new Event("strong-journal-install-ready"));
 });
 `;
 

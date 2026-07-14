@@ -42,7 +42,7 @@ test("install button falls back to instructions without a prompt event", async (
   await page.goto("/");
   await page.getByRole("button", { name: "Install app" }).click();
   await expect(
-    page.getByRole("heading", { name: "Install Cali Pro" }),
+    page.getByRole("heading", { name: "Install Strong Journal" }),
   ).toBeVisible();
   await expect(page.getByText("Add to Home screen")).toBeVisible();
 });

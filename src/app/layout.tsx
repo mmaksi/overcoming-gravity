@@ -17,8 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cali Pro",
-  description: "Build calisthenics programs, design mesocycles, track workouts.",
+  title: "Strong Journal",
+  description:
+    "Build calisthenics programs, design mesocycles, track workouts.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icons/icon.svg",
@@ -27,7 +28,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Cali Pro",
+    title: "Strong Journal",
   },
 };
 

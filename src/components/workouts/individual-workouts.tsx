@@ -83,7 +83,7 @@ export function IndividualWorkouts({
         <span className="min-w-0">
           <span className="block font-semibold">Create a workout</span>
           <span className="block text-sm text-muted-foreground">
-            A one-off session outside any program — just pick exercises.
+            A one-off session outside your programs.
           </span>
         </span>
         <ChevronRight className="ml-auto size-5 shrink-0 text-muted-foreground" />

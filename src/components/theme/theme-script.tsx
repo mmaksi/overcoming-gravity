@@ -5,7 +5,7 @@
 const THEME_SCRIPT = `
 (function () {
   try {
-    var theme = localStorage.getItem("cali-theme");
+    var theme = localStorage.getItem("strong-journal-theme");
     var dark =
       theme === "dark" ||
       ((!theme || theme === "system") &&

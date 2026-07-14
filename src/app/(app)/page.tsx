@@ -121,7 +121,7 @@ export default async function DashboardPage() {
           </Button>
           {programs.length > 0 && (
             <Button asChild variant="outline" size="lg">
-              <Link href="/programs">My programs</Link>
+              <Link href="/programs">Programs</Link>
             </Button>
           )}
         </div>
@@ -138,9 +138,7 @@ export default async function DashboardPage() {
     getCachedFinishedSessions(store, user.id),
   ]);
   const streak = workoutStreak(finished);
-  const totalWorkouts = finished.filter(
-    (s) => s.status === "completed",
-  ).length;
+  const totalWorkouts = finished.filter((s) => s.status === "completed").length;
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
   const programGoals: ProgramGoals[] = [];
 

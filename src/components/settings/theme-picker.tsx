@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 type Theme = "system" | "light" | "dark";
 
-const STORAGE_KEY = "cali-theme";
+const STORAGE_KEY = "strong-journal-theme";
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void) {

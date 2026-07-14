@@ -1,4 +1,4 @@
--- Cali Pro — initial schema
+-- Strong Journal — initial schema
 -- Domain documents (mesocycle, progressions, session entries) are stored as
 -- jsonb: they are read and written as aggregates by the app, never queried
 -- row-by-row inside the database.

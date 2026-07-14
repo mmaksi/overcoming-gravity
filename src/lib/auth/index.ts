@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { Profile } from "@/lib/domain/schemas";
 import { dataBackend } from "@/lib/data";
 
-export const MOCK_ADMIN_COOKIE = "cali-mock-admin";
+export const MOCK_ADMIN_COOKIE = "strong-journal-mock-admin";
 
 /**
  * Auth seam mirroring the DataStore seam: mock session in development

@@ -107,7 +107,7 @@ function postToServiceWorker(message: Record<string, unknown>) {
 
 /** localStorage key for a session's in-flight rest, so it survives navigation. */
 function restKey(sessionId: string) {
-  return `cali-rest:${sessionId}`;
+  return `strong-journal-rest:${sessionId}`;
 }
 
 function saveRest(sessionId: string, timer: RestTimerState) {
@@ -590,8 +590,7 @@ export function WorkoutLogger({
       }
     }
     document.addEventListener("visibilitychange", onVisibility);
-    return () =>
-      document.removeEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
   return (
@@ -814,7 +813,10 @@ export function WorkoutLogger({
                                   ...en,
                                   sets: en.sets.map((x, k) =>
                                     k === j
-                                      ? { ...x, reps: digitsOnly(e.target.value) }
+                                      ? {
+                                          ...x,
+                                          reps: digitsOnly(e.target.value),
+                                        }
                                       : x,
                                   ),
                                 }))

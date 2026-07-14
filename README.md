@@ -1,4 +1,4 @@
-# Cali Pro
+# Strong Journal
 
 A mobile-first PWA for calisthenics athletes: build training programs, design
 mesocycles from an exercise library, and track workouts on a calendar.

@@ -1,4 +1,4 @@
-/* Cali Pro service worker: offline-capable app shell.
+/* Strong Journal service worker: offline-capable app shell.
  * - navigations: network-first, falling back to the cached shell
  * - static assets (/_next/static, icons, fonts): cache-first
  */
@@ -100,7 +100,7 @@ self.addEventListener("message", (event) => {
     const until = new Date(Date.now() + seconds * 1000);
     const hhmm = `${String(until.getHours()).padStart(2, "0")}:${String(until.getMinutes()).padStart(2, "0")}:${String(until.getSeconds()).padStart(2, "0")}`;
     self.registration.showNotification("Resting…", {
-      tag: "cali-rest-timer",
+      tag: "strong-journal-rest-timer",
       body: `Until ${hhmm} · next: ${nextLabel}`,
       silent: true,
     });
@@ -115,7 +115,7 @@ self.addEventListener("message", (event) => {
           restDone = null;
           self.registration
             .showNotification("Rest over 💪", {
-              tag: "cali-rest-timer",
+              tag: "strong-journal-rest-timer",
               body: nextLabel,
               renotify: true,
               vibrate: [200, 100, 200],
@@ -129,7 +129,7 @@ self.addEventListener("message", (event) => {
   if (data.type === "rest-timer-cancel") {
     cancelRest();
     self.registration
-      .getNotifications({ tag: "cali-rest-timer" })
+      .getNotifications({ tag: "strong-journal-rest-timer" })
       .then((notifications) => notifications.forEach((n) => n.close()));
   }
 });

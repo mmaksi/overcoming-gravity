@@ -64,7 +64,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md border-border/50 bg-card/90 backdrop-blur">
         <CardHeader className="text-center">
           <Logo className="mx-auto size-20" />
-          <CardTitle className="text-xl">Cali Pro</CardTitle>
+          <CardTitle className="text-xl">Strong Journal</CardTitle>
           <CardDescription>
             Sign in to build and track your calisthenics programs.
           </CardDescription>
