@@ -72,7 +72,7 @@ test("start, reset, and custom individual workouts", async ({ page }) => {
 
   // Custom individual workout: create, prefilled from defaults, do it.
   await page.goto("/programs");
-  await page.getByRole("button", { name: "New workout" }).click();
+  await page.getByRole("button", { name: "New", exact: true }).click();
   await expect(page.getByLabel("Workout title")).toHaveValue("My workout");
   await expect(page.getByText("Wrist Circles & Prep").first()).toBeVisible();
   await page.getByRole("button", { name: "Do this workout" }).click();

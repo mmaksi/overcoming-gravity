@@ -49,6 +49,12 @@
 }
 
 :root {
+  /* UI font: SF Pro via the native system stack (Apple's own typeface — it
+     resolves to SF Pro on Apple devices, the platform sans elsewhere). */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "SF Pro Icons", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+
   /* Brand: #f29e23 orange on black & white. */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -73,7 +79,9 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  /* Boxes are only lightly rounded (~3px). rounded-full is unaffected, so
+     avatars, pills and the progress bar stay fully round. */
+  --radius: 0.1875rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);

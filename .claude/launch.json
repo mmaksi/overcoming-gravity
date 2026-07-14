@@ -6,6 +6,16 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "dev-json",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "3210"],
+      "port": 3210,
+      "env": {
+        "DATA_BACKEND": "json",
+        "DATA_FILE": "data/db.json"
+      }
     }
   ]
 }

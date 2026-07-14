@@ -2,16 +2,16 @@
 
 import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Camera, Check, Loader2, Trash2 } from "lucide-react";
+import { Camera, Check, Loader2, X } from "lucide-react";
 import { removeAvatar, uploadAvatar } from "@/lib/actions/settings";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { UserAvatar } from "@/components/home/user-avatar";
+import { cn } from "@/lib/utils";
 
 /**
- * Profile picture upload: picks a file from the device and sends it to the
- * blob store (Supabase Storage in production). The instant local preview
- * uses an object URL while the round-trip runs.
+ * Profile picture upload. The avatar circle *is* the control: tapping it opens
+ * the file picker (a camera badge sits on the circle to signal that), and a
+ * small ✕ badge removes the current photo. The instant local preview uses an
+ * object URL while the upload round-trips.
  */
 export function AvatarForm({
   name,
@@ -22,6 +22,7 @@ export function AvatarForm({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [broken, setBroken] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +44,7 @@ export function AvatarForm({
   function upload(file: File) {
     setSaved(false);
     setError(null);
+    setBroken(false);
     setPreview(URL.createObjectURL(file));
     const formData = new FormData();
     formData.set("avatar", file);
@@ -57,58 +59,94 @@ export function AvatarForm({
   }
 
   const shownUrl = preview ?? initialAvatarUrl;
+  const showImage = shownUrl && !broken;
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="avatar-file">Profile picture</Label>
-      <div className="flex items-center gap-3">
-        <UserAvatar name={name} avatarUrl={shownUrl} />
-        <input
-          ref={fileRef}
-          id="avatar-file"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) upload(file);
-            e.target.value = "";
-          }}
-        />
-        <Button
-          variant="outline"
-          disabled={pending}
-          onClick={() => fileRef.current?.click()}
-        >
-          {pending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Camera className="size-4" />
-          )}{" "}
-          {shownUrl ? "Change photo" : "Upload photo"}
-        </Button>
-        {shownUrl && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Remove profile picture"
-            className="text-muted-foreground hover:text-destructive"
+      <Label>Profile picture</Label>
+      <div className="flex items-center gap-4">
+        <div className="relative size-20 shrink-0">
+          <input
+            ref={fileRef}
+            id="avatar-file"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) upload(file);
+              e.target.value = "";
+            }}
+          />
+          {/* The circle itself is the upload button. */}
+          <button
+            type="button"
             disabled={pending}
-            onClick={remove}
+            aria-label={showImage ? "Change profile picture" : "Upload profile picture"}
+            onClick={() => fileRef.current?.click()}
+            className="group relative block size-20 overflow-hidden rounded-full bg-primary/15 text-2xl font-bold text-primary"
           >
-            <Trash2 className="size-5" />
-          </Button>
-        )}
+            {showImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={shownUrl}
+                alt={name}
+                className="size-full object-cover"
+                onError={() => setBroken(true)}
+              />
+            ) : (
+              <span className="flex size-full items-center justify-center">
+                {(name.trim()[0] ?? "?").toUpperCase()}
+              </span>
+            )}
+            {/* Darken + show a camera on hover/focus (and while uploading). */}
+            <span
+              className={cn(
+                "absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
+                pending && "opacity-100",
+              )}
+            >
+              {pending ? (
+                <Loader2 className="size-6 animate-spin" />
+              ) : (
+                <Camera className="size-6" />
+              )}
+            </span>
+          </button>
+
+          {/* Persistent camera badge so the affordance is obvious at rest. */}
+          <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex size-7 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground">
+            <Camera className="size-3.5" />
+          </span>
+
+          {/* Remove badge, only when there's a picture to remove. */}
+          {showImage && !pending && (
+            <button
+              type="button"
+              aria-label="Remove profile picture"
+              onClick={remove}
+              className="absolute -right-0.5 -top-0.5 z-10 flex size-6 items-center justify-center rounded-full border-2 border-background bg-destructive text-white transition-transform hover:scale-105"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="min-w-0 text-sm">
+          <p className="text-muted-foreground">
+            Tap your photo to {showImage ? "change" : "upload"} it.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            JPEG, PNG or WebP, up to 5 MB.
+          </p>
+          {saved && (
+            <p className="mt-1 flex items-center gap-1 text-sm text-primary">
+              <Check className="size-4" /> Updated
+            </p>
+          )}
+          {error && <p className="mt-1 text-sm text-destructive">{error}</p>}
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        JPEG, PNG or WebP, up to 5 MB.
-      </p>
-      {saved && (
-        <p className="flex items-center gap-1 text-sm text-primary">
-          <Check className="size-4" /> Profile picture updated
-        </p>
-      )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

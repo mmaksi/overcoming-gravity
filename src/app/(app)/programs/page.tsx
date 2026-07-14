@@ -8,7 +8,6 @@ import {
   PROGRAM_TYPE_LABELS,
   SPLIT_TYPE_LABELS,
 } from "@/lib/domain/types";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IndividualWorkouts } from "@/components/workouts/individual-workouts";
 import { MotivationalQuote } from "@/components/programs/motivational-quote";
@@ -29,26 +28,35 @@ export default async function ProgramsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Programs</h1>
-        <Button asChild>
-          <Link href="/programs/new">
-            <Plus className="size-4" /> New
-          </Link>
-        </Button>
-      </div>
+      <h1 className="text-2xl font-bold">My programs</h1>
 
       {/* Server component: renders once per request, so reading the clock to
           pick the day's quote is deterministic per response. */}
       {/* eslint-disable-next-line react-hooks/purity */}
       <MotivationalQuote seed={Math.floor(Date.now() / 86_400_000)} />
 
+      {/* Inviting create call-to-action in place of a small header button. */}
+      <Link
+        href="/programs/new"
+        className="group flex items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-4 transition-colors hover:border-primary hover:bg-primary/10"
+      >
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary transition-transform group-hover:scale-105">
+          <Plus className="size-6" />
+        </span>
+        <span className="min-w-0">
+          <span className="block font-semibold">Create a program</span>
+          <span className="block text-sm text-muted-foreground">
+            Pick a type, choose your skills, design the mesocycle.
+          </span>
+        </span>
+        <ChevronRight className="ml-auto size-5 shrink-0 text-muted-foreground" />
+      </Link>
+
       {programs.length === 0 ? (
         <div className="space-y-1 py-8 text-center">
           <p className="font-medium">No programs yet</p>
           <p className="text-sm text-muted-foreground">
-            Create your first program: pick a program type, the skills you want
-            to learn, and design your mesocycle.
+            Tap “Create a program” above to build your first one.
           </p>
         </div>
       ) : (

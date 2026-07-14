@@ -6,51 +6,36 @@ import { dataBackend } from "@/lib/data";
 /**
  * Auth server actions — the only place the app talks to the auth provider.
  * UI components call these and stay provider-agnostic; swapping Supabase for
- * another provider means reimplementing this file (and the middleware
- * session refresh), nothing else.
+ * another provider means reimplementing this file (and the proxy session
+ * refresh), nothing else.
+ *
+ * Sign-in is Google OAuth only. `signInWithGoogle` returns a URL for the
+ * client to navigate to rather than calling `redirect()` itself: for Supabase
+ * that's Google's consent page (an external URL), and returning it keeps the
+ * client in control of the hand-off.
  */
 
-export type AuthResult = { error?: string; message?: string };
+export type AuthResult = { error?: string; url?: string };
 
-export async function signInWithPassword(
-  email: string,
-  password: string,
-): Promise<AuthResult> {
-  if (dataBackend() === "json") redirect("/"); // dev: always signed in
+export async function signInWithGoogle(): Promise<AuthResult> {
+  // Dev (JSON backend) is always "signed in" — skip OAuth, land on the app.
+  if (dataBackend() === "json") return { url: "/" };
 
-  const { createServerSupabase } = await import("@/lib/supabase/server");
-  const supabase = await createServerSupabase();
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (error) return { error: error.message };
-  redirect("/");
-}
-
-export async function signUpWithPassword(
-  email: string,
-  password: string,
-  name: string,
-): Promise<AuthResult> {
-  if (dataBackend() === "json") redirect("/");
+  const { headers } = await import("next/headers");
+  const origin =
+    (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "";
 
   const { createServerSupabase } = await import("@/lib/supabase/server");
   const supabase = await createServerSupabase();
-  // The handle_new_user trigger copies `name` into the profile row.
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name: name.trim() } },
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    // Google sends the user back here with a code; the callback route
+    // exchanges it for a session cookie (src/app/(auth)/auth/callback).
+    options: { redirectTo: `${origin}/auth/callback` },
   });
   if (error) return { error: error.message };
-  // Every new signup is a normal user (profiles.is_admin defaults to false);
-  // admin rights are granted manually in the database.
-  if (data.session) redirect("/"); // email confirmation disabled
-  return {
-    message:
-      "Account created — check your inbox to confirm your email, then sign in.",
-  };
+  if (!data.url) return { error: "Could not start Google sign-in." };
+  return { url: data.url };
 }
 
 export async function signOut(): Promise<void> {

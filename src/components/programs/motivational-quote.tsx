@@ -64,7 +64,7 @@ export function MotivationalQuote({ seed }: { seed: number }) {
   const showImage = quote.image && !imageBroken;
 
   return (
-    <figure className="flex items-center gap-4 rounded-2xl bg-primary/5 p-4">
+    <figure className="flex items-start gap-4 rounded-2xl bg-primary/5 p-4">
       <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-sm font-bold text-primary">
         {showImage ? (
           // eslint-disable-next-line @next/next/no-img-element

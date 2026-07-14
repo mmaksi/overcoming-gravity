@@ -37,13 +37,18 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
-  if (!user && !isAuthRoute) {
+  const path = request.nextUrl.pathname;
+  const isLogin = path.startsWith("/login");
+  // The OAuth callback under /auth must run while still unauthenticated (it's
+  // what establishes the session), so it's always allowed through.
+  const isOAuthCallback = path.startsWith("/auth");
+
+  if (!user && !isLogin && !isOAuthCallback) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  if (user && isAuthRoute) {
+  if (user && isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

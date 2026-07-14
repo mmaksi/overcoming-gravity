@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, Dumbbell, Play } from "lucide-react";
+import { ArrowRight, Dumbbell, Play, Settings } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
   getCachedBodyweight,
+  getCachedCompletedSessions,
   getCachedDashboard,
   getCachedExercises,
   getCachedUserPrograms,
@@ -29,6 +30,7 @@ import { InstallAppButton } from "@/components/home/install-app-button";
 import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
 import { RunCarousel } from "@/components/home/run-carousel";
 import { StatsSection } from "@/components/home/stats-section";
+import { StreakCard } from "@/components/home/streak-card";
 import { UserAvatar } from "@/components/home/user-avatar";
 
 /** The planned exercises of the upcoming session, in section order. */
@@ -128,10 +130,12 @@ export default async function DashboardPage() {
   }
 
   const today = toISODate(new Date());
-  // Stats are cached until a weigh-in changes in Settings.
-  const [bodyweight, exercises] = await Promise.all([
+  // Stats are cached until a weigh-in changes in Settings; completed history
+  // (the streak) is cached until a workout is completed/deleted.
+  const [bodyweight, exercises, completed] = await Promise.all([
     getCachedBodyweight(store, user.id),
     getCachedExercises(store),
+    getCachedCompletedSessions(store, user.id),
   ]);
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
   const programGoals: ProgramGoals[] = [];
@@ -225,14 +229,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
-        <h1 className="text-2xl font-bold">Hi, {user.name}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
+          <h1 className="truncate text-2xl font-bold">Hi, {user.name}</h1>
+        </div>
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="-mr-2 shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Settings className="size-6" />
+        </Link>
       </div>
 
       <InstallAppButton />
 
       <RunCarousel>{runCards}</RunCarousel>
+
+      <StreakCard dates={completed.map((s) => s.date)} today={today} />
 
       <StatsSection
         entries={bodyweight}

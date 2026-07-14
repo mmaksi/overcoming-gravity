@@ -47,66 +47,81 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
   );
 
   const showProgramName = optimistic.length > 1;
-  const flat = optimistic.flatMap((p) =>
-    GOAL_AREAS.flatMap((area) =>
+  // Group every active program's goals by area, keeping the fixed GOAL_AREAS
+  // order. Areas with no goals are dropped so empty categories don't render.
+  const byArea = GOAL_AREAS.map((area) => ({
+    area,
+    items: optimistic.flatMap((p) =>
       // Older programs may miss newer areas entirely.
       (p.goals[area] ?? []).map((goal, index) => ({
         programId: p.programId,
         programName: p.programName,
-        area,
         index,
         goal,
       })),
     ),
+  })).filter((group) => group.items.length > 0);
+
+  const total = byArea.reduce((n, g) => n + g.items.length, 0);
+  if (total === 0) return null;
+  const achieved = byArea.reduce(
+    (n, g) => n + g.items.filter((x) => x.goal.done).length,
+    0,
   );
-  if (flat.length === 0) return null;
-  const achieved = flat.filter((x) => x.goal.done).length;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <h2 className="flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-primary">
-        <Target className="size-5" /> Goals · {achieved}/{flat.length} achieved
+        <Target className="size-5" /> Goals · {achieved}/{total} achieved
       </h2>
-      <div className="space-y-2.5">
-        {flat.map(({ programId, programName, area, index, goal }) => (
-          <label
-            key={`${programId}-${area}-${index}`}
-            className="flex min-h-11 cursor-pointer items-center gap-3"
-          >
-            <input
-              type="checkbox"
-              className="size-5 shrink-0 accent-primary"
-              checked={goal.done}
-              onChange={(e) => {
-                const done = e.target.checked;
-                startTransition(async () => {
-                  applyOptimistic({ programId, area, index, done });
-                  await toggleMutation.mutateAsync({
-                    programId,
-                    area,
-                    index,
-                    done,
-                  });
-                });
-              }}
-            />
-            <span className="min-w-0">
-              <span
-                className={cn(
-                  "block truncate",
-                  goal.done && "text-muted-foreground line-through",
-                )}
+      {byArea.map(({ area, items }) => (
+        <div key={area} className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {GOAL_AREA_LABELS[area]}
+          </h3>
+          <div className="space-y-2.5">
+            {items.map(({ programId, programName, index, goal }) => (
+              <label
+                key={`${programId}-${area}-${index}`}
+                className="flex min-h-11 cursor-pointer items-center gap-3"
               >
-                {goal.text}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {GOAL_AREA_LABELS[area]}
-                {showProgramName && ` · ${programName}`}
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
+                <input
+                  type="checkbox"
+                  className="size-5 shrink-0 accent-primary"
+                  checked={goal.done}
+                  onChange={(e) => {
+                    const done = e.target.checked;
+                    startTransition(async () => {
+                      applyOptimistic({ programId, area, index, done });
+                      await toggleMutation.mutateAsync({
+                        programId,
+                        area,
+                        index,
+                        done,
+                      });
+                    });
+                  }}
+                />
+                <span className="min-w-0">
+                  <span
+                    className={cn(
+                      "block truncate",
+                      goal.done && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {goal.text}
+                  </span>
+                  {showProgramName && (
+                    <span className="text-xs text-muted-foreground">
+                      {programName}
+                    </span>
+                  )}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
