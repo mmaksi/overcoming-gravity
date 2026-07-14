@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Check, CloudUpload, Loader2, Play, Trash2 } from "lucide-react";
 import { Attribute } from "@/lib/domain/types";
@@ -55,9 +56,7 @@ export function WorkoutEditor({
   const router = useRouter();
   const [pickingFor, setPickingFor] = useState<Attribute | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [starting, startTransition] = useTransition();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, startDeleting] = useTransition();
 
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
 
@@ -67,21 +66,31 @@ export function WorkoutEditor({
   const latest = useRef({ title, day });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inflightRef = useRef<Promise<void>>(Promise.resolve());
+  // Debounced draft autosave, routed through TanStack Query. onMutate/onSuccess
+  // /onError drive the little save-state indicator.
+  const { mutateAsync: autosave } = useMutation({
+    mutationFn: () =>
+      saveCustomWorkout({
+        id: workout.id,
+        title: latest.current.title.trim() || "My workout",
+        day: latest.current.day,
+      }),
+    onMutate: () => setSaveState("saving"),
+    onSuccess: () => setSaveState("saved"),
+    onError: () => setSaveState("dirty"),
+  });
   const schedule = useCallback(() => {
     setSaveState("dirty");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      setSaveState("saving");
-      inflightRef.current = saveCustomWorkout({
-        id: workout.id,
-        title: latest.current.title.trim() || "My workout",
-        day: latest.current.day,
-      }).then(
-        () => setSaveState("saved"),
-        () => setSaveState("dirty"),
+      // Keep the in-flight promise so "Do this workout" / delete can wait it
+      // out before navigating (an overlapping save swallows the redirect).
+      inflightRef.current = autosave().then(
+        () => undefined,
+        () => undefined,
       );
     }, 1200);
-  }, [workout.id]);
+  }, [autosave]);
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -98,6 +107,39 @@ export function WorkoutEditor({
     setTitle(next);
     schedule();
   }
+
+  // "Do this workout": flush any pending/in-flight save so the session runs the
+  // latest plan, then open the logger for the returned session id. Navigation
+  // happens after the awaited mutation (see `startWorkout`), not in onSuccess: a
+  // router.push queued in the same tick as the action's revalidation is
+  // swallowed in this Next fork.
+  const startMutation = useMutation({
+    mutationFn: async () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      await inflightRef.current;
+      await saveCustomWorkout({
+        id: workout.id,
+        title: latest.current.title.trim() || "My workout",
+        day: latest.current.day,
+      });
+      return startCustomWorkout(workout.id);
+    },
+  });
+  function startWorkout() {
+    startMutation
+      .mutateAsync()
+      .then((sessionId) => router.push(`/workout/${sessionId}`))
+      .catch(() => undefined);
+  }
+
+  // Delete: cancel the pending autosave first so it can't resurrect the workout.
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      await deleteCustomWorkout(workout.id);
+    },
+    onSuccess: () => router.push("/programs"),
+  });
 
   const editingExercise: WorkoutExercise | null =
     day.exercises.find((we) => we.id === editingId) ?? null;
@@ -134,23 +176,10 @@ export function WorkoutEditor({
       <Button
         className="w-full"
         size="lg"
-        disabled={starting || day.exercises.length === 0}
-        onClick={() =>
-          startTransition(async () => {
-            // Flush edits first so the session runs the latest plan, and so
-            // no autosave overlaps the redirecting action below.
-            if (timerRef.current) clearTimeout(timerRef.current);
-            await inflightRef.current;
-            await saveCustomWorkout({
-              id: workout.id,
-              title: latest.current.title.trim() || "My workout",
-              day: latest.current.day,
-            });
-            await startCustomWorkout(workout.id);
-          })
-        }
+        disabled={startMutation.isPending || day.exercises.length === 0}
+        onClick={startWorkout}
       >
-        {starting ? (
+        {startMutation.isPending ? (
           <Loader2 className="size-4 animate-spin" />
         ) : (
           <>
@@ -209,17 +238,10 @@ export function WorkoutEditor({
           <DialogFooter>
             <Button
               variant="destructive"
-              disabled={deleting}
-              onClick={() =>
-                startDeleting(async () => {
-                  // Stop the pending autosave from resurrecting the workout.
-                  if (timerRef.current) clearTimeout(timerRef.current);
-                  await deleteCustomWorkout(workout.id);
-                  router.push("/programs");
-                })
-              }
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
             >
-              {deleting ? (
+              {deleteMutation.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 "Delete"

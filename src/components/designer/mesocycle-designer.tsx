@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Check, CloudUpload, Copy, Loader2 } from "lucide-react";
 import {
@@ -48,7 +49,6 @@ export function MesocycleDesigner({
   const [meso, setMeso] = useState<Mesocycle>(program.mesocycle);
   const [weekIndex, setWeekIndex] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [finishing, setFinishing] = useState(false);
 
   // Editor / picker / copy-dialog targets
   const [editing, setEditing] = useState<{
@@ -80,24 +80,27 @@ export function MesocycleDesigner({
   const mesoRef = useRef(meso);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const apply = useCallback((next: Mesocycle) => {
-    mesoRef.current = next;
-    setMeso(next);
-    setSaveState("dirty");
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(async () => {
-      setSaveState("saving");
-      try {
-        await saveMesocycle({
-          programId: program.id,
-          mesocycle: mesoRef.current,
-        });
-        setSaveState("saved");
-      } catch {
-        setSaveState("dirty");
-      }
-    }, 1200);
-  }, [program.id]);
+  // Debounced draft autosave, routed through TanStack Query. Draft saves pass
+  // no `final` flag, so they persist without busting any cache.
+  const { mutateAsync: autosaveMeso } = useMutation({
+    mutationFn: () =>
+      saveMesocycle({ programId: program.id, mesocycle: mesoRef.current }),
+    onMutate: () => setSaveState("saving"),
+    onSuccess: () => setSaveState("saved"),
+    onError: () => setSaveState("dirty"),
+  });
+  const apply = useCallback(
+    (next: Mesocycle) => {
+      mesoRef.current = next;
+      setMeso(next);
+      setSaveState("dirty");
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        autosaveMeso().catch(() => undefined);
+      }, 1200);
+    },
+    [autosaveMeso],
+  );
 
   useEffect(() => {
     return () => {
@@ -105,11 +108,13 @@ export function MesocycleDesigner({
     };
   }, []);
 
-  async function finishDesign() {
-    setFinishing(true);
-    try {
+  // Finish: flush the debounce, do the final (cache-busting) save, activate the
+  // program if it's still a draft. Navigation happens after the awaited mutation
+  // (in the click handler, not onSuccess): a router.push queued in the same tick
+  // as the action's revalidation is swallowed in this Next fork.
+  const finishMutation = useMutation({
+    mutationFn: async () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      // Final save: this one busts the programs + dashboard caches.
       await saveMesocycle({
         programId: program.id,
         mesocycle: mesoRef.current,
@@ -117,13 +122,15 @@ export function MesocycleDesigner({
       });
       if (program.status === "draft") {
         await activateProgram(program.id);
-      } else {
-        router.push(`/programs/${program.id}`);
       }
-    } catch (e) {
-      if (e && typeof e === "object" && "digest" in e) throw e;
-      setFinishing(false);
-    }
+    },
+  });
+  const finishing = finishMutation.isPending;
+  function finish() {
+    finishMutation
+      .mutateAsync()
+      .then(() => router.push(`/programs/${program.id}`))
+      .catch(() => undefined);
   }
 
   const editingExercise: WorkoutExercise | null = editing
@@ -156,7 +163,7 @@ export function MesocycleDesigner({
             )}
           </p>
         </div>
-        <Button onClick={finishDesign} disabled={finishing}>
+        <Button onClick={finish} disabled={finishing}>
           {finishing ? (
             <Loader2 className="size-4 animate-spin" />
           ) : program.status === "draft" ? (

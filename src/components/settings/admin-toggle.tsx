@@ -1,12 +1,15 @@
 "use client";
 
-import { useTransition } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { setAdminMode } from "@/lib/actions/settings";
 
 export function AdminToggle({ isAdmin }: { isAdmin: boolean }) {
-  const [pending, startTransition] = useTransition();
+  const toggleMutation = useMutation({
+    mutationFn: (checked: boolean) => setAdminMode(checked),
+  });
+  const pending = toggleMutation.isPending;
   return (
     <div className="flex items-center justify-between">
       <div>
@@ -19,9 +22,7 @@ export function AdminToggle({ isAdmin }: { isAdmin: boolean }) {
         id="admin-mode"
         checked={isAdmin}
         disabled={pending}
-        onCheckedChange={(checked) =>
-          startTransition(() => setAdminMode(checked))
-        }
+        onCheckedChange={(checked) => toggleMutation.mutate(checked)}
       />
     </div>
   );

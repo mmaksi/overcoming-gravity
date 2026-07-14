@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
@@ -20,9 +19,14 @@ import { WizardPayload, wizardPayloadSchema } from "@/lib/domain/wizard";
 const asGoalItems = (texts: string[]): GoalItem[] =>
   texts.map((text) => ({ text, done: false }));
 
+/**
+ * Create a draft program from the wizard and return its id. The caller
+ * navigates to the designer — a server redirect() here would be swallowed by
+ * the TanStack Query mutation this runs in (outside a React transition).
+ */
 export async function createProgramFromWizard(
   payload: WizardPayload,
-): Promise<void> {
+): Promise<string> {
   const user = await requireUser();
   const parsed = wizardPayloadSchema.parse(payload);
   const store = await getStore();
@@ -65,7 +69,7 @@ export async function createProgramFromWizard(
   await store.createProgram(program);
   updateTag(userProgramsTag(user.id));
   revalidatePath("/programs");
-  redirect(`/programs/${program.id}/design`);
+  return program.id;
 }
 
 const saveMesocycleSchema = z.object({
@@ -119,7 +123,7 @@ export async function activateProgram(programId: string): Promise<void> {
   });
   updateTag(userProgramsTag(user.id));
   revalidatePath("/programs");
-  redirect(`/programs/${programId}`);
+  // The caller navigates to the program page (client-side — see the designer).
 }
 
 const editGoalAreaSchema = z.array(z.string().trim().min(1)).max(2).default([]);
@@ -228,5 +232,5 @@ export async function deleteProgram(programId: string): Promise<void> {
   updateTag(userHistoryTag(user.id));
   updateTag(userDashboardTag(user.id));
   revalidatePath("/programs");
-  redirect("/programs");
+  // The caller navigates back to /programs (client-side — see the button).
 }

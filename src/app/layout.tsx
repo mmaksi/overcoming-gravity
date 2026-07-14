@@ -4,6 +4,7 @@ import "./globals.css";
 import { InstallPromptScript } from "@/components/shell/install-prompt-script";
 import { ServiceWorkerRegister } from "@/components/shell/sw-register";
 import { ThemeScript } from "@/components/theme/theme-script";
+import { QueryProvider } from "@/lib/query/provider";
 
 const sans = Space_Grotesk({
   variable: "--font-sans",
@@ -54,7 +55,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-background">
         <ServiceWorkerRegister />
-        {children}
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

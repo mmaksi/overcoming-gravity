@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Camera, Check, Loader2, Trash2 } from "lucide-react";
 import { removeAvatar, uploadAvatar } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,23 @@ export function AvatarForm({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const uploadMutation = useMutation({
+    mutationFn: (formData: FormData) => uploadAvatar(formData),
+    onSuccess: () => setSaved(true),
+    onError: (e) => {
+      setPreview(null);
+      setError(e instanceof Error ? e.message : "Upload failed");
+    },
+  });
+  const removeMutation = useMutation({
+    mutationFn: () => removeAvatar(),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Couldn't remove"),
+  });
+  const pending = uploadMutation.isPending || removeMutation.isPending;
 
   function upload(file: File) {
     setSaved(false);
@@ -31,28 +46,14 @@ export function AvatarForm({
     setPreview(URL.createObjectURL(file));
     const formData = new FormData();
     formData.set("avatar", file);
-    startTransition(async () => {
-      try {
-        await uploadAvatar(formData);
-        setSaved(true);
-      } catch (e) {
-        setPreview(null);
-        setError(e instanceof Error ? e.message : "Upload failed");
-      }
-    });
+    uploadMutation.mutate(formData);
   }
 
   function remove() {
     setSaved(false);
     setError(null);
     setPreview(null);
-    startTransition(async () => {
-      try {
-        await removeAvatar();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't remove");
-      }
-    });
+    removeMutation.mutate();
   }
 
   const shownUrl = preview ?? initialAvatarUrl;

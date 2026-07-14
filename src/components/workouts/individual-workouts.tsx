@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
+import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -38,9 +39,6 @@ export function IndividualWorkouts({
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  // Plain state, not a transition: the updateTag refresh the action triggers
-  // would keep a wrapping transition pending and swallow the router.push.
-  const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CustomWorkout | null>(
     null,
   );
@@ -48,6 +46,25 @@ export function IndividualWorkouts({
     workouts,
     (state, deletedId: string) => state.filter((w) => w.id !== deletedId),
   );
+
+  // Create then navigate to the new editor. Navigation happens after the
+  // awaited mutation (see `createWorkout`), not in onSuccess: a router.push
+  // queued in the same tick as the action's revalidation is swallowed in this
+  // Next fork.
+  const createMutation = useMutation({
+    mutationFn: () => createCustomWorkout(),
+  });
+  function createWorkout() {
+    createMutation
+      .mutateAsync()
+      .then((id) => router.push(`/workouts/${id}`))
+      .catch(() => undefined);
+  }
+  // Delete's optimistic removal needs a transition (useOptimistic); only the
+  // server call goes through TanStack Query.
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCustomWorkout(id),
+  });
 
   return (
     <div className="space-y-5 border-t pt-6">
@@ -58,18 +75,10 @@ export function IndividualWorkouts({
         <Button
           variant="outline"
           size="sm"
-          disabled={creating}
-          onClick={async () => {
-            setCreating(true);
-            try {
-              const id = await createCustomWorkout();
-              router.push(`/workouts/${id}`);
-            } catch {
-              setCreating(false);
-            }
-          }}
+          disabled={createMutation.isPending}
+          onClick={createWorkout}
         >
-          {creating ? (
+          {createMutation.isPending ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <Plus className="size-4" />
@@ -137,7 +146,9 @@ export function IndividualWorkouts({
                 startTransition(async () => {
                   // The row disappears instantly; the server catches up.
                   removeOptimistic(workout.id);
-                  await deleteCustomWorkout(workout.id).catch(() => undefined);
+                  await deleteMutation
+                    .mutateAsync(workout.id)
+                    .catch(() => undefined);
                 });
               }}
             >

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Check, Loader2 } from "lucide-react";
 import { updateName } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
@@ -9,15 +10,16 @@ import { Label } from "@/components/ui/label";
 
 export function NameForm({ initialName }: { initialName: string }) {
   const [name, setName] = useState(initialName);
-  const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const saveMutation = useMutation({
+    mutationFn: () => updateName(name.trim()),
+    onSuccess: () => setSaved(true),
+  });
+  const pending = saveMutation.isPending;
 
   function save() {
     setSaved(false);
-    startTransition(async () => {
-      await updateName(name.trim());
-      setSaved(true);
-    });
+    saveMutation.mutate();
   }
 
   return (

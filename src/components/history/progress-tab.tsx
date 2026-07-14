@@ -1,33 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { loadProgressRows } from "@/lib/actions/history";
-import { ProgressList, ProgressRow } from "@/components/history/progress-list";
+import { queryKeys } from "@/lib/query/keys";
+import { ProgressList } from "@/components/history/progress-list";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
 /**
  * The Progress tab's content, fetched on first visit only: Radix mounts a
  * tab's content when it is first selected, so the heavy full-history read
- * never runs for users who stay on the Workouts tab.
+ * never runs for users who stay on the Workouts tab. TanStack Query then keeps
+ * the rows for a day (`staleTime`) and across navigations, refetching only when
+ * a completed/deleted workout invalidates the `progress` key.
  */
 export function ProgressTab() {
-  const [rows, setRows] = useState<ProgressRow[] | null>(null);
+  const { data: rows } = useQuery({
+    queryKey: queryKeys.progress(),
+    queryFn: () => loadProgressRows(),
+    staleTime: ONE_DAY_MS,
+    gcTime: ONE_DAY_MS,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    loadProgressRows()
-      .then((loaded) => {
-        if (!cancelled) setRows(loaded);
-      })
-      .catch(() => {
-        if (!cancelled) setRows([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (rows === null) {
+  if (rows === undefined) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 5 }, (_, i) => (

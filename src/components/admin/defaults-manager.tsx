@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Check, CloudUpload, Loader2 } from "lucide-react";
 import { Attribute } from "@/lib/domain/types";
 import {
@@ -44,21 +45,24 @@ export function DefaultsManager({
   // Debounced autosave, same rhythm as the mesocycle designer.
   const dayRef = useRef(day);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const apply = useCallback((next: WorkoutDay) => {
-    dayRef.current = next;
-    setDay(next);
-    setSaveState("dirty");
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(async () => {
-      setSaveState("saving");
-      try {
-        await saveTemplate({ id: "default", day: dayRef.current });
-        setSaveState("saved");
-      } catch {
-        setSaveState("dirty");
-      }
-    }, 1200);
-  }, []);
+  const { mutateAsync: autosaveTemplate } = useMutation({
+    mutationFn: () => saveTemplate({ id: "default", day: dayRef.current }),
+    onMutate: () => setSaveState("saving"),
+    onSuccess: () => setSaveState("saved"),
+    onError: () => setSaveState("dirty"),
+  });
+  const apply = useCallback(
+    (next: WorkoutDay) => {
+      dayRef.current = next;
+      setDay(next);
+      setSaveState("dirty");
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        autosaveTemplate().catch(() => undefined);
+      }, 1200);
+    },
+    [autosaveTemplate],
+  );
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);

@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
@@ -95,9 +94,11 @@ export async function deleteCustomWorkout(id: string): Promise<void> {
 
 /**
  * Do a custom workout now: reuse today's unfinished session for it if one
- * exists, otherwise create one, then open the logger.
+ * exists, otherwise create one. Returns the session id; the caller opens the
+ * logger (a server redirect() would be swallowed by the TanStack Query
+ * mutation this is invoked from — see the client editor).
  */
-export async function startCustomWorkout(id: string): Promise<void> {
+export async function startCustomWorkout(id: string): Promise<string> {
   const user = await requireUser();
   const store = await getStore();
   const workout = await store.getCustomWorkout(id);
@@ -108,7 +109,7 @@ export async function startCustomWorkout(id: string): Promise<void> {
   const existing = (
     await store.listSessionsByUser(user.id, today, today)
   ).find((s) => s.customWorkoutId === id && s.status === "planned");
-  if (existing) redirect(`/workout/${existing.id}`);
+  if (existing) return existing.id;
 
   const session: WorkoutSession = {
     id: crypto.randomUUID(),
@@ -123,5 +124,5 @@ export async function startCustomWorkout(id: string): Promise<void> {
   await store.createSession(session);
   // Custom-workout sessions never show on the home run cards, so no tags.
   revalidatePath("/calendar");
-  redirect(`/workout/${session.id}`);
+  return session.id;
 }

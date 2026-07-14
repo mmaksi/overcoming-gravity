@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Target } from "lucide-react";
 import { GOAL_AREA_LABELS, GOAL_AREAS, GoalArea } from "@/lib/domain/types";
 import { Goals } from "@/lib/domain/schemas";
@@ -20,7 +21,13 @@ type Patch = { programId: string; area: GoalArea; index: number; done: boolean }
  * tickable in place. Optimistic so ticks feel instant.
  */
 export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
+  // useOptimistic must run inside a transition, so the transition stays; the
+  // server write itself goes through TanStack Query. The tick reverts on its
+  // own when the revalidated dashboard props arrive.
   const [, startTransition] = useTransition();
+  const toggleMutation = useMutation({
+    mutationFn: (patch: Patch) => toggleProgramGoal(patch),
+  });
   const [optimistic, applyOptimistic] = useOptimistic(
     programs,
     (state, patch: Patch) =>
@@ -74,7 +81,12 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
                 const done = e.target.checked;
                 startTransition(async () => {
                   applyOptimistic({ programId, area, index, done });
-                  await toggleProgramGoal({ programId, area, index, done });
+                  await toggleMutation.mutateAsync({
+                    programId,
+                    area,
+                    index,
+                    done,
+                  });
                 });
               }}
             />

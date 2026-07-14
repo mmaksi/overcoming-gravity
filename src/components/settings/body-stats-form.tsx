@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Check, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { BodyweightEntry } from "@/lib/domain/schemas";
 import { deleteBodyweight, saveBodyweight } from "@/lib/actions/bodyweight";
@@ -31,43 +32,47 @@ export function BodyStatsForm({
   const [target, setTarget] = useState(
     initialTargetWeightKg != null ? String(initialTargetWeightKg) : "",
   );
-  const [statsPending, startStats] = useTransition();
   const [statsSaved, setStatsSaved] = useState(false);
 
   const [date, setDate] = useState(today);
   const [weight, setWeight] = useState("");
-  const [logPending, startLog] = useTransition();
 
   const [error, setError] = useState<string | null>(null);
+
+  // All three writes refresh the home Stats block server-side (userStatsTag);
+  // there is no client-cached read to invalidate here.
+  const statsMutation = useMutation({
+    mutationFn: () =>
+      saveBodyStats({
+        heightCm: height.trim() === "" ? null : Number(height),
+        targetWeightKg: target.trim() === "" ? null : Number(target),
+      }),
+    onSuccess: () => setStatsSaved(true),
+    onError: (e) => setError(e instanceof Error ? e.message : "Couldn't save"),
+  });
+  const statsPending = statsMutation.isPending;
+
+  const logMutation = useMutation({
+    mutationFn: (weightKg: number) => saveBodyweight({ date, weightKg }),
+    onSuccess: () => setWeight(""),
+    onError: (e) => setError(e instanceof Error ? e.message : "Couldn't save"),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteBodyweight(id),
+  });
+  const logPending = logMutation.isPending || deleteMutation.isPending;
 
   function saveStats() {
     setStatsSaved(false);
     setError(null);
-    startStats(async () => {
-      try {
-        await saveBodyStats({
-          heightCm: height.trim() === "" ? null : Number(height),
-          targetWeightKg: target.trim() === "" ? null : Number(target),
-        });
-        setStatsSaved(true);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't save");
-      }
-    });
+    statsMutation.mutate();
   }
 
   function logWeight() {
     const weightKg = Number(weight);
     if (!weightKg || weightKg <= 0 || !date) return;
     setError(null);
-    startLog(async () => {
-      try {
-        await saveBodyweight({ date, weightKg });
-        setWeight("");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't save");
-      }
-    });
+    logMutation.mutate(weightKg);
   }
 
   // Newest first; keep the list short — the chart on Home shows the trend.
@@ -196,11 +201,7 @@ export function BodyStatsForm({
                 size="icon"
                 aria-label={`Delete weigh-in from ${entry.date}`}
                 className="size-8 text-muted-foreground hover:text-destructive"
-                onClick={() =>
-                  startLog(() =>
-                    deleteBodyweight(entry.id).catch(() => undefined),
-                  )
-                }
+                onClick={() => deleteMutation.mutate(entry.id)}
               >
                 <Trash2 className="size-4" />
               </Button>

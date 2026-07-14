@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Loader2, Plus, X } from "lucide-react";
 import {
   GOAL_AREA_LABELS,
@@ -55,8 +57,18 @@ const PERIODIZATION_DESCRIPTIONS: Record<Periodization, string> = {
 
 export function ProgramWizard() {
   const [step, setStep] = useState(0);
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  // createProgramFromWizard returns the new draft's id. Navigate in the event
+  // handler right after awaiting the mutation (not in onSuccess): in this Next
+  // fork a router.push queued in the same tick as the action's revalidation is
+  // swallowed, so the await-then-push shape is the one that navigates.
+  const createMutation = useMutation({
+    mutationFn: (payload: WizardPayload) => createProgramFromWizard(payload),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Something went wrong"),
+  });
+  const pending = createMutation.isPending;
 
   const [name, setName] = useState("");
   const [type, setType] = useState<ProgramType | null>(null);
@@ -133,15 +145,10 @@ export function ProgramWizard() {
       weeks,
     };
     setError(null);
-    startTransition(async () => {
-      try {
-        await createProgramFromWizard(payload);
-      } catch (e) {
-        // Next.js redirect() throws — let it through.
-        if (e && typeof e === "object" && "digest" in e) throw e;
-        setError(e instanceof Error ? e.message : "Something went wrong");
-      }
-    });
+    createMutation
+      .mutateAsync(payload)
+      .then((programId) => router.push(`/programs/${programId}/design`))
+      .catch(() => undefined);
   }
 
   return (

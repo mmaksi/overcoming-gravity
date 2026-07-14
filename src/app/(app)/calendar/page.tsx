@@ -215,7 +215,6 @@ export default async function CalendarPage({
 
         <TabsContent value="workouts" className="pt-3">
           <HistoryFeed
-            key={`${historyItems[0]?.id ?? "empty"}-${historyItems.length}`}
             initialItems={historyItems}
             initialHasMore={firstPage.length === HISTORY_PAGE_SIZE}
           />

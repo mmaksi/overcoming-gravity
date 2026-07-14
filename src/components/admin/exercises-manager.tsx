@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronUp,
@@ -64,8 +65,23 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
   const [query, setQuery] = useState("");
   const [attribute, setAttribute] = useState<Attribute | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const saveMutation = useMutation({
+    mutationFn: (d: Draft) =>
+      saveExercise({
+        ...d,
+        progressions: d.progressions.map((p, i) => ({ ...p, order: i })),
+      }),
+    onSuccess: () => setDraft(null),
+    onError: (e) => setError(e instanceof Error ? e.message : "Failed to save"),
+  });
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => removeExercise(id),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Failed to delete"),
+  });
+  const pending = saveMutation.isPending || removeMutation.isPending;
 
   const filtered = useMemo(
     () =>
@@ -120,17 +136,7 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
   function submit() {
     if (!draft) return;
     setError(null);
-    startTransition(async () => {
-      try {
-        await saveExercise({
-          ...draft,
-          progressions: draft.progressions.map((p, i) => ({ ...p, order: i })),
-        });
-        setDraft(null);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to save");
-      }
-    });
+    saveMutation.mutate(draft);
   }
 
   return (
@@ -232,18 +238,10 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                 size="icon"
                 className="text-destructive"
                 disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    setError(null);
-                    try {
-                      await removeExercise(e.id);
-                    } catch (err) {
-                      setError(
-                        err instanceof Error ? err.message : "Failed to delete",
-                      );
-                    }
-                  })
-                }
+                onClick={() => {
+                  setError(null);
+                  removeMutation.mutate(e.id);
+                }}
               >
                 <Trash2 className="size-4" />
               </Button>

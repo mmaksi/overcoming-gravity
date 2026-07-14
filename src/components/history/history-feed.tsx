@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowDownUp, Clock, Loader2, Trash2 } from "lucide-react";
 import { HistoryItem } from "@/lib/domain/history";
 import { loadHistoryPage } from "@/lib/actions/history";
 import { deleteWorkoutSession } from "@/lib/actions/runs";
+import { queryKeys } from "@/lib/query/keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,10 +113,19 @@ function HistoryCard({
   );
 }
 
+type HistoryPage = { items: HistoryItem[]; hasMore: boolean };
+
 /**
- * Completed-workout history with infinite scroll: the server renders the
- * newest page, older pages stream in as the sentinel at the bottom comes
- * into view. Deletes are optimistic (row disappears immediately).
+ * Completed-workout history with infinite scroll, backed by TanStack Query.
+ * The server renders the newest page (seeded here as `initialData`), older
+ * pages stream in as the sentinel comes into view. The cache never goes stale
+ * on its own (`staleTime: Infinity`) — only completing a workout (see the
+ * workout logger) or deleting one here refreshes it. Deletes are optimistic:
+ * the row disappears immediately and rolls back if the server rejects it.
+ *
+ * The next page's offset is the running total of items currently cached, so an
+ * optimistic delete (which shrinks both the cache and the server's list by one)
+ * keeps pagination aligned without a separate offset counter.
  */
 export function HistoryFeed({
   initialItems,
@@ -118,38 +134,71 @@ export function HistoryFeed({
   initialItems: HistoryItem[];
   initialHasMore: boolean;
 }) {
-  const [items, setItems] = useState(initialItems);
-  const [hasMore, setHasMore] = useState(initialHasMore);
-  const [, startTransition] = useTransition();
+  const queryClient = useQueryClient();
   const [confirm, setConfirm] = useState<HistoryItem | null>(null);
-  // The next page's offset in the server's list. Kept separately from
-  // items.length because deletions shift the list under the pagination.
-  const offsetRef = useRef(initialItems.length);
-  const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: queryKeys.history(),
+      queryFn: ({ pageParam }) => loadHistoryPage(pageParam),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.hasMore
+          ? allPages.reduce((n, p) => n + p.items.length, 0)
+          : undefined,
+      initialData: {
+        pages: [{ items: initialItems, hasMore: initialHasMore }],
+        pageParams: [0],
+      },
+      staleTime: Infinity,
+      gcTime: Infinity,
+    });
+
+  const items = data.pages.flatMap((p) => p.items);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteWorkoutSession(id),
+    // Optimistically drop the row; the running-total offset above stays correct
+    // because the server's list shrinks by the same one on the next fetch.
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.history() });
+      const previous = queryClient.getQueryData<InfiniteData<HistoryPage>>(
+        queryKeys.history(),
+      );
+      queryClient.setQueryData<InfiniteData<HistoryPage>>(
+        queryKeys.history(),
+        (old) =>
+          old && {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.filter((i) => i.id !== id),
+            })),
+          },
+      );
+      return { previous };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.history(), context.previous);
+      }
+    },
+    // Progress rows aggregate this workout's volume, so they must recompute.
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.progress() });
+    },
+  });
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    if (!sentinel || !hasMore) return;
-    const observer = new IntersectionObserver(async ([entry]) => {
-      if (!entry.isIntersecting || loadingRef.current) return;
-      loadingRef.current = true;
-      try {
-        const page = await loadHistoryPage(offsetRef.current);
-        offsetRef.current += page.items.length;
-        setItems((current) => {
-          // Guard against overlap after deletions shifted the offset.
-          const known = new Set(current.map((i) => i.id));
-          return [...current, ...page.items.filter((i) => !known.has(i.id))];
-        });
-        setHasMore(page.hasMore);
-      } finally {
-        loadingRef.current = false;
-      }
+    if (!sentinel || !hasNextPage) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !isFetchingNextPage) fetchNextPage();
     });
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   if (items.length === 0) {
     return (
@@ -174,7 +223,7 @@ export function HistoryFeed({
         ))}
       </div>
 
-      {hasMore && (
+      {hasNextPage && (
         <div ref={sentinelRef} className="flex justify-center py-4">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
@@ -198,15 +247,7 @@ export function HistoryFeed({
               onClick={() => {
                 const session = confirm;
                 setConfirm(null);
-                if (!session) return;
-                // The card disappears instantly; the server catches up.
-                setItems((current) =>
-                  current.filter((i) => i.id !== session.id),
-                );
-                offsetRef.current = Math.max(0, offsetRef.current - 1);
-                startTransition(async () => {
-                  await deleteWorkoutSession(session.id).catch(() => undefined);
-                });
+                if (session) deleteMutation.mutate(session.id);
               }}
             >
               Delete

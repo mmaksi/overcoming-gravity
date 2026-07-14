@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 import { CalendarCheck, Loader2, Play } from "lucide-react";
 import { Weekday, WEEKDAY_LABELS, WEEKDAYS } from "@/lib/domain/types";
 import {
@@ -65,7 +67,13 @@ export function StartRunButton({
     [firstTrainingDay],
   );
   const [startDate, setStartDate] = useState(todayISO);
-  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  // Navigate after awaiting the mutation (not in onSuccess): a router.push
+  // queued in the same tick as the action's revalidation is swallowed in this
+  // Next fork.
+  const startMutation = useMutation({
+    mutationFn: () => startRun({ programId, startDate }),
+  });
 
   const firstWorkout = firstWorkoutDate(startDate, trainingDays);
 
@@ -129,12 +137,19 @@ export function StartRunButton({
         </div>
         <DialogFooter>
           <Button
-            disabled={pending || !startDate}
+            disabled={startMutation.isPending || !startDate}
             onClick={() =>
-              startTransition(() => startRun({ programId, startDate }))
+              startMutation
+                .mutateAsync()
+                .then(() => router.push("/"))
+                .catch(() => undefined)
             }
           >
-            {pending ? <Loader2 className="size-4 animate-spin" /> : "Start"}
+            {startMutation.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              "Start"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

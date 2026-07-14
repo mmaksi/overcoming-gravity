@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
@@ -57,7 +56,9 @@ export async function startRun(input: {
   updateTag(userProgramsTag(user.id));
   updateTag(userDashboardTag(user.id));
   revalidatePath("/");
-  redirect("/");
+  // The caller navigates home. A server redirect() thrown here would be
+  // swallowed when this action is invoked from a TanStack Query mutation
+  // (outside a React transition), so navigation stays on the client.
 }
 
 /**

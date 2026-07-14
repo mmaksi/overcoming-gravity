@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Loader2, RotateCcw } from "lucide-react";
 import { resetRun } from "@/lib/actions/runs";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,12 @@ import {
 /** Restart the active run from scratch; exercise history stays intact. */
 export function ResetRunButton({ runId }: { runId: string }) {
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  // resetRun revalidates the page in place (no redirect), so just close the
+  // dialog once it resolves.
+  const resetMutation = useMutation({
+    mutationFn: () => resetRun(runId),
+    onSuccess: () => setOpen(false),
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -38,15 +44,14 @@ export function ResetRunButton({ runId }: { runId: string }) {
         <DialogFooter>
           <Button
             variant="destructive"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                await resetRun(runId);
-                setOpen(false);
-              })
-            }
+            disabled={resetMutation.isPending}
+            onClick={() => resetMutation.mutate()}
           >
-            {pending ? <Loader2 className="size-4 animate-spin" /> : "Reset"}
+            {resetMutation.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              "Reset"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Loader2, Pencil, Plus, X } from "lucide-react";
 import { GOAL_AREA_LABELS, GOAL_AREAS, GoalArea } from "@/lib/domain/types";
 import { Goals } from "@/lib/domain/schemas";
@@ -25,7 +26,6 @@ export function GoalsEditor({
   goals: Goals | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<GoalArea, string[]>>(
     () =>
@@ -39,21 +39,25 @@ export function GoalsEditor({
     draft[area].map((g) => g.trim()).filter(Boolean).slice(0, 2);
   const valid = GOAL_AREAS.some((area) => clean(area).length > 0);
 
+  // updateProgramGoals revalidates the page in place (no redirect); close the
+  // sheet on success and surface the validation error on failure.
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      updateProgramGoals({
+        programId,
+        goals: Object.fromEntries(
+          GOAL_AREAS.map((area) => [area, clean(area)]),
+        ) as Record<GoalArea, string[]>,
+      }),
+    onSuccess: () => setOpen(false),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Failed to save goals"),
+  });
+  const pending = saveMutation.isPending;
+
   function save() {
     setError(null);
-    startTransition(async () => {
-      try {
-        await updateProgramGoals({
-          programId,
-          goals: Object.fromEntries(
-            GOAL_AREAS.map((area) => [area, clean(area)]),
-          ) as Record<GoalArea, string[]>,
-        });
-        setOpen(false);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to save goals");
-      }
-    });
+    saveMutation.mutate();
   }
 
   return (

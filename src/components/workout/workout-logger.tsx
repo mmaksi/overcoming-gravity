@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/domain/schemas";
 import { statsKey } from "@/lib/domain/volume";
 import { saveWorkoutSession } from "@/lib/actions/runs";
+import { queryKeys } from "@/lib/query/keys";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -434,26 +436,67 @@ export function WorkoutLogger({
     });
   }
 
-  async function submit(action: "save" | "complete" | "skip") {
-    setPendingAction(action);
-    setTimer(null);
-    clearRest(session.id);
-    postToServiceWorker({ type: "rest-timer-cancel" });
-    // No wrapping transition, and no autosave overlap: a draft action still
-    // in flight when this one navigates would swallow the navigation.
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    await autosaveInflight.current;
-    try {
-      const result = await saveWorkoutSession({
+  const queryClient = useQueryClient();
+
+  // Every server write goes through TanStack Query. The explicit submit
+  // invalidates the client-cached history + progress reads on complete/skip
+  // (a "save" leaves the session planned, so it changes neither); the draft
+  // autosave writes silently and invalidates nothing.
+  const submitMutation = useMutation({
+    mutationFn: (action: "save" | "complete" | "skip") =>
+      saveWorkoutSession({
         sessionId: session.id,
         entries: action === "skip" ? [] : resolveEntries(action),
         action,
         durationSeconds: elapsedSeconds,
-      });
+      }),
+    // Completing/skipping changes the cached history + progress reads. (A save
+    // leaves the session planned, so it changes neither.) Navigation is done by
+    // the caller after awaiting, not here: a router.push queued in the same tick
+    // as the action's revalidation is swallowed in this Next fork.
+    onSuccess: (_result, action) => {
+      if (action === "save") return;
+      queryClient.invalidateQueries({ queryKey: queryKeys.history() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.progress() });
+    },
+  });
+
+  const autosaveMutation = useMutation({
+    mutationFn: () =>
+      saveWorkoutSession({
+        sessionId: session.id,
+        entries: resolveEntries("save"),
+        action: "save",
+        durationSeconds: elapsedSeconds,
+        // Background draft: persists data without invalidating any caches.
+        draft: true,
+      }),
+    onMutate: () => setSaveStatus("saving"),
+    onSuccess: () => setSaveStatus("saved"),
+    onError: () => setSaveStatus("idle"),
+  });
+
+  async function submit(action: "save" | "complete" | "skip") {
+    // Synchronous guard so a double-tap during the autosave await below can't
+    // fire two submits (the derived `pending` only flips once the mutation
+    // starts, which is after the await).
+    if (pending) return;
+    setPendingAction(action);
+    setTimer(null);
+    clearRest(session.id);
+    postToServiceWorker({ type: "rest-timer-cancel" });
+    // No autosave overlap: a draft write still in flight when this one
+    // navigates would swallow the navigation, so cancel and await it first.
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    await autosaveInflight.current;
+    try {
+      const result = await submitMutation.mutateAsync(action);
       if (action === "save") {
         setPendingAction(null);
         return;
       }
+      // Navigate here, after the await, so the push isn't swallowed by the
+      // action's revalidation; this component then unmounts.
       if (result.runCompleted && result.programId) {
         router.push(`/programs/${result.programId}`);
       } else {
@@ -470,17 +513,13 @@ export function WorkoutLogger({
   useEffect(() => {
     autosaveRef.current = () => {
       if (readOnly || pending) return;
-      setSaveStatus("saving");
-      autosaveInflight.current = saveWorkoutSession({
-        sessionId: session.id,
-        entries: resolveEntries("save"),
-        action: "save",
-        durationSeconds: elapsedSeconds,
-        // Background draft: persists data without invalidating any caches.
-        draft: true,
-      }).then(
-        () => setSaveStatus("saved"),
-        () => setSaveStatus("idle"),
+      // Keep the in-flight promise so an explicit submit can await it before
+      // navigating (see submit()). mutateAsync rejects on error; both outcomes
+      // settle to void here so that await never throws. Status is driven by the
+      // mutation's onMutate/onSuccess/onError callbacks.
+      autosaveInflight.current = autosaveMutation.mutateAsync().then(
+        () => undefined,
+        () => undefined,
       );
     };
   });
