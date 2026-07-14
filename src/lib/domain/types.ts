@@ -144,7 +144,8 @@ export const INTER_TECHNIQUES: InterTechniqueDef[] = [
     kind: "notes",
     description:
       "Use a measurable assistance tool and reduce it over time (band strength, counterweight, foot support).",
-    prompt: "Which assistance did you use? e.g. green band, 10kg counterweight…",
+    prompt:
+      "Which assistance did you use? e.g. green band, 10kg counterweight…",
   },
   {
     id: "eccentric",
@@ -186,9 +187,7 @@ export const INTER_TECHNIQUES: InterTechniqueDef[] = [
   },
 ];
 
-export const TECHNIQUES_BY_ID = new Map(
-  INTER_TECHNIQUES.map((t) => [t.id, t]),
-);
+export const TECHNIQUES_BY_ID = new Map(INTER_TECHNIQUES.map((t) => [t.id, t]));
 
 export const MIN_WEEKS = 6;
 export const MAX_WEEKS = 8;
@@ -246,7 +245,7 @@ export const SPLIT_TYPE_LABELS: Record<SplitType, string> = {
 };
 
 export const PERIODIZATION_LABELS: Record<Periodization, string> = {
-  none: "No periodization",
+  none: "Simple",
   daily_undulating: "Accumulation & Intensification",
   high_low: "Light / Heavy",
 };

@@ -9,12 +9,15 @@ export function ChoiceCard({
   selected,
   onSelect,
   disabled,
+  recommended,
 }: {
   title: string;
   description?: string;
   selected: boolean;
   onSelect: () => void;
   disabled?: boolean;
+  /** Shows a "Recommended" pill next to the title. */
+  recommended?: boolean;
 }) {
   return (
     <button
@@ -32,7 +35,14 @@ export function ChoiceCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="font-semibold">{title}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">{title}</span>
+            {recommended && (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                Recommended
+              </span>
+            )}
+          </div>
           {description && (
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}

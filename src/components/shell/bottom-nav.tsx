@@ -29,8 +29,8 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
         {navItems.map(({ href, label, icon: Icon }) => {
           const active =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
-          // Icon-forward: the active tab also shows its label, inactive tabs
-          // are icon-only. The bar is taller with larger touch targets.
+          // Every tab shows its label; the active one is highlighted and its
+          // icon drawn heavier. The bar is taller with larger touch targets.
           return (
             <Link
               key={href}
@@ -45,11 +45,14 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
               )}
             >
               <Icon className="size-7" strokeWidth={active ? 2.4 : 1.8} />
-              {active && (
-                <span className="text-[13px] font-semibold leading-none">
-                  {label}
-                </span>
-              )}
+              <span
+                className={cn(
+                  "text-[13px] leading-none",
+                  active ? "font-semibold" : "font-medium",
+                )}
+              >
+                {label}
+              </span>
             </Link>
           );
         })}

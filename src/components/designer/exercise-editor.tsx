@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { ChevronDown, Minus, Plus } from "lucide-react";
 import { INTER_TECHNIQUES, TECHNIQUES_BY_ID } from "@/lib/domain/types";
-import { Exercise, WorkoutExercise } from "@/lib/domain/schemas";
+import {
+  Exercise,
+  measurementOf,
+  WorkoutExercise,
+} from "@/lib/domain/schemas";
 import { ExpandableText } from "@/components/ui/expandable-text";
 
 /** Quick rest picks, shown as tappable chips (values in seconds). */
@@ -57,9 +61,13 @@ export function ExerciseEditor({
   const selectedProgression = exercise.progressions.find(
     (p) => p.id === value.progressionId,
   );
-  const isTime = exercise.measurement === "time";
+  const isTime =
+    measurementOf(exercise, value.progressionId, value.measurement) === "time";
   const isCluster = exercise.repStyle === "cluster";
   const unitLabel = isTime ? "sec" : isCluster ? "cluster reps" : "reps";
+  // Tapping the unit flips this exercise between reps and hold-time for this
+  // program, overriding the progression's default measurement.
+  const toggleUnit = () => set({ measurement: isTime ? "reps" : "time" });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -104,6 +112,13 @@ export function ExerciseEditor({
                   ? "Sets — cluster reps and optional added weight per set"
                   : "Sets — reps and optional added weight per set"}
             </Label>
+            <p className="text-xs text-muted-foreground">
+              Tap the unit (
+              <span className="underline decoration-dotted underline-offset-2">
+                {isTime ? "sec" : "reps"}
+              </span>
+              ) next to a set to switch how this exercise is measured.
+            </p>
             <div className="space-y-2">
               {value.sets.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -120,9 +135,15 @@ export function ExerciseEditor({
                       })
                     }
                   />
-                  <span className="text-xs text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={toggleUnit}
+                    title="Tap to switch between reps and hold time"
+                    className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                  >
                     {unitLabel}
-                  </span>
+                    <ChevronDown className="size-3" />
+                  </button>
                   <Input
                     type="number"
                     min={0}

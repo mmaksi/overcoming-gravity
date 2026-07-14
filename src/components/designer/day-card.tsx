@@ -40,6 +40,7 @@ import {
 } from "@/lib/domain/types";
 import {
   Exercise,
+  measurementOf,
   sectionOf,
   WorkoutDay,
   WorkoutExercise,
@@ -48,7 +49,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 function setsSummary(we: WorkoutExercise, exercise: Exercise): string {
-  const unit = exercise.measurement === "time" ? "s hold" : " reps";
+  const unit =
+    measurementOf(exercise, we.progressionId, we.measurement) === "time"
+      ? "s hold"
+      : " reps";
   const values = we.sets.map((s) => s.reps).join("/");
   const weights = we.sets.filter((s) => s.weight !== undefined);
   const weight =

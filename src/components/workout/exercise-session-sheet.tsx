@@ -6,7 +6,12 @@ import {
   MEASUREMENT_LABELS,
   TECHNIQUES_BY_ID,
 } from "@/lib/domain/types";
-import { Exercise, VolumeStats, WorkoutExercise } from "@/lib/domain/schemas";
+import {
+  Exercise,
+  measurementOf,
+  VolumeStats,
+  WorkoutExercise,
+} from "@/lib/domain/schemas";
 import { statsKey } from "@/lib/domain/volume";
 import {
   Sheet,
@@ -72,7 +77,11 @@ export function ExerciseSessionSheet({
         <SheetHeader>
           <SheetTitle>{exercise.title}</SheetTitle>
           <SheetDescription>
-            {MEASUREMENT_LABELS[exercise.measurement]}
+            {
+              MEASUREMENT_LABELS[
+                measurementOf(exercise, progressionId, planned.measurement)
+              ]
+            }
             {exercise.repStyle === "cluster" && " · cluster reps (eccentric)"}
           </SheetDescription>
         </SheetHeader>
@@ -125,7 +134,9 @@ export function ExerciseSessionSheet({
                     {s?.maxReps != null && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <Trophy className="size-3" /> best: {s.maxReps}
-                        {exercise.measurement === "time" ? "s" : " reps"}
+                        {measurementOf(exercise, p.id) === "time"
+                          ? "s"
+                          : " reps"}
                       </p>
                     )}
                   </button>

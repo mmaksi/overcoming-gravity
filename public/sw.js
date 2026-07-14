@@ -2,7 +2,7 @@
  * - navigations: network-first, falling back to the cached shell
  * - static assets (/_next/static, icons, fonts): cache-first
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `shell-${VERSION}`;
 const ASSET_CACHE = `assets-${VERSION}`;
 const SHELL_URLS = ["/", "/programs", "/calendar", "/settings"];

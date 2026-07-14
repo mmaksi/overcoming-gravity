@@ -9,17 +9,20 @@ import { cn } from "@/lib/utils";
 export function Logo({ className }: { className?: string }) {
   return (
     <>
+      {/* `shrink-0` guards against Tailwind's base `max-width:100%` collapsing
+          the mark to zero width inside a flex/grid parent with indefinite
+          width. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logos/logo-light.png"
         alt="Strong Journal"
-        className={cn("object-contain dark:hidden", className)}
+        className={cn("shrink-0 object-contain dark:hidden", className)}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logos/logo-dark.png"
         alt="Strong Journal"
-        className={cn("hidden object-contain dark:block", className)}
+        className={cn("hidden shrink-0 object-contain dark:block", className)}
       />
     </>
   );

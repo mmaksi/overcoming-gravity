@@ -46,6 +46,9 @@ function ex(
       name,
       order,
       description,
+      // Each progression carries its own unit; seed them from the exercise
+      // default (admins can then vary individual progressions).
+      measurement: opts.measurement ?? "reps",
     })),
   };
 }

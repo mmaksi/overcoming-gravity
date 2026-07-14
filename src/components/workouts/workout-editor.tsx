@@ -8,6 +8,7 @@ import { Attribute } from "@/lib/domain/types";
 import {
   CustomWorkout,
   Exercise,
+  measurementOf,
   sectionOf,
   WorkoutDay,
   WorkoutExercise,
@@ -258,7 +259,10 @@ export function WorkoutEditor({
         exercises={exercises}
         section={pickingFor}
         onPick={(exercise) => {
-          const defaultValue = exercise.measurement === "time" ? 10 : 8;
+          const defaultValue =
+            measurementOf(exercise, exercise.progressions[0].id) === "time"
+              ? 10
+              : 8;
           const we: WorkoutExercise = {
             id: crypto.randomUUID(),
             exerciseId: exercise.id,

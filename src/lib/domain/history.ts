@@ -1,6 +1,7 @@
 import {
   CustomWorkout,
   Exercise,
+  measurementOf,
   Program,
   ProgramRun,
   VolumeStats,
@@ -88,7 +89,8 @@ export function buildHistoryItems(
     for (const entry of session.entries) {
       if (entry.performedSets.length === 0) continue;
       const ex = exercisesById.get(entry.exerciseId);
-      const unit = ex?.measurement === "time" ? "s" : "";
+      const unit =
+        measurementOf(ex, entry.progressionId) === "time" ? "s" : "";
       const progressionName = (id: string) =>
         ex?.progressions.find((p) => p.id === id)?.name ?? "?";
       const progression = ex?.progressions.find(
@@ -189,7 +191,7 @@ export function buildProgressRows(
         title: ex.title,
         attribute: ex.attribute as "skill" | "strength",
         detail: progression
-          ? `${progression.name} · best ${best ?? "—"}${ex.measurement === "time" ? "s" : " reps"} · ${methodLabel(currentMethod.get(ex.id))}`
+          ? `${progression.name} · best ${best ?? "—"}${measurementOf(ex, progression.id) === "time" ? "s" : " reps"} · ${methodLabel(currentMethod.get(ex.id))}`
           : "Not trained yet",
         step,
         totalSteps: ex.progressions.length,

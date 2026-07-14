@@ -154,7 +154,7 @@ export default async function ProgramPage({
             )}
             <Button asChild variant="outline" className="w-full">
               <Link href={`/programs/${program.id}/design`}>
-                <Pencil className="size-4" /> Edit workouts
+                <Pencil className="size-4" /> Edit program
               </Link>
             </Button>
           </>

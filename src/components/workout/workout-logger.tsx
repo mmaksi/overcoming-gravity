@@ -22,6 +22,7 @@ import {
   GROUP_TYPE_COLORS,
   GROUP_TYPE_LABELS,
   INTENSITY_LABELS,
+  Measurement,
   TECHNIQUES_BY_ID,
   WEEK_FOCUS_LABELS,
   WeekFocus,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/domain/types";
 import {
   Exercise,
+  measurementOf,
   sectionOf,
   SessionEntry,
   VolumeStats,
@@ -63,18 +65,18 @@ import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
 import { cn } from "@/lib/utils";
 
-function unitOf(exercise: Exercise): string {
-  if (exercise.measurement === "time") return "sec";
+function unitOf(exercise: Exercise, measurement: Measurement): string {
+  if (measurement === "time") return "sec";
   if (exercise.repStyle === "cluster") return "cluster reps";
   return "reps";
 }
 
 function volumeLabel(
   sets: { reps: number | null; weight?: number }[],
-  exercise: Exercise,
+  measurement: Measurement,
 ): string {
   const values = sets.map((s) => s.reps ?? "—").join("/");
-  const unit = exercise.measurement === "time" ? "s" : " reps";
+  const unit = measurement === "time" ? "s" : " reps";
   const weighted = sets.filter((s) => s.weight !== undefined);
   const weight =
     weighted.length > 0
@@ -703,7 +705,12 @@ export function WorkoutLogger({
               : undefined;
             const isGroupStart =
               group && (!prev || prev.groupId !== we.groupId);
-            const unit = unitOf(ex);
+            const measurement = measurementOf(
+              ex,
+              entry.progressionId,
+              we.measurement,
+            );
+            const unit = unitOf(ex, measurement);
             const allDone =
               entry.sets.length > 0 && entry.sets.every((s) => s.done);
 
@@ -770,14 +777,14 @@ export function WorkoutLogger({
                         <p className="flex items-center gap-1 text-xs text-primary">
                           <History className="size-3" />
                           Last time ({last.date}):{" "}
-                          {volumeLabel(last.performedSets, ex)}
+                          {volumeLabel(last.performedSets, measurement)}
                         </p>
                       )}
                       {max != null && (
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Trophy className="size-3" />
                           Best single set: {max}
-                          {ex.measurement === "time" ? "s" : " reps"}
+                          {measurement === "time" ? "s" : " reps"}
                         </p>
                       )}
                     </div>

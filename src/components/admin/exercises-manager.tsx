@@ -45,6 +45,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type DraftProgression = {
+  id: string;
+  name: string;
+  order: number;
+  description: string;
+  measurement: Measurement;
+};
+
 type Draft = {
   id: string;
   title: string;
@@ -53,7 +61,7 @@ type Draft = {
   measurement: Measurement;
   repStyle: RepStyle;
   imageUrl: string;
-  progressions: { id: string; name: string; order: number; description: string }[];
+  progressions: DraftProgression[];
 };
 
 /** Capitalize the first letter of every word as the admin types. */
@@ -71,6 +79,9 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
     mutationFn: (d: Draft) =>
       saveExercise({
         ...d,
+        // Keep the exercise-level default aligned with the first progression,
+        // so any legacy reader without a progression still gets a sane unit.
+        measurement: d.progressions[0]?.measurement ?? d.measurement,
         progressions: d.progressions.map((p, i) => ({ ...p, order: i })),
       }),
     onSuccess: () => setDraft(null),
@@ -160,7 +171,13 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
               repStyle: "standard",
               imageUrl: "",
               progressions: [
-                { id: crypto.randomUUID(), name: "", order: 0, description: "" },
+                {
+                  id: crypto.randomUUID(),
+                  name: "",
+                  order: 0,
+                  description: "",
+                  measurement: "reps",
+                },
               ],
             })
           }
@@ -227,6 +244,9 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                     progressions: e.progressions.map((p) => ({
                       ...p,
                       description: p.description ?? "",
+                      // Fall back to the exercise-level default for
+                      // progressions saved before per-progression units.
+                      measurement: p.measurement ?? e.measurement ?? "reps",
                     })),
                   })
                 }
@@ -352,28 +372,11 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
               </div>
 
               <div className="space-y-2">
-                <Label>Measured by</Label>
-                <Select
-                  value={draft.measurement}
-                  onValueChange={(v) =>
-                    setDraft({ ...draft, measurement: v as Measurement })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MEASUREMENTS.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {MEASUREMENT_LABELS[m]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Progressions (easiest → hardest)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Each progression sets its own &ldquo;measured by&rdquo; unit —
+                  some are reps, some are seconds of hold.
+                </p>
                 {draft.progressions.map((p, i) => (
                   <div key={p.id} className="space-y-2 rounded-lg border p-3">
                     <div className="flex items-center gap-2">
@@ -445,6 +448,35 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                         })
                       }
                     />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Measured by
+                      </span>
+                      <div className="flex gap-1">
+                        {MEASUREMENTS.map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            aria-pressed={p.measurement === m}
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                progressions: draft.progressions.map((x, j) =>
+                                  j === i ? { ...x, measurement: m } : x,
+                                ),
+                              })
+                            }
+                            className={
+                              p.measurement === m
+                                ? "rounded-md border border-primary bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground"
+                                : "rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30"
+                            }
+                          >
+                            {MEASUREMENT_LABELS[m]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 ))}
                 <Button
@@ -462,6 +494,10 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                           name: "",
                           order: draft.progressions.length,
                           description: "",
+                          // Inherit the previous progression's unit as a sane
+                          // default; the admin can flip it per progression.
+                          measurement:
+                            draft.progressions.at(-1)?.measurement ?? "reps",
                         },
                       ],
                     });

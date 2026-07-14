@@ -71,12 +71,14 @@ export function ProgramWizard() {
   const pending = createMutation.isPending;
 
   const [name, setName] = useState("");
-  const [type, setType] = useState<ProgramType | null>(null);
+  // Full Body is the recommended default — most people should start here.
+  const [type, setType] = useState<ProgramType | null>("full_body");
   const [splitType, setSplitType] = useState<SplitType | null>(null);
   const [sportName, setSportName] = useState("");
   const [sportDays, setSportDays] = useState<Weekday[]>([]);
+  // "Simple" (no periodization) is the recommended default.
   const [periodization, setPeriodization] = useState<Periodization | null>(
-    null,
+    "none",
   );
   const [trainingDays, setTrainingDays] = useState<Weekday[]>([]);
   const [weeks, setWeeks] = useState(6);
@@ -98,7 +100,10 @@ export function ProgramWizard() {
       case 0:
         if (!name.trim() || !type) return false;
         if (type === "split" && !splitType) return false;
-        if (type === "sport_mix" && (!sportName.trim() || sportDays.length === 0))
+        if (
+          type === "sport_mix" &&
+          (!sportName.trim() || sportDays.length === 0)
+        )
           return false;
         return true;
       case 1:
@@ -110,7 +115,17 @@ export function ProgramWizard() {
       default:
         return false;
     }
-  }, [step, name, type, splitType, sportName, sportDays, goalsValid, periodization, trainingDays]);
+  }, [
+    step,
+    name,
+    type,
+    splitType,
+    sportName,
+    sportDays,
+    goalsValid,
+    periodization,
+    trainingDays,
+  ]);
 
   function setGoal(area: GoalArea, index: number, value: string) {
     setGoals((g) => ({
@@ -120,7 +135,10 @@ export function ProgramWizard() {
   }
 
   function cleanGoals(area: GoalArea): string[] {
-    return goals[area].map((g) => g.trim()).filter(Boolean).slice(0, 2);
+    return goals[area]
+      .map((g) => g.trim())
+      .filter(Boolean)
+      .slice(0, 2);
   }
 
   function finish() {
@@ -197,6 +215,7 @@ export function ProgramWizard() {
                 title={PROGRAM_TYPE_LABELS[t]}
                 description={TYPE_DESCRIPTIONS[t]}
                 selected={type === t}
+                recommended={t === "full_body"}
                 onSelect={() => setType(t)}
               />
             ))}
@@ -304,6 +323,7 @@ export function ProgramWizard() {
               title={PERIODIZATION_LABELS[p]}
               description={PERIODIZATION_DESCRIPTIONS[p]}
               selected={periodization === p}
+              recommended={p === "none"}
               onSelect={() => setPeriodization(p)}
             />
           ))}
@@ -355,7 +375,8 @@ export function ProgramWizard() {
             <AlertTitle>Deload week</AlertTitle>
             <AlertDescription>
               Week {weeks} is your deload: same movements, roughly half the
-              volume, so you recover and come back stronger. Don&apos;t skip it.
+              volume, so you recover and come back stronger. Don&apos;t skip
+              this.
             </AlertDescription>
           </Alert>
         </div>
@@ -387,7 +408,11 @@ export function ProgramWizard() {
             Next <ArrowRight className="size-4" />
           </Button>
         ) : (
-          <Button className="flex-1" disabled={!stepValid || pending} onClick={finish}>
+          <Button
+            className="flex-1"
+            disabled={!stepValid || pending}
+            onClick={finish}
+          >
             {pending ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (

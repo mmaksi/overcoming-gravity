@@ -7,6 +7,7 @@ import {
   GROUP_TYPES,
   INTENSITIES,
   MAX_WEEKS,
+  Measurement,
   MEASUREMENTS,
   MIN_WEEKS,
   PERIODIZATIONS,
@@ -27,6 +28,12 @@ export const progressionSchema = z.object({
   order: z.number().int().min(0),
   /** Every progression carries its own description (exercises don't). */
   description: z.string(),
+  /**
+   * How this progression is measured (reps or seconds of hold). Optional for
+   * back-compat: progressions saved before per-progression measurement fall
+   * back to the exercise-level `measurement`. See `measurementOf`.
+   */
+  measurement: z.enum(MEASUREMENTS).optional(),
 });
 export type Progression = z.infer<typeof progressionSchema>;
 
@@ -35,7 +42,11 @@ export const exerciseSchema = z.object({
   title: z.string().min(1),
   category: z.enum(CATEGORIES),
   attribute: z.enum(ATTRIBUTES),
-  /** Reps, or seconds of hold (isometrics like levers and L-sits). */
+  /**
+   * Exercise-level default measurement (reps, or seconds of hold). Each
+   * progression may override this with its own `measurement`; resolve the
+   * effective value with `measurementOf`.
+   */
   measurement: z.enum(MEASUREMENTS).default("reps"),
   /** Cluster style marks eccentric work: rest between single reps in a set. */
   repStyle: z.enum(REP_STYLES).default("standard"),
@@ -82,8 +93,30 @@ export const workoutExerciseSchema = z.object({
    * any section; when unset it shows in its own attribute's section.
    */
   section: z.enum(ATTRIBUTES).optional(),
+  /**
+   * Per-program unit override: when the athlete flips the unit while designing
+   * a program (tap the unit word), it's stored here and wins over the
+   * progression's own measurement. Unset = follow the progression. See
+   * `measurementOf`.
+   */
+  measurement: z.enum(MEASUREMENTS).optional(),
 });
 export type WorkoutExercise = z.infer<typeof workoutExerciseSchema>;
+
+/**
+ * The effective measurement (reps vs. hold time) for a planned exercise:
+ * a per-program override wins, then the chosen progression's own measurement,
+ * then the exercise-level default, finally "reps".
+ */
+export function measurementOf(
+  exercise: Pick<Exercise, "measurement" | "progressions"> | undefined,
+  progressionId: string | undefined,
+  override?: Measurement,
+): Measurement {
+  if (override) return override;
+  const prog = exercise?.progressions.find((p) => p.id === progressionId);
+  return prog?.measurement ?? exercise?.measurement ?? "reps";
+}
 
 /** The day section a planned exercise belongs to (see `section` above). */
 export function sectionOf(

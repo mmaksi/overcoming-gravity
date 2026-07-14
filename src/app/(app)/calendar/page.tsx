@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, TrendingUp, X } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
@@ -25,8 +32,18 @@ import { ProgressTab } from "@/components/history/progress-tab";
 import { cn } from "@/lib/utils";
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 export default async function CalendarPage({
@@ -79,8 +96,14 @@ export default async function CalendarPage({
     }
   }
 
-  const prev = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
-  const next = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
+  const prev =
+    month === 1
+      ? `${year - 1}-12`
+      : `${year}-${String(month - 1).padStart(2, "0")}`;
+  const next =
+    month === 12
+      ? `${year + 1}-01`
+      : `${year}-${String(month + 1).padStart(2, "0")}`;
   const todayISO = toISODate(now);
 
   // History (moved here from the old History tab): only the newest page is
@@ -146,7 +169,9 @@ export default async function CalendarPage({
                 daySessions.length > 0 && "bg-muted/50",
               )}
             >
-              <span className={cn(iso === todayISO && "font-bold text-primary")}>
+              <span
+                className={cn(iso === todayISO && "font-bold text-primary")}
+              >
                 {date.getDate()}
               </span>
               {daySessions.length > 0 && (
@@ -207,13 +232,13 @@ export default async function CalendarPage({
         <TabsList className="h-auto w-full p-1">
           <TabsTrigger
             value="workouts"
-            className="flex-1 gap-2 py-3 text-base [&_svg:not([class*='size-'])]:size-5"
+            className="flex-1 gap-2 py-5 text-base [&_svg:not([class*='size-'])]:size-5"
           >
             <CalendarDays /> Workouts
           </TabsTrigger>
           <TabsTrigger
             value="progress"
-            className="flex-1 gap-2 py-3 text-base [&_svg:not([class*='size-'])]:size-5"
+            className="flex-1 gap-2 py-5 text-base [&_svg:not([class*='size-'])]:size-5"
           >
             <TrendingUp /> Progress
           </TabsTrigger>

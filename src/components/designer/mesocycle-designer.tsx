@@ -12,6 +12,7 @@ import {
 } from "@/lib/domain/types";
 import {
   Exercise,
+  measurementOf,
   Mesocycle,
   Program,
   sectionOf,
@@ -199,6 +200,41 @@ export function MesocycleDesigner({
         ))}
       </div>
 
+      {/* Brief how-to for the chosen periodization. */}
+      {weekPeriodized && (
+        <Alert>
+          <AlertTitle>Accumulation & Intensification</AlertTitle>
+          <AlertDescription>
+            Pick each exercise once — it carries across every week.{" "}
+            <span className="font-medium text-sky-600 dark:text-sky-400">
+              Accumulation
+            </span>{" "}
+            weeks (blue) build volume: more sets/reps on easier progressions.{" "}
+            <span className="font-medium text-orange-600 dark:text-orange-400">
+              Intensification
+            </span>{" "}
+            weeks (orange) push intensity: harder progressions, fewer reps,
+            longer rest. Flip a week&apos;s phase with the badge below.
+          </AlertDescription>
+        </Alert>
+      )}
+      {dayPeriodized && (
+        <Alert>
+          <AlertTitle>Light / Heavy days</AlertTitle>
+          <AlertDescription>
+            Pick each exercise once.{" "}
+            <span className="font-medium text-orange-600 dark:text-orange-400">
+              Heavy
+            </span>{" "}
+            days (orange) are your hard sessions — top progressions, low reps.{" "}
+            <span className="font-medium text-sky-600 dark:text-sky-400">
+              Light
+            </span>{" "}
+            days (blue) stay easy so you recover. Flip a day with its badge.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {week?.isDeload && (
         <Alert>
           <AlertTitle>Deload week</AlertTitle>
@@ -250,8 +286,22 @@ export function MesocycleDesigner({
         </Button>
       </div>
 
-      {/* Days — separated by generous spacing rather than boxes */}
-      <div className="space-y-10">
+      {/* Days — separated by generous spacing rather than boxes. In
+          Accumulation & Intensification the whole week gets a phase tint so
+          which phase you're editing reads at a glance. */}
+      <div
+        className={cn(
+          "space-y-10",
+          weekPeriodized &&
+            !week?.isDeload &&
+            "-mx-2 rounded-2xl p-3 transition-colors",
+          weekPeriodized &&
+            !week?.isDeload &&
+            (week?.focus === "intensification"
+              ? "bg-orange-500/[0.06]"
+              : "bg-sky-500/[0.06]"),
+        )}
+      >
         {orderedDays.map((weekday) => {
           const day = week?.days[weekday];
           if (!day) return null;
@@ -339,7 +389,10 @@ export function MesocycleDesigner({
         onPick={(exercise) => {
           if (!pickingFor) return;
           const { weekday } = pickingFor;
-          const defaultValue = exercise.measurement === "time" ? 10 : 8;
+          const defaultValue =
+            measurementOf(exercise, exercise.progressions[0].id) === "time"
+              ? 10
+              : 8;
           const we: WorkoutExercise = {
             id: crypto.randomUUID(),
             exerciseId: exercise.id,

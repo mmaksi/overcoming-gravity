@@ -31,12 +31,18 @@ export function GoalsEditor({
     () =>
       Object.fromEntries(
         // Older programs may miss newer areas — treat them as empty.
-        GOAL_AREAS.map((area) => [area, goals?.[area]?.map((g) => g.text) ?? []]),
+        GOAL_AREAS.map((area) => [
+          area,
+          goals?.[area]?.map((g) => g.text) ?? [],
+        ]),
       ) as Record<GoalArea, string[]>,
   );
 
   const clean = (area: GoalArea) =>
-    draft[area].map((g) => g.trim()).filter(Boolean).slice(0, 2);
+    draft[area]
+      .map((g) => g.trim())
+      .filter(Boolean)
+      .slice(0, 2);
   const valid = GOAL_AREAS.some((area) => clean(area).length > 0);
 
   // updateProgramGoals revalidates the page in place (no redirect); close the
@@ -67,12 +73,14 @@ export function GoalsEditor({
       </Button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto pb-8">
+        <SheetContent
+          side="bottom"
+          className="max-h-[90dvh] overflow-y-auto pb-8"
+        >
           <SheetHeader>
             <SheetTitle>Goals</SheetTitle>
             <SheetDescription>
-              Up to 2 goals per area — one goal in total is enough. Goals you
-              don&apos;t change keep their achieved tick.
+              Pick 1-2 goals per area to help you stay focused and motivated.
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-5 px-4">
@@ -122,8 +130,16 @@ export function GoalsEditor({
               </div>
             ))}
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button className="w-full" disabled={!valid || pending} onClick={save}>
-              {pending ? <Loader2 className="size-4 animate-spin" /> : "Save goals"}
+            <Button
+              className="w-full"
+              disabled={!valid || pending}
+              onClick={save}
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Save goals"
+              )}
             </Button>
           </div>
         </SheetContent>

@@ -7,8 +7,11 @@ import { Logo } from "@/components/shell/logo";
  */
 export default function Loading() {
   return (
-    <div className="flex min-h-[70dvh] flex-col items-center justify-center">
-      <Logo className="size-24 animate-pulse" />
+    <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-6 px-6 text-center">
+      <Logo className="size-40 animate-pulse" />
+      <p className="text-2xl font-bold tracking-tight text-foreground">
+        Redefine Your Impossible
+      </p>
     </div>
   );
 }

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     "Build calisthenics programs, design mesocycles, track workouts.",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icons/icon.svg",
+    icon: "/icons/icon-192.png",
     apple: "/icons/apple-touch-icon.png",
   },
   appleWebApp: {

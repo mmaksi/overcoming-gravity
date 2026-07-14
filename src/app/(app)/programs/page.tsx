@@ -28,7 +28,7 @@ export default async function ProgramsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">My programs</h1>
+      <h1 className="text-2xl font-bold">Programs</h1>
 
       {/* Server component: renders once per request, so reading the clock to
           pick the day's quote is deterministic per response. */}
