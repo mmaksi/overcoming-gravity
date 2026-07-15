@@ -9,8 +9,12 @@ import {
   ProfileStats,
   Program,
   ProgramRun,
+  ProgramSummary,
+  SessionSummary,
+  WorkoutDay,
   WorkoutSession,
 } from "@/lib/domain/schemas";
+import { Weekday } from "@/lib/domain/types";
 
 /**
  * The single seam between the app and its persistence. Two implementations:
@@ -35,6 +39,19 @@ export interface DataStore {
   updateProgram(program: Program): Promise<Program>;
   deleteProgram(id: string): Promise<void>;
 
+  /**
+   * Summary reads that omit the (large) embedded mesocycle — for the program
+   * list, dashboard cards and calendar, which never render the full plan.
+   */
+  listProgramSummaries(userId: string): Promise<ProgramSummary[]>;
+  getProgramSummary(id: string): Promise<ProgramSummary | null>;
+  /** A single planned day out of a program's mesocycle (dashboard "up next"). */
+  getProgramDay(
+    programId: string,
+    weekIndex: number,
+    weekday: Weekday,
+  ): Promise<WorkoutDay | null>;
+
   // Standalone workouts outside any program.
   listCustomWorkouts(userId: string): Promise<CustomWorkout[]>;
   getCustomWorkout(id: string): Promise<CustomWorkout | null>;
@@ -53,6 +70,8 @@ export interface DataStore {
   updateRun(run: ProgramRun): Promise<ProgramRun>;
 
   listSessionsByRun(runId: string): Promise<WorkoutSession[]>;
+  /** Session summaries (no performed-set entries) for a run — dashboard cards. */
+  listSessionSummariesByRun(runId: string): Promise<SessionSummary[]>;
   /** Remove a run's not-yet-done sessions (used when a run is abandoned). */
   deletePlannedSessions(runId: string): Promise<void>;
   listSessionsByUser(
@@ -60,6 +79,12 @@ export interface DataStore {
     fromDate: string,
     toDate: string,
   ): Promise<WorkoutSession[]>;
+  /** Session summaries (no entries) in a date window — the calendar grid. */
+  listSessionSummariesByUser(
+    userId: string,
+    fromDate: string,
+    toDate: string,
+  ): Promise<SessionSummary[]>;
   getSession(id: string): Promise<WorkoutSession | null>;
   updateSession(session: WorkoutSession): Promise<WorkoutSession>;
   /** Permanently remove a session (used to delete a workout from history). */
@@ -77,14 +102,25 @@ export interface DataStore {
   ): Promise<WorkoutSession[]>;
 
   /**
+   * Completed workouts (newest first) that include any of `exerciseIds` — the
+   * workout logger only needs progression stats for the planned exercises, so
+   * this avoids downloading a user's entire completed history. An empty
+   * `exerciseIds` returns nothing.
+   */
+  listCompletedSessionsByExercises(
+    userId: string,
+    exerciseIds: string[],
+  ): Promise<WorkoutSession[]>;
+
+  /**
    * Every finished schedule slot — completed **and** skipped — oldest first.
    * Powers the workout streak (consecutive completions, broken by a skip).
    */
   listFinishedSessions(userId: string): Promise<WorkoutSession[]>;
 
   /**
-   * A user's remembered notes per exercise + inter-technique pair. Saving
-   * upserts on (userId, exerciseId, techniqueId).
+   * A user's remembered notes per exercise progression. Saving upserts on
+   * (userId, exerciseId, progressionId).
    */
   listExerciseNotes(userId: string): Promise<ExerciseNote[]>;
   saveExerciseNote(note: ExerciseNote): Promise<ExerciseNote>;

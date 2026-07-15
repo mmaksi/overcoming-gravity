@@ -7,13 +7,29 @@ import {
   Exercise,
   ExerciseNote,
   Feedback,
+  isTimeMeasurement,
   Profile,
   ProfileStats,
   Program,
   ProgramRun,
+  ProgramSummary,
+  SessionSummary,
+  WorkoutDay,
   WorkoutSession,
 } from "@/lib/domain/schemas";
+import { Weekday } from "@/lib/domain/types";
 import { DataStore } from "./store";
+
+/**
+ * The `exercises.measurement` column carries a `check (in ('reps','time'))`
+ * constraint, so the precise seconds/minutes unit lives per-progression in the
+ * `progressions` jsonb instead. Collapse the exercise-level default to a value
+ * the column accepts on write.
+ */
+const columnMeasurement = (m: string): "reps" | "time" =>
+  m === "time" || isTimeMeasurement(m as Exercise["measurement"])
+    ? "time"
+    : "reps";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -32,6 +48,19 @@ const toExercise = (r: Row): Exercise => ({
   progressions: r.progressions,
 });
 
+// Explicit column lists (finding 7): reads name exactly what they need so a new
+// column never silently inflates an existing screen's payload, and summary
+// reads can drop the big jsonb documents (mesocycle / entries / day).
+const PROGRAM_SUMMARY_COLS =
+  "id,user_id,name,type,split_type,sport,goals,periodization,weeks,training_days,status,created_at,updated_at";
+const PROGRAM_COLS = `${PROGRAM_SUMMARY_COLS},mesocycle`;
+const SESSION_SUMMARY_COLS =
+  "id,run_id,custom_workout_id,user_id,date,week_index,weekday,status,has_entries,duration_seconds";
+const SESSION_COLS =
+  "id,run_id,custom_workout_id,user_id,date,week_index,weekday,status,entries,duration_seconds";
+const CUSTOM_WORKOUT_SUMMARY_COLS = "id,user_id,title,created_at,updated_at";
+const CUSTOM_WORKOUT_COLS = `${CUSTOM_WORKOUT_SUMMARY_COLS},day`;
+
 const toProgram = (r: Row): Program => ({
   id: r.id,
   userId: r.user_id,
@@ -44,6 +73,22 @@ const toProgram = (r: Row): Program => ({
   weeks: r.weeks,
   trainingDays: r.training_days,
   mesocycle: r.mesocycle,
+  status: r.status,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+const toProgramSummary = (r: Row): ProgramSummary => ({
+  id: r.id,
+  userId: r.user_id,
+  name: r.name,
+  type: r.type,
+  splitType: r.split_type ?? undefined,
+  sport: r.sport ?? undefined,
+  goals: r.goals ?? undefined,
+  periodization: r.periodization,
+  weeks: r.weeks,
+  trainingDays: r.training_days,
   status: r.status,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -95,6 +140,21 @@ const toSession = (r: Row): WorkoutSession => ({
   status: r.status,
   entries: r.entries,
   durationSeconds: r.duration_seconds ?? undefined,
+});
+
+const toSessionSummary = (r: Row): SessionSummary => ({
+  id: r.id,
+  runId: r.run_id ?? undefined,
+  customWorkoutId: r.custom_workout_id ?? undefined,
+  userId: r.user_id,
+  date: r.date,
+  weekIndex: r.week_index,
+  weekday: r.weekday,
+  status: r.status,
+  durationSeconds: r.duration_seconds ?? undefined,
+  // `has_entries` is a generated column (migration 0010) so summaries never
+  // download the `entries` document just to know whether any sets were logged.
+  hasEntries: r.has_entries ?? false,
 });
 
 const fromSession = (s: WorkoutSession): Row => ({
@@ -151,7 +211,7 @@ class SupabaseStore implements DataStore {
         title: exercise.title,
         category: exercise.category,
         attribute: exercise.attribute,
-        measurement: exercise.measurement,
+        measurement: columnMeasurement(exercise.measurement),
         rep_style: exercise.repStyle,
         image_url: exercise.imageUrl || null,
         progressions: exercise.progressions,
@@ -167,7 +227,7 @@ class SupabaseStore implements DataStore {
           title: exercise.title,
           category: exercise.category,
           attribute: exercise.attribute,
-          measurement: exercise.measurement,
+          measurement: columnMeasurement(exercise.measurement),
           rep_style: exercise.repStyle,
           image_url: exercise.imageUrl || null,
           progressions: exercise.progressions,
@@ -222,14 +282,42 @@ class SupabaseStore implements DataStore {
     return orThrow(
       await this.db
         .from("programs")
-        .select()
+        .select(PROGRAM_COLS)
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
     ).map(toProgram);
   }
   async getProgram(id: string): Promise<Program | null> {
-    const rows = orThrow(await this.db.from("programs").select().eq("id", id));
+    const rows = orThrow(
+      await this.db.from("programs").select(PROGRAM_COLS).eq("id", id),
+    );
     return rows.length > 0 ? toProgram(rows[0]) : null;
+  }
+  async listProgramSummaries(userId: string): Promise<ProgramSummary[]> {
+    return orThrow(
+      await this.db
+        .from("programs")
+        .select(PROGRAM_SUMMARY_COLS)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+    ).map(toProgramSummary);
+  }
+  async getProgramSummary(id: string): Promise<ProgramSummary | null> {
+    const rows = orThrow(
+      await this.db.from("programs").select(PROGRAM_SUMMARY_COLS).eq("id", id),
+    );
+    return rows.length > 0 ? toProgramSummary(rows[0]) : null;
+  }
+  async getProgramDay(
+    programId: string,
+    weekIndex: number,
+    weekday: Weekday,
+  ): Promise<WorkoutDay | null> {
+    // Only the mesocycle column, then slice out the one planned day.
+    const rows = orThrow(
+      await this.db.from("programs").select("mesocycle").eq("id", programId),
+    );
+    return rows[0]?.mesocycle?.weeks?.[weekIndex]?.days?.[weekday] ?? null;
   }
   async createProgram(program: Program): Promise<Program> {
     orThrow(await this.db.from("programs").insert(fromProgram(program)).select());
@@ -255,14 +343,14 @@ class SupabaseStore implements DataStore {
     return orThrow(
       await this.db
         .from("custom_workouts")
-        .select()
+        .select(CUSTOM_WORKOUT_COLS)
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
     ).map(toCustomWorkout);
   }
   async getCustomWorkout(id: string): Promise<CustomWorkout | null> {
     const rows = orThrow(
-      await this.db.from("custom_workouts").select().eq("id", id),
+      await this.db.from("custom_workouts").select(CUSTOM_WORKOUT_COLS).eq("id", id),
     );
     return rows.length > 0 ? toCustomWorkout(rows[0]) : null;
   }
@@ -357,8 +445,21 @@ class SupabaseStore implements DataStore {
 
   async listSessionsByRun(runId: string): Promise<WorkoutSession[]> {
     return orThrow(
-      await this.db.from("sessions").select().eq("run_id", runId).order("date"),
+      await this.db
+        .from("sessions")
+        .select(SESSION_COLS)
+        .eq("run_id", runId)
+        .order("date"),
     ).map(toSession);
+  }
+  async listSessionSummariesByRun(runId: string): Promise<SessionSummary[]> {
+    return orThrow(
+      await this.db
+        .from("sessions")
+        .select(SESSION_SUMMARY_COLS)
+        .eq("run_id", runId)
+        .order("date"),
+    ).map(toSessionSummary);
   }
   async listSessionsByUser(
     userId: string,
@@ -368,15 +469,32 @@ class SupabaseStore implements DataStore {
     return orThrow(
       await this.db
         .from("sessions")
-        .select()
+        .select(SESSION_COLS)
         .eq("user_id", userId)
         .gte("date", fromDate)
         .lte("date", toDate)
         .order("date"),
     ).map(toSession);
   }
+  async listSessionSummariesByUser(
+    userId: string,
+    fromDate: string,
+    toDate: string,
+  ): Promise<SessionSummary[]> {
+    return orThrow(
+      await this.db
+        .from("sessions")
+        .select(SESSION_SUMMARY_COLS)
+        .eq("user_id", userId)
+        .gte("date", fromDate)
+        .lte("date", toDate)
+        .order("date"),
+    ).map(toSessionSummary);
+  }
   async getSession(id: string): Promise<WorkoutSession | null> {
-    const rows = orThrow(await this.db.from("sessions").select().eq("id", id));
+    const rows = orThrow(
+      await this.db.from("sessions").select(SESSION_COLS).eq("id", id),
+    );
     return rows.length > 0 ? toSession(rows[0]) : null;
   }
   async updateSession(session: WorkoutSession): Promise<WorkoutSession> {
@@ -403,7 +521,7 @@ class SupabaseStore implements DataStore {
     return orThrow(
       await this.db
         .from("sessions")
-        .select()
+        .select(SESSION_COLS)
         .eq("user_id", userId)
         .eq("status", "completed")
         .order("date", { ascending: false })
@@ -411,11 +529,27 @@ class SupabaseStore implements DataStore {
     ).map(toSession);
   }
 
+  async listCompletedSessionsByExercises(
+    userId: string,
+    exerciseIds: string[],
+  ): Promise<WorkoutSession[]> {
+    if (exerciseIds.length === 0) return [];
+    // A DB function filters to sessions whose entries reference any planned
+    // exercise (migration 0010), so the logger never downloads the user's
+    // whole completed history just to build stats for a handful of exercises.
+    const { data, error } = await this.db.rpc(
+      "completed_sessions_for_exercises",
+      { p_user_id: userId, p_exercise_ids: exerciseIds },
+    );
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Row[]).map(toSession);
+  }
+
   async listFinishedSessions(userId: string): Promise<WorkoutSession[]> {
     return orThrow(
       await this.db
         .from("sessions")
-        .select()
+        .select(SESSION_COLS)
         .eq("user_id", userId)
         .in("status", ["completed", "skipped"])
         .order("date", { ascending: true }),
@@ -428,7 +562,9 @@ class SupabaseStore implements DataStore {
     ).map((r: Row) => ({
       userId: r.user_id,
       exerciseId: r.exercise_id,
-      techniqueId: r.technique_id,
+      // The `technique_id` column now carries the progression id (notes moved
+      // from per-exercise to per-progression without a schema migration).
+      progressionId: r.technique_id,
       note: r.note,
       updatedAt: r.updated_at,
     }));
@@ -440,7 +576,8 @@ class SupabaseStore implements DataStore {
         .upsert({
           user_id: note.userId,
           exercise_id: note.exerciseId,
-          technique_id: note.techniqueId,
+          // Reused column: holds the progression id (see listExerciseNotes).
+          technique_id: note.progressionId,
           note: note.note,
           updated_at: note.updatedAt,
         })

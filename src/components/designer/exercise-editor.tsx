@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
-import { INTER_TECHNIQUES, TECHNIQUES_BY_ID } from "@/lib/domain/types";
+import {
+  INTER_TECHNIQUES,
+  Measurement,
+  TECHNIQUES_BY_ID,
+} from "@/lib/domain/types";
 import {
   Exercise,
   measurementOf,
@@ -61,13 +65,32 @@ export function ExerciseEditor({
   const selectedProgression = exercise.progressions.find(
     (p) => p.id === value.progressionId,
   );
-  const isTime =
-    measurementOf(exercise, value.progressionId, value.measurement) === "time";
+  const measurement = measurementOf(
+    exercise,
+    value.progressionId,
+    value.measurement,
+  );
   const isCluster = exercise.repStyle === "cluster";
-  const unitLabel = isTime ? "sec" : isCluster ? "cluster reps" : "reps";
-  // Tapping the unit flips this exercise between reps and hold-time for this
-  // program, overriding the progression's default measurement.
-  const toggleUnit = () => set({ measurement: isTime ? "reps" : "time" });
+  const unitLabel =
+    measurement === "seconds"
+      ? "sec"
+      : measurement === "minutes"
+        ? "min"
+        : isCluster
+          ? "cluster reps"
+          : "reps";
+  // Tapping the unit cycles this exercise reps → seconds → minutes for this
+  // program, overriding the progression's default measurement. The typed
+  // targets stay put and are reinterpreted in the new unit.
+  const cycleUnit = () => {
+    const next: Measurement =
+      measurement === "reps"
+        ? "seconds"
+        : measurement === "seconds"
+          ? "minutes"
+          : "reps";
+    set({ measurement: next });
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -106,18 +129,20 @@ export function ExerciseEditor({
           {/* Sets */}
           <div className="space-y-2">
             <Label>
-              {isTime
+              {measurement === "seconds"
                 ? "Sets — hold seconds and optional added weight per set"
-                : isCluster
-                  ? "Sets — cluster reps and optional added weight per set"
-                  : "Sets — reps and optional added weight per set"}
+                : measurement === "minutes"
+                  ? "Sets — hold minutes and optional added weight per set"
+                  : isCluster
+                    ? "Sets — cluster reps and optional added weight per set"
+                    : "Sets — reps and optional added weight per set"}
             </Label>
             <p className="text-xs text-muted-foreground">
               Tap the unit (
               <span className="underline decoration-dotted underline-offset-2">
-                {isTime ? "sec" : "reps"}
+                {unitLabel}
               </span>
-              ) next to a set to switch how this exercise is measured.
+              ) next to a set to cycle reps → seconds → minutes.
             </p>
             <div className="space-y-2">
               {value.sets.map((s, i) => (
@@ -127,6 +152,7 @@ export function ExerciseEditor({
                   </span>
                   <RepsInput
                     value={s.reps}
+                    decimal={measurement === "minutes"}
                     onValue={(reps) =>
                       set({
                         sets: value.sets.map((x, j) =>
@@ -137,8 +163,8 @@ export function ExerciseEditor({
                   />
                   <button
                     type="button"
-                    onClick={toggleUnit}
-                    title="Tap to switch between reps and hold time"
+                    onClick={cycleUnit}
+                    title="Tap to cycle reps → seconds → minutes"
                     className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
                   >
                     {unitLabel}
@@ -357,9 +383,12 @@ export function ExerciseEditor({
 function RepsInput({
   value,
   onValue,
+  decimal = false,
 }: {
   value: number;
   onValue: (reps: number) => void;
+  /** Allow a fractional value (minute holds like 1.5). */
+  decimal?: boolean;
 }) {
   const [draft, setDraft] = useState(String(value));
   // Reflect external changes (e.g. duplicating a set) by resetting the draft
@@ -374,18 +403,23 @@ function RepsInput({
   return (
     <Input
       type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
+      inputMode={decimal ? "decimal" : "numeric"}
+      pattern={decimal ? "[0-9.]*" : "[0-9]*"}
       className="flex-1"
       value={draft}
       onFocus={(e) => e.target.select()}
       onChange={(e) => {
-        const digits = e.target.value.replace(/\D/g, "");
-        setDraft(digits);
-        if (digits !== "") onValue(Math.max(1, Number(digits)));
+        // Digits only, plus a single decimal point when fractions are allowed.
+        const cleaned = decimal
+          ? e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1")
+          : e.target.value.replace(/\D/g, "");
+        setDraft(cleaned);
+        if (cleaned !== "" && cleaned !== ".") {
+          onValue(Math.max(decimal ? 0.1 : 1, Number(cleaned)));
+        }
       }}
       onBlur={() => {
-        if (draft === "") setDraft(String(value));
+        if (draft === "" || draft === ".") setDraft(String(value));
       }}
     />
   );

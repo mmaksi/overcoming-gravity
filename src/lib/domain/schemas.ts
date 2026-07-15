@@ -22,6 +22,16 @@ import {
 // ---------------------------------------------------------------------------
 // Admin-managed content
 
+/**
+ * A measurement unit as stored. Accepts the current units and silently maps the
+ * legacy "time" (which meant seconds) forward, so progressions/rows saved
+ * before the seconds/minutes split keep parsing.
+ */
+const measurementValue = z.preprocess(
+  (v) => (v === "time" ? "seconds" : v),
+  z.enum(MEASUREMENTS),
+);
+
 export const progressionSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -29,11 +39,12 @@ export const progressionSchema = z.object({
   /** Every progression carries its own description (exercises don't). */
   description: z.string(),
   /**
-   * How this progression is measured (reps or seconds of hold). Optional for
-   * back-compat: progressions saved before per-progression measurement fall
-   * back to the exercise-level `measurement`. See `measurementOf`.
+   * How this progression is measured (reps, seconds, or minutes of hold).
+   * Optional for back-compat: progressions saved before per-progression
+   * measurement fall back to the exercise-level `measurement`. See
+   * `measurementOf`.
    */
-  measurement: z.enum(MEASUREMENTS).optional(),
+  measurement: measurementValue.optional(),
 });
 export type Progression = z.infer<typeof progressionSchema>;
 
@@ -43,11 +54,12 @@ export const exerciseSchema = z.object({
   category: z.enum(CATEGORIES),
   attribute: z.enum(ATTRIBUTES),
   /**
-   * Exercise-level default measurement (reps, or seconds of hold). Each
-   * progression may override this with its own `measurement`; resolve the
-   * effective value with `measurementOf`.
+   * Exercise-level default measurement — a coarse fallback only. The precise
+   * per-progression unit (reps/seconds/minutes) lives on each progression; this
+   * column stays reps/seconds so the persisted DB check constraint holds. Each
+   * progression overrides it; resolve the effective value with `measurementOf`.
    */
-  measurement: z.enum(MEASUREMENTS).default("reps"),
+  measurement: measurementValue.default("reps"),
   /** Cluster style marks eccentric work: rest between single reps in a set. */
   repStyle: z.enum(REP_STYLES).default("standard"),
   /** Optional illustration shown in the picker; admin-managed. */
@@ -68,7 +80,9 @@ export type Exercise = z.infer<typeof exerciseSchema>;
  * exercises.
  */
 export const setPlanSchema = z.object({
-  reps: z.number().int().min(1),
+  // Target per set in the progression's unit: reps, seconds, or minutes of
+  // hold. Fractional so a target can be e.g. 1.5 minutes.
+  reps: z.number().positive(),
   weight: z.number().min(0).optional(),
 });
 export type SetPlan = z.infer<typeof setPlanSchema>;
@@ -99,23 +113,65 @@ export const workoutExerciseSchema = z.object({
    * progression's own measurement. Unset = follow the progression. See
    * `measurementOf`.
    */
-  measurement: z.enum(MEASUREMENTS).optional(),
+  measurement: measurementValue.optional(),
 });
 export type WorkoutExercise = z.infer<typeof workoutExerciseSchema>;
 
+/** Legacy "time" (pre-minutes) means seconds; unknown values are ignored. */
+function normalizeMeasurement(
+  m: string | undefined | null,
+): Measurement | undefined {
+  if (m === "time") return "seconds";
+  if (m === "reps" || m === "seconds" || m === "minutes") return m;
+  return undefined;
+}
+
 /**
- * The effective measurement (reps vs. hold time) for a planned exercise:
- * a per-program override wins, then the chosen progression's own measurement,
- * then the exercise-level default, finally "reps".
+ * The effective measurement (reps / seconds / minutes) for a planned exercise:
+ * a per-program (or per-session) override wins, then the chosen progression's
+ * own measurement, then the exercise-level default, finally "reps".
  */
 export function measurementOf(
   exercise: Pick<Exercise, "measurement" | "progressions"> | undefined,
   progressionId: string | undefined,
   override?: Measurement,
 ): Measurement {
-  if (override) return override;
   const prog = exercise?.progressions.find((p) => p.id === progressionId);
-  return prog?.measurement ?? exercise?.measurement ?? "reps";
+  return (
+    normalizeMeasurement(override) ??
+    normalizeMeasurement(prog?.measurement) ??
+    normalizeMeasurement(exercise?.measurement) ??
+    "reps"
+  );
+}
+
+/** True for hold measurements (seconds or minutes), false for reps. */
+export function isTimeMeasurement(m: Measurement): boolean {
+  return m === "seconds" || m === "minutes";
+}
+
+/**
+ * Convert a value between units, preserving the physical quantity where that's
+ * meaningful (seconds↔minutes). Reps↔time keeps the raw number, since a rep
+ * count and a hold length aren't interchangeable.
+ */
+export function convertMeasureValue(
+  value: number,
+  from: Measurement,
+  to: Measurement,
+): number {
+  if (from === to || from === "reps" || to === "reps") return value;
+  const seconds = from === "minutes" ? value * 60 : value;
+  const out = to === "minutes" ? seconds / 60 : seconds;
+  return Math.round(out * 100) / 100;
+}
+
+/**
+ * Sensible default per-set target when an exercise is first added, in the
+ * progression's unit: 8 reps, a 10-second hold, or a 1-minute hold.
+ */
+export function defaultSetTarget(m: Measurement): number {
+  return m === "minutes" ? 1 : m === "seconds" ? 10 : 8;
 }
 
 /** The day section a planned exercise belongs to (see `section` above). */
@@ -266,7 +322,9 @@ export type ProgramRun = z.infer<typeof programRunSchema>;
  * empty inputs to their suggested values.
  */
 export const performedSetSchema = z.object({
-  reps: z.number().int().min(0).nullable(),
+  // The logged value in the entry's unit (reps, seconds, or minutes of hold);
+  // null while not yet recorded. Fractional so minute holds can be e.g. 1.5.
+  reps: z.number().min(0).nullable(),
   weight: z.number().min(0).optional(),
   /** Legacy hybrid sets: the single progression used for this set. */
   progressionId: z.string().optional(),
@@ -298,6 +356,11 @@ export const sessionEntrySchema = z.object({
   /** Session-level inter-exercise technique pick (overrides the plan's). */
   interTechniqueId: z.string().optional(),
   notes: z.string().optional(),
+  /**
+   * The unit the athlete logged in this session — they can switch reps/seconds/
+   * minutes mid-workout. Unset = follow the plan/progression measurement.
+   */
+  measurement: measurementValue.optional(),
 });
 export type SessionEntry = z.infer<typeof sessionEntrySchema>;
 
@@ -324,30 +387,28 @@ export const workoutSessionSchema = z
 export type WorkoutSession = z.infer<typeof workoutSessionSchema>;
 
 /**
- * A user's remembered note for one exercise + inter-exercise technique pair.
- * Written whenever the athlete logs a note with a technique; read back to
- * prefill the note the next time they pick that exercise with that technique.
+ * A user's remembered note for one exercise **progression**. Written whenever
+ * the athlete logs a note while training a progression; read back to prefill
+ * the note the next time they train that same progression (swapping the
+ * progression mid-workout surfaces that progression's own note).
+ *
+ * Storage note: this reuses the persisted `exercise_notes.technique_id` column
+ * to carry the progression id (see the stores), so moving notes from
+ * per-exercise to per-progression needs no schema migration.
  */
 export const exerciseNoteSchema = z.object({
   userId: z.string(),
   exerciseId: z.string(),
-  techniqueId: z.string(),
+  progressionId: z.string(),
   note: z.string(),
   updatedAt: z.string(),
 });
 export type ExerciseNote = z.infer<typeof exerciseNoteSchema>;
 
-/** Map key for exercise-note lookups. */
-export function exerciseNoteKey(exerciseId: string, techniqueId: string) {
-  return `${exerciseId}:${techniqueId}`;
+/** Map key for remembered-note lookups (one note per exercise progression). */
+export function exerciseNoteKey(exerciseId: string, progressionId: string) {
+  return `${exerciseId}:${progressionId}`;
 }
-
-/**
- * Notes are remembered per exercise (not per technique) so they show up every
- * time that exercise is trained. They're stored under this sentinel
- * technique id, which keeps the (user, exercise, technique) row shape intact.
- */
-export const EXERCISE_NOTE_TECHNIQUE = "_exercise";
 
 // ---------------------------------------------------------------------------
 // Users
@@ -419,3 +480,25 @@ export type VolumeStats = {
   /** Best single-set value ever logged (reps, or seconds for holds). */
   maxReps: number | null;
 };
+
+// ---------------------------------------------------------------------------
+// Read projections
+//
+// Lightweight shapes for list/summary screens that don't need the whole
+// aggregate. The heavy fields are the embedded `mesocycle` (a Program's full
+// week-by-week plan), the `day` (a custom workout's exercises) and a session's
+// performed-set `entries`. Summary read methods on the DataStore return these
+// so the dashboard, program list and calendar don't download plans they never
+// show. See docs/performance-data-transfer-review.md.
+
+/** A program without its mesocycle — list cards, dashboard and calendar. */
+export type ProgramSummary = Omit<Program, "mesocycle">;
+
+/** A session without its performed-set entries — calendar and dashboard. */
+export type SessionSummary = Omit<WorkoutSession, "entries"> & {
+  /** Whether any sets have been logged (drives "Continue" vs "Start"). */
+  hasEntries: boolean;
+};
+
+/** A custom workout without its day — history labels and lists. */
+export type CustomWorkoutSummary = Omit<CustomWorkout, "day">;

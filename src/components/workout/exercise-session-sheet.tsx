@@ -4,6 +4,7 @@ import { Check, Trophy } from "lucide-react";
 import {
   INTER_TECHNIQUES,
   MEASUREMENT_LABELS,
+  MEASUREMENT_UNIT,
   TECHNIQUES_BY_ID,
 } from "@/lib/domain/types";
 import {
@@ -105,6 +106,7 @@ export function ExerciseSessionSheet({
                 const s = stats[statsKey(exercise.id, p.id)];
                 const active = p.id === progressionId;
                 const isPlan = p.id === planned.progressionId;
+                const bestMeasure = measurementOf(exercise, p.id);
                 return (
                   <button
                     key={p.id}
@@ -134,9 +136,9 @@ export function ExerciseSessionSheet({
                     {s?.maxReps != null && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <Trophy className="size-3" /> best: {s.maxReps}
-                        {measurementOf(exercise, p.id) === "time"
-                          ? "s"
-                          : " reps"}
+                        {bestMeasure === "reps"
+                          ? " reps"
+                          : MEASUREMENT_UNIT[bestMeasure]}
                       </p>
                     )}
                   </button>

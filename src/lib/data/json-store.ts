@@ -13,10 +13,28 @@ import {
   ProfileStats,
   Program,
   ProgramRun,
+  ProgramSummary,
+  SessionSummary,
+  WorkoutDay,
   WorkoutSession,
 } from "@/lib/domain/schemas";
+import { Weekday } from "@/lib/domain/types";
 import { DataStore } from "./store";
 import { DbData, seedData } from "./seed";
+
+// Projections to the lightweight summary shapes (see schemas.ts). The JSON
+// store already holds everything in memory, so these just drop heavy fields to
+// keep the shape identical to what SupabaseStore returns from narrow selects.
+function toProgramSummary({ mesocycle: _m, ...rest }: Program): ProgramSummary {
+  void _m;
+  return rest;
+}
+function toSessionSummary({
+  entries,
+  ...rest
+}: WorkoutSession): SessionSummary {
+  return { ...rest, hasEntries: entries.length > 0 };
+}
 
 const DB_FILE = path.join(
   process.cwd(),
@@ -163,6 +181,27 @@ export class JsonStore implements DataStore {
     await db.write();
   }
 
+  async listProgramSummaries(userId: string): Promise<ProgramSummary[]> {
+    const db = await getDb();
+    return db.data.programs
+      .filter((p) => p.userId === userId)
+      .map(toProgramSummary);
+  }
+  async getProgramSummary(id: string): Promise<ProgramSummary | null> {
+    const program = (await getDb()).data.programs.find((p) => p.id === id);
+    return program ? toProgramSummary(program) : null;
+  }
+  async getProgramDay(
+    programId: string,
+    weekIndex: number,
+    weekday: Weekday,
+  ): Promise<WorkoutDay | null> {
+    const program = (await getDb()).data.programs.find(
+      (p) => p.id === programId,
+    );
+    return program?.mesocycle.weeks[weekIndex]?.days[weekday] ?? null;
+  }
+
   // Standalone workouts ------------------------------------------------------
   async listCustomWorkouts(userId: string): Promise<CustomWorkout[]> {
     return (await getDb()).data.customWorkouts.filter(
@@ -242,6 +281,9 @@ export class JsonStore implements DataStore {
       .filter((s) => s.runId === runId)
       .sort((a, b) => a.date.localeCompare(b.date));
   }
+  async listSessionSummariesByRun(runId: string): Promise<SessionSummary[]> {
+    return (await this.listSessionsByRun(runId)).map(toSessionSummary);
+  }
   async listSessionsByUser(
     userId: string,
     fromDate: string,
@@ -253,6 +295,15 @@ export class JsonStore implements DataStore {
         (s) => s.userId === userId && s.date >= fromDate && s.date <= toDate,
       )
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+  async listSessionSummariesByUser(
+    userId: string,
+    fromDate: string,
+    toDate: string,
+  ): Promise<SessionSummary[]> {
+    return (await this.listSessionsByUser(userId, fromDate, toDate)).map(
+      toSessionSummary,
+    );
   }
   async getSession(id: string): Promise<WorkoutSession | null> {
     return (await getDb()).data.sessions.find((s) => s.id === id) ?? null;
@@ -281,6 +332,23 @@ export class JsonStore implements DataStore {
       .slice(offset, offset + limit);
   }
 
+  async listCompletedSessionsByExercises(
+    userId: string,
+    exerciseIds: string[],
+  ): Promise<WorkoutSession[]> {
+    if (exerciseIds.length === 0) return [];
+    const wanted = new Set(exerciseIds);
+    const db = await getDb();
+    return db.data.sessions
+      .filter(
+        (s) =>
+          s.userId === userId &&
+          s.status === "completed" &&
+          s.entries.some((e) => wanted.has(e.exerciseId)),
+      )
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
   async listFinishedSessions(userId: string): Promise<WorkoutSession[]> {
     const db = await getDb();
     return db.data.sessions
@@ -303,7 +371,7 @@ export class JsonStore implements DataStore {
       (n) =>
         n.userId === note.userId &&
         n.exerciseId === note.exerciseId &&
-        n.techniqueId === note.techniqueId,
+        n.progressionId === note.progressionId,
     );
     if (i === -1) db.data.exerciseNotes.push(note);
     else db.data.exerciseNotes[i] = note;

@@ -10,11 +10,7 @@ import {
   userProgramsTag,
 } from "@/lib/data/cached";
 import { generateSessions } from "@/lib/domain/schedule";
-import {
-  EXERCISE_NOTE_TECHNIQUE,
-  ProgramRun,
-  sessionEntrySchema,
-} from "@/lib/domain/schemas";
+import { ProgramRun, sessionEntrySchema } from "@/lib/domain/schemas";
 
 const startRunSchema = z.object({
   programId: z.string(),
@@ -148,15 +144,16 @@ export async function saveWorkoutSession(input: {
     durationSeconds: durationSeconds ?? session.durationSeconds,
   });
 
-  // Notes belong to the user + exercise (technique-independent) so they
-  // resurface every time that exercise is trained.
+  // Notes belong to the user + exercise progression, so they resurface every
+  // time that specific progression is trained (mid-workout progression swaps
+  // are captured because the entry carries the progression actually performed).
   const now = new Date().toISOString();
   for (const entry of entries) {
     if (entry.notes?.trim()) {
       await store.saveExerciseNote({
         userId: user.id,
         exerciseId: entry.exerciseId,
-        techniqueId: EXERCISE_NOTE_TECHNIQUE,
+        progressionId: entry.progressionId,
         note: entry.notes.trim(),
         updatedAt: now,
       });

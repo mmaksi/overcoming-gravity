@@ -1,6 +1,12 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
-import { Program, ProgramRun, WorkoutSession } from "@/lib/domain/schemas";
+import {
+  ProgramRun,
+  ProgramSummary,
+  SessionSummary,
+  WorkoutDay,
+} from "@/lib/domain/schemas";
+import { Weekday } from "@/lib/domain/types";
 import { DataStore } from "./store";
 
 /**
@@ -59,8 +65,11 @@ const ONE_DAY_SECONDS = 60 * 60 * 24;
 export function getCachedUserPrograms(store: DataStore, userId: string) {
   return unstable_cache(
     async () => {
+      // Program *summaries* only — the list cards, dashboard and history labels
+      // never render the (large) mesocycle. Custom workouts stay whole: they're
+      // small and the /programs page shows each one's exercise count.
       const [programs, runs, customWorkouts] = await Promise.all([
-        store.listPrograms(userId),
+        store.listProgramSummaries(userId),
         store.listRuns(userId),
         store.listCustomWorkouts(userId),
       ]);
@@ -110,11 +119,17 @@ export function getCachedFinishedSessions(store: DataStore, userId: string) {
   )();
 }
 
-/** One active run's card data on the home dashboard. */
+/**
+ * One active run's card data on the home dashboard. Program and sessions are
+ * summaries (no mesocycle, no performed-set entries) — the card only needs
+ * name/weeks/goals and each session's date/status. The single "up next" day is
+ * fetched separately (getCachedProgramDay) since which day is upcoming depends
+ * on today's date, not on the cached schedule.
+ */
 export type DashboardRun = {
   run: ProgramRun;
-  program: Program | null;
-  sessions: WorkoutSession[];
+  program: ProgramSummary | null;
+  sessions: SessionSummary[];
 };
 
 /**
@@ -135,12 +150,32 @@ export function getCachedDashboard(
       return Promise.all(
         runs.map(async (run) => ({
           run,
-          program: await store.getProgram(run.programId),
-          sessions: await store.listSessionsByRun(run.id),
+          program: await store.getProgramSummary(run.programId),
+          sessions: await store.listSessionSummariesByRun(run.id),
         })),
       );
     },
     ["user-dashboard", userId],
+    { tags: [userDashboardTag(userId)] },
+  )();
+}
+
+/**
+ * The single planned day the dashboard shows as "up next". Keyed by the exact
+ * (program, week, weekday) slot so each distinct day caches on first render and
+ * repeat loads on the same day are free; busted with the dashboard tag when the
+ * mesocycle is redesigned.
+ */
+export function getCachedProgramDay(
+  store: DataStore,
+  userId: string,
+  programId: string,
+  weekIndex: number,
+  weekday: Weekday,
+): Promise<WorkoutDay | null> {
+  return unstable_cache(
+    () => store.getProgramDay(programId, weekIndex, weekday),
+    ["program-day", programId, String(weekIndex), weekday],
     { tags: [userDashboardTag(userId)] },
   )();
 }

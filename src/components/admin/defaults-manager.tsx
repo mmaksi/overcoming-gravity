@@ -6,6 +6,7 @@ import { Check, CloudUpload, Loader2 } from "lucide-react";
 import { Attribute } from "@/lib/domain/types";
 import {
   DefaultTemplate,
+  defaultSetTarget,
   Exercise,
   measurementOf,
   sectionOf,
@@ -139,10 +140,9 @@ export function DefaultsManager({
         exercises={exercises}
         section={pickingFor}
         onPick={(exercise) => {
-          const defaultValue =
-            measurementOf(exercise, exercise.progressions[0].id) === "time"
-              ? 10
-              : 8;
+          const defaultValue = defaultSetTarget(
+            measurementOf(exercise, exercise.progressions[0].id),
+          );
           const we: WorkoutExercise = {
             id: crypto.randomUUID(),
             exerciseId: exercise.id,

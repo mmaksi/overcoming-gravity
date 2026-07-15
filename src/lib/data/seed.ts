@@ -87,32 +87,32 @@ const exercises: Exercise[] = [
     ["Single leg", "One leg extended fully, the other tucked; swap sides evenly."],
     ["Straddle", "Both legs extended wide; squeeze toward full over time."],
     ["Full", "Body fully horizontal under the bar with straight arms."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
   ex("back-lever", "Back Lever", "both", "skill", [
     ["German hang", "Skin-the-cat to a relaxed hang behind the body; builds shoulder extension."],
     ["Tuck", "Knees tucked, facing the floor; find the balance point."],
     ["Advanced tuck", "Hips open to ~90°, back flat, arms locked."],
     ["Straddle", "Legs wide and extended; brace hard through the glutes."],
     ["Full", "Fully horizontal facing down, arms straight behind you."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
   ex("handstand", "Handstand", "push", "skill", [
     ["Wall plank", "Feet on a box or low wall walk-ups; stack shoulders over hands."],
     ["Chest-to-wall hold", "Nose to the wall, hollow body, push tall through the shoulders."],
     ["Back-to-wall hold", "Kick up with heels resting on the wall; practice taking heels off."],
     ["Freestanding", "Balance without support; fingertip corrections, 30s+ goal."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
   ex("l-sit", "L-sit", "both", "skill", [
     ["Foot-supported", "Hands on floor or parallettes, heels lightly supported."],
     ["Tuck", "Knees to chest, feet off the floor, shoulders depressed."],
     ["One leg", "Extend one leg at a time; keep both hips level."],
     ["Full L-sit", "Both legs horizontal, knees locked, toes pointed."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
   ex("planche", "Planche", "push", "skill", [
     ["Planche lean", "Plank with shoulders pushed far past the wrists; straight arms."],
     ["Tuck", "Knees tucked tight, feet off the floor, full protraction."],
     ["Advanced tuck", "Flatten the back and open the hips to ~90°."],
     ["Straddle", "Legs wide and extended behind you; elite strength required."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
 
   // Strength ----------------------------------------------------------------
   ex("pull-up", "Pull-up", "pull", "strength", [
@@ -187,7 +187,7 @@ const exercises: Exercise[] = [
     ["Single unders", "Steady rhythm, soft knees, tall posture."],
     ["High pace", "Intervals: 40s fast / 20s easy."],
     ["Double unders", "Two rope passes per jump; wrists do the work."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
 
   // Prehabilitation -----------------------------------------------------
   ex("cuban-rotation", "Cuban Rotation", "pull", "prehabilitation", [
@@ -229,27 +229,27 @@ const exercises: Exercise[] = [
     ["Supported", "Sit on a cushion, legs wide, fold with a flat back."],
     ["Full fold", "Chest toward the floor between wide legs."],
     ["Weighted", "Light plate held at the chest to deepen the fold."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
   ex("shoulder-ext", "Shoulder Extension Stretch", "both", "flexibility", [
     ["Floor", "Hands behind you on the floor, fingers back; slide the hips forward."],
     ["Elevated", "Hands on a bench behind you; sink the shoulders."],
     ["German hang", "Full hang behind the body on rings or bar; breathe."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
   ex("thoracic-bridge", "Thoracic Bridge", "both", "flexibility", [
     ["Table bridge", "Hips up, chest open, gaze back — gentle opener."],
     ["Full bridge", "Push to a full bridge; straighten the arms."],
     ["Elevated bridge", "Feet elevated to bias the upper back and shoulders."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
 
   // Cool-down -----------------------------------------------------------
   ex("hang-decompress", "Hanging Decompression", "both", "cooldown", [
     ["Feet supported", "Passive hang with feet lightly on the floor."],
     ["Full hang", "Relaxed dead hang; let the spine and shoulders lengthen."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
   ex("breathing", "Down-regulation Breathing", "both", "cooldown", [
     ["4-4-8 pattern", "Inhale 4s, hold 4s, exhale 8s — five rounds lying down."],
     ["Box breathing", "4s each: in, hold, out, hold."],
-  ], { measurement: "time" }),
+  ], { measurement: "seconds" }),
 ];
 
 /** Template seed helper: one default workout-exercise entry. */

@@ -83,8 +83,13 @@ export const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   other: "Other",
 };
 
-/** How an exercise is measured: repetitions, or seconds of hold. */
-export const MEASUREMENTS = ["reps", "time"] as const;
+/**
+ * How a progression is measured: repetitions, seconds of hold, or minutes of
+ * hold. Each is a distinct entry unit the athlete can switch between while
+ * training. The legacy value "time" (pre-minutes) is read as "seconds" — see
+ * `measurementOf` / the schema's back-compat handling.
+ */
+export const MEASUREMENTS = ["reps", "seconds", "minutes"] as const;
 export type Measurement = (typeof MEASUREMENTS)[number];
 
 /**
@@ -252,7 +257,22 @@ export const PERIODIZATION_LABELS: Record<Periodization, string> = {
 
 export const MEASUREMENT_LABELS: Record<Measurement, string> = {
   reps: "Reps",
-  time: "Hold time (seconds)",
+  seconds: "Hold (seconds)",
+  minutes: "Hold (minutes)",
+};
+
+/** Short unit suffix for compact displays. */
+export const MEASUREMENT_UNIT: Record<Measurement, string> = {
+  reps: "reps",
+  seconds: "s",
+  minutes: "min",
+};
+
+/** One-word labels for tight toggles/pickers. */
+export const MEASUREMENT_SHORT: Record<Measurement, string> = {
+  reps: "Reps",
+  seconds: "Seconds",
+  minutes: "Minutes",
 };
 
 export const REP_STYLE_LABELS: Record<RepStyle, string> = {

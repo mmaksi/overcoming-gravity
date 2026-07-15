@@ -11,6 +11,7 @@ import {
   WEEKDAYS,
 } from "@/lib/domain/types";
 import {
+  defaultSetTarget,
   Exercise,
   measurementOf,
   Mesocycle,
@@ -389,10 +390,9 @@ export function MesocycleDesigner({
         onPick={(exercise) => {
           if (!pickingFor) return;
           const { weekday } = pickingFor;
-          const defaultValue =
-            measurementOf(exercise, exercise.progressions[0].id) === "time"
-              ? 10
-              : 8;
+          const defaultValue = defaultSetTarget(
+            measurementOf(exercise, exercise.progressions[0].id),
+          );
           const we: WorkoutExercise = {
             id: crypto.randomUUID(),
             exerciseId: exercise.id,

@@ -1,13 +1,17 @@
 import {
-  CustomWorkout,
+  CustomWorkoutSummary,
   Exercise,
   measurementOf,
-  Program,
   ProgramRun,
+  ProgramSummary,
   VolumeStats,
   WorkoutSession,
 } from "@/lib/domain/schemas";
-import { TECHNIQUES_BY_ID, WEEKDAY_LABELS } from "@/lib/domain/types";
+import {
+  MEASUREMENT_UNIT,
+  TECHNIQUES_BY_ID,
+  WEEKDAY_LABELS,
+} from "@/lib/domain/types";
 import { statsKey } from "@/lib/domain/volume";
 import type { ProgressRow } from "@/components/history/progress-list";
 
@@ -38,9 +42,9 @@ export type HistoryItem = {
 
 /** What to call a session in history: its program or custom-workout name. */
 export function makeSessionLabel(
-  programs: Program[],
+  programs: ProgramSummary[],
   runs: ProgramRun[],
-  customWorkouts: CustomWorkout[],
+  customWorkouts: CustomWorkoutSummary[],
 ): (session: WorkoutSession) => string {
   const programNameByRun = new Map(
     runs.map((r) => [
@@ -89,8 +93,8 @@ export function buildHistoryItems(
     for (const entry of session.entries) {
       if (entry.performedSets.length === 0) continue;
       const ex = exercisesById.get(entry.exerciseId);
-      const unit =
-        measurementOf(ex, entry.progressionId) === "time" ? "s" : "";
+      const m = measurementOf(ex, entry.progressionId, entry.measurement);
+      const unit = m === "reps" ? "" : MEASUREMENT_UNIT[m];
       const progressionName = (id: string) =>
         ex?.progressions.find((p) => p.id === id)?.name ?? "?";
       const progression = ex?.progressions.find(
@@ -146,6 +150,11 @@ export function buildHistoryItems(
   });
 }
 
+/** Unit suffix for a "best" value: " reps" | "s" | "min". */
+function bestUnit(m: ReturnType<typeof measurementOf>): string {
+  return m === "reps" ? " reps" : MEASUREMENT_UNIT[m];
+}
+
 /** "Intra" or the inter-exercise technique's name — what to do next time. */
 function methodLabel(interTechniqueId?: string): string {
   if (!interTechniqueId) return "Intra";
@@ -191,7 +200,7 @@ export function buildProgressRows(
         title: ex.title,
         attribute: ex.attribute as "skill" | "strength",
         detail: progression
-          ? `${progression.name} · best ${best ?? "—"}${measurementOf(ex, progression.id) === "time" ? "s" : " reps"} · ${methodLabel(currentMethod.get(ex.id))}`
+          ? `${progression.name} · best ${best ?? "—"}${bestUnit(measurementOf(ex, progression.id))} · ${methodLabel(currentMethod.get(ex.id))}`
           : "Not trained yet",
         step,
         totalSteps: ex.progressions.length,

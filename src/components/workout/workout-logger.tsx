@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Check,
   CheckCircle2,
+  ChevronDown,
   Clock,
   History,
   Info,
@@ -23,13 +24,16 @@ import {
   GROUP_TYPE_LABELS,
   INTENSITY_LABELS,
   Measurement,
+  MEASUREMENT_UNIT,
   TECHNIQUES_BY_ID,
   WEEK_FOCUS_LABELS,
   WeekFocus,
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
 import {
+  convertMeasureValue,
   Exercise,
+  exerciseNoteKey,
   measurementOf,
   sectionOf,
   SessionEntry,
@@ -65,10 +69,21 @@ import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
 import { cn } from "@/lib/utils";
 
+/** Short unit shown next to a set input: "sec" | "min" | "cluster reps" | "reps". */
 function unitOf(exercise: Exercise, measurement: Measurement): string {
-  if (measurement === "time") return "sec";
+  if (measurement === "seconds") return "sec";
+  if (measurement === "minutes") return "min";
   if (exercise.repStyle === "cluster") return "cluster reps";
   return "reps";
+}
+
+/** The next unit in the reps → seconds → minutes cycle. */
+function nextUnit(measurement: Measurement): Measurement {
+  return measurement === "reps"
+    ? "seconds"
+    : measurement === "seconds"
+      ? "minutes"
+      : "reps";
 }
 
 function volumeLabel(
@@ -76,7 +91,7 @@ function volumeLabel(
   measurement: Measurement,
 ): string {
   const values = sets.map((s) => s.reps ?? "—").join("/");
-  const unit = measurement === "time" ? "s" : " reps";
+  const unit = measurement === "reps" ? " reps" : MEASUREMENT_UNIT[measurement];
   const weighted = sets.filter((s) => s.weight !== undefined);
   const weight =
     weighted.length > 0
@@ -88,9 +103,14 @@ function volumeLabel(
 /** One progression-slice of a hybrid set. */
 type RawPart = { progressionId: string; reps: string };
 
-/** Digits only — the athlete may also clear the field completely. */
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, "");
+/**
+ * Digits only, plus a single decimal point when the unit allows fractions
+ * (minute holds like 1.5). The athlete may also clear the field completely.
+ */
+function cleanNumeric(value: string, allowDecimal: boolean): string {
+  return allowDecimal
+    ? value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1")
+    : value.replace(/\D/g, "");
 }
 
 /** Select the whole value on focus so typing replaces it immediately. */
@@ -181,6 +201,8 @@ type EntryState = {
   progressionId: string;
   interTechniqueId?: string;
   notes?: string;
+  /** The unit the athlete is logging in — switchable mid-workout. */
+  measurement?: Measurement;
   sets: RawSet[];
 };
 
@@ -203,7 +225,7 @@ export function WorkoutLogger({
   weekFocus?: WeekFocus;
   exercises: Exercise[];
   stats: Record<string, VolumeStats>;
-  /** Remembered notes keyed by exercise id. */
+  /** Remembered notes keyed by `exerciseNoteKey(exerciseId, progressionId)`. */
   userNotes?: Record<string, string>;
 }) {
   const router = useRouter();
@@ -268,6 +290,7 @@ export function WorkoutLogger({
           progressionId: existing.progressionId,
           interTechniqueId: existing.interTechniqueId ?? we.interTechniqueId,
           notes: existing.notes,
+          measurement: existing.measurement ?? we.measurement,
           sets: existing.performedSets.map((s) => ({
             reps: s.reps === null ? "" : String(s.reps),
             weight: s.weight !== undefined ? String(s.weight) : "",
@@ -293,8 +316,9 @@ export function WorkoutLogger({
         exerciseId: we.exerciseId,
         progressionId: we.progressionId,
         interTechniqueId: we.interTechniqueId,
-        // Remembered note for this exercise always resurfaces.
-        notes: we.notes ?? userNotes[we.exerciseId],
+        measurement: we.measurement,
+        // Remembered note for this exercise progression always resurfaces.
+        notes: we.notes ?? userNotes[exerciseNoteKey(we.exerciseId, we.progressionId)],
         // Start empty: the placeholder shows your past max for this
         // progression (or the plan target). Empty stays empty on "save
         // progress" and resolves to the placeholder on "complete".
@@ -318,6 +342,24 @@ export function WorkoutLogger({
         e.workoutExerciseId === workoutExerciseId ? updater(e) : e,
       ),
     );
+  }
+
+  /**
+   * Switch how this exercise is logged today (reps → seconds → minutes),
+   * converting typed set values so the physical amount is preserved across
+   * seconds↔minutes. The choice is saved on the session entry.
+   */
+  function cycleUnit(workoutExerciseId: string, current: Measurement) {
+    const to = nextUnit(current);
+    updateEntry(workoutExerciseId, (en) => ({
+      ...en,
+      measurement: to,
+      sets: en.sets.map((s) =>
+        s.reps === ""
+          ? s
+          : { ...s, reps: String(convertMeasureValue(Number(s.reps), current, to)) },
+      ),
+    }));
   }
 
   /** Placeholder for a set input: past best, else the plan target. */
@@ -433,6 +475,7 @@ export function WorkoutLogger({
         progressionId: entry.progressionId,
         interTechniqueId: entry.interTechniqueId,
         notes: entry.notes || undefined,
+        measurement: entry.measurement,
         performedSets,
       };
     });
@@ -708,7 +751,7 @@ export function WorkoutLogger({
             const measurement = measurementOf(
               ex,
               entry.progressionId,
-              we.measurement,
+              entry.measurement ?? we.measurement,
             );
             const unit = unitOf(ex, measurement);
             const allDone =
@@ -784,7 +827,9 @@ export function WorkoutLogger({
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Trophy className="size-3" />
                           Best single set: {max}
-                          {measurement === "time" ? "s" : " reps"}
+                          {measurement === "reps"
+                            ? " reps"
+                            : MEASUREMENT_UNIT[measurement]}
                         </p>
                       )}
                     </div>
@@ -809,8 +854,12 @@ export function WorkoutLogger({
                           {!isHybrid && (
                             <Input
                               type="text"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
+                              inputMode={
+                                measurement === "minutes" ? "decimal" : "numeric"
+                              }
+                              pattern={
+                                measurement === "minutes" ? "[0-9.]*" : "[0-9]*"
+                              }
                               disabled={readOnly}
                               placeholder={String(placeholderFor(entry, we, j))}
                               value={s.reps}
@@ -822,7 +871,10 @@ export function WorkoutLogger({
                                     k === j
                                       ? {
                                           ...x,
-                                          reps: digitsOnly(e.target.value),
+                                          reps: cleanNumeric(
+                                            e.target.value,
+                                            measurement === "minutes",
+                                          ),
                                         }
                                       : x,
                                   ),
@@ -830,11 +882,25 @@ export function WorkoutLogger({
                               }
                             />
                           )}
-                          {!isHybrid && (
-                            <span className="w-12 shrink-0 text-xs text-muted-foreground">
-                              {isHybridEcc ? "dyn." : unit}
-                            </span>
-                          )}
+                          {!isHybrid &&
+                            (isHybridEcc ? (
+                              <span className="w-12 shrink-0 text-xs text-muted-foreground">
+                                dyn.
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={readOnly}
+                                onClick={() => cycleUnit(we.id, measurement)}
+                                title="Tap to switch unit: reps → seconds → minutes"
+                                className="flex w-12 shrink-0 items-center gap-0.5 text-left text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-100"
+                              >
+                                {unit}
+                                {!readOnly && (
+                                  <ChevronDown className="size-3 shrink-0" />
+                                )}
+                              </button>
+                            ))}
                           {isHybridEcc ? (
                             <>
                               <Input
@@ -852,8 +918,9 @@ export function WorkoutLogger({
                                       k === j
                                         ? {
                                             ...x,
-                                            eccentricReps: digitsOnly(
+                                            eccentricReps: cleanNumeric(
                                               e.target.value,
+                                              false,
                                             ),
                                           }
                                         : x,
@@ -954,8 +1021,9 @@ export function WorkoutLogger({
                                                 q === pi
                                                   ? {
                                                       ...p,
-                                                      reps: digitsOnly(
+                                                      reps: cleanNumeric(
                                                         e.target.value,
+                                                        false,
                                                       ),
                                                     }
                                                   : p,
@@ -1069,7 +1137,8 @@ export function WorkoutLogger({
                       </div>
                     )}
                     {/* Notes are always available and remembered per
-                        exercise, so they resurface every time you train it. */}
+                        progression, so they resurface every time you train
+                        that progression. */}
                     <Textarea
                       placeholder={
                         technique?.prompt ??
@@ -1100,21 +1169,34 @@ export function WorkoutLogger({
                   stats={stats}
                   readOnly={readOnly}
                   onChange={(patch) =>
-                    updateEntry(we.id, (en) => ({
-                      ...en,
-                      ...(patch.progressionId !== undefined && {
-                        progressionId: patch.progressionId,
-                      }),
-                      ...(patch.notes !== undefined && { notes: patch.notes }),
-                      ...(patch.interTechniqueId !== undefined && {
-                        interTechniqueId: patch.interTechniqueId ?? undefined,
-                        // Prefill the remembered note for this exercise if the
-                        // field is still empty (never overwrite what's typed).
-                        ...(!en.notes?.trim() && {
-                          notes: userNotes[en.exerciseId],
-                        }),
-                      }),
-                    }))
+                    updateEntry(we.id, (en) => {
+                      const next = { ...en };
+                      if (patch.progressionId !== undefined) {
+                        next.progressionId = patch.progressionId;
+                        // Swapping progression surfaces that progression's own
+                        // remembered note, but only into an empty field.
+                        if (!en.notes?.trim()) {
+                          next.notes =
+                            userNotes[
+                              exerciseNoteKey(en.exerciseId, patch.progressionId)
+                            ];
+                        }
+                      }
+                      if (patch.notes !== undefined) next.notes = patch.notes;
+                      if (patch.interTechniqueId !== undefined) {
+                        next.interTechniqueId =
+                          patch.interTechniqueId ?? undefined;
+                        // Prefill the remembered note for the current
+                        // progression when nothing has been typed yet.
+                        if (!next.notes?.trim()) {
+                          next.notes =
+                            userNotes[
+                              exerciseNoteKey(en.exerciseId, next.progressionId)
+                            ];
+                        }
+                      }
+                      return next;
+                    })
                   }
                 />
               </div>

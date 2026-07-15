@@ -19,11 +19,11 @@ import {
   Category,
   CATEGORY_LABELS,
   Measurement,
-  MEASUREMENT_LABELS,
+  MEASUREMENT_SHORT,
   MEASUREMENTS,
   RepStyle,
 } from "@/lib/domain/types";
-import { Exercise } from "@/lib/domain/schemas";
+import { Exercise, measurementOf } from "@/lib/domain/schemas";
 import { removeExercise, saveExercise } from "@/lib/actions/admin";
 import { ExerciseThumb } from "@/components/exercise/exercise-thumb";
 import { Button } from "@/components/ui/button";
@@ -238,15 +238,15 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                     title: e.title,
                     category: e.category,
                     attribute: e.attribute,
-                    measurement: e.measurement ?? "reps",
+                    measurement: measurementOf(e, e.progressions[0]?.id),
                     repStyle: e.repStyle ?? "standard",
                     imageUrl: e.imageUrl ?? "",
                     progressions: e.progressions.map((p) => ({
                       ...p,
                       description: p.description ?? "",
-                      // Fall back to the exercise-level default for
-                      // progressions saved before per-progression units.
-                      measurement: p.measurement ?? e.measurement ?? "reps",
+                      // Resolve (and normalize legacy "time") the per-progression
+                      // unit, falling back to the exercise-level default.
+                      measurement: measurementOf(e, p.id),
                     })),
                   })
                 }
@@ -472,7 +472,7 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                                 : "rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30"
                             }
                           >
-                            {MEASUREMENT_LABELS[m]}
+                            {MEASUREMENT_SHORT[m]}
                           </button>
                         ))}
                       </div>

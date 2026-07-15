@@ -11,7 +11,11 @@ import {
 } from "@/lib/data/cached";
 import { toISODate } from "@/lib/domain/schedule";
 import { workoutStreak } from "@/lib/domain/streak";
-import { ATTRIBUTES, WEEKDAY_LABELS } from "@/lib/domain/types";
+import {
+  ATTRIBUTES,
+  MEASUREMENT_UNIT,
+  WEEKDAY_LABELS,
+} from "@/lib/domain/types";
 import {
   Exercise,
   measurementOf,
@@ -64,10 +68,8 @@ function UpcomingExercises({
           const progression = exercise?.progressions.find(
             (p) => p.id === we.progressionId,
           );
-          const unit =
-            measurementOf(exercise, we.progressionId, we.measurement) === "time"
-              ? "s"
-              : "";
+          const m = measurementOf(exercise, we.progressionId, we.measurement);
+          const unit = m === "reps" ? "" : MEASUREMENT_UNIT[m];
           return (
             <li
               key={we.id}
