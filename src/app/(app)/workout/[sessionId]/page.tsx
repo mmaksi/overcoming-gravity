@@ -43,9 +43,14 @@ export default async function WorkoutPage({
   }
   if (!plannedDay) notFound();
 
+  // Only the exercises planned for this day need stats — so we fetch just the
+  // completed sessions that reference them, not the athlete's whole history.
+  const plannedExerciseIds = [
+    ...new Set(plannedDay.exercises.map((we) => we.exerciseId)),
+  ];
   const [exercises, completed, notes] = await Promise.all([
     getCachedExercises(store),
-    store.listCompletedSessions(user.id),
+    store.listCompletedSessionsByExercises(user.id, plannedExerciseIds),
     store.listExerciseNotes(user.id),
   ]);
 

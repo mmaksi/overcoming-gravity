@@ -66,7 +66,7 @@ export default async function CalendarPage({
   const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   const gridEnd = cells[cells.length - 1];
 
-  const sessions = await store.listSessionsByUser(
+  const sessions = await store.listSessionSummariesByUser(
     user.id,
     toISODate(gridStart),
     toISODate(gridEnd),
@@ -85,7 +85,7 @@ export default async function CalendarPage({
   );
   const sportByDate = new Map<string, string>();
   for (const run of runs) {
-    const program = await store.getProgram(run.programId);
+    const program = await store.getProgramSummary(run.programId);
     if (!program?.sport) continue;
     const start = parseISODate(run.startDate);
     for (let i = 0; i < program.weeks * 7; i++) {

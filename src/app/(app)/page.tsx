@@ -7,6 +7,7 @@ import {
   getCachedDashboard,
   getCachedExercises,
   getCachedFinishedSessions,
+  getCachedProgramDay,
   getCachedUserPrograms,
 } from "@/lib/data/cached";
 import { toISODate } from "@/lib/domain/schedule";
@@ -20,8 +21,8 @@ import {
   Exercise,
   measurementOf,
   sectionOf,
+  SessionSummary,
   WorkoutDay,
-  WorkoutSession,
 } from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,7 @@ function UpcomingExercises({
   isToday,
 }: {
   day: WorkoutDay;
-  session: WorkoutSession;
+  session: SessionSummary;
   exercisesById: Map<string, Exercise>;
   isToday: boolean;
 }) {
@@ -168,10 +169,18 @@ export default async function DashboardPage() {
       sessions.length === 0 ? 0 : Math.round((done / sessions.length) * 100);
 
     const upcoming = todaySession ?? nextSession;
-    const upcomingDay = upcoming
-      ? (program?.mesocycle.weeks[upcoming.weekIndex]?.days[upcoming.weekday] ??
-        null)
-      : null;
+    // The one planned day the card previews — fetched on its own so the
+    // dashboard cache never carries the whole mesocycle.
+    const upcomingDay =
+      upcoming && program
+        ? await getCachedProgramDay(
+            store,
+            user.id,
+            program.id,
+            upcoming.weekIndex,
+            upcoming.weekday,
+          )
+        : null;
 
     runCards.push(
       <Card
@@ -215,7 +224,7 @@ export default async function DashboardPage() {
                   <Play className="size-4" />
                   {todaySession.status === "completed"
                     ? "Review workout"
-                    : todaySession.entries.length > 0
+                    : todaySession.hasEntries
                       ? "Continue workout"
                       : "Start workout"}
                 </Link>
