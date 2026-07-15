@@ -4,13 +4,14 @@ import { Lightbulb } from "lucide-react";
 // pick is deterministic for a given day seed (computed on the server) so the
 // server and client render the same tip with no hydration flash.
 const TIPS: string[] = [
+  "Are you sleeping well? That's the secret to solidifying your workout gains.",
   "Progress on skills by making each rep harder, not just adding reps: slower tempo, longer holds, or a tougher leverage.",
   "Grease the groove — practise a hard skill often with fresh, sub-maximal sets. Frequency builds strength faster than grinding to failure.",
   "Log every set. What gets measured gets progressed — next time, aim to beat one number.",
   "Full range of motion first, extra reps second. Deeper reps build more strength and mobility than shallow ones.",
-  "Rest fully between hard skill sets (2–4 min). Strength work rewards quality, not breathlessness.",
-  "Warm the exact joints you're about to load — wrists before planches, shoulders before pulls.",
-  "Struggling to add a rep? Add an eccentric instead: lower slowly for 3–5 seconds and your strength will catch up.",
+  "Rest fully between hard skill sets (3-5 min). Strength work rewards quality, not breathlessness.",
+  "Warm the exact joints you're about to load — wrists before handstands, shoulders before pulls.",
+  "Struggling to add a rep? Check out the different progression methods in your workout logger.",
   "Deload on purpose every few weeks. Backing off lets adaptations surface — you come back stronger, not weaker.",
   "Straight-arm strength (planche, front lever) needs patient, frequent, low-rep practice. Protect your elbows: build slowly.",
   "Consistency beats intensity. Three focused sessions every week for months outperforms the occasional brutal one.",
