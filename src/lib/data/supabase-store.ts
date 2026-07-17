@@ -1,5 +1,6 @@
 import "server-only";
 import { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 import {
   BodyweightEntry,
   CustomWorkout,
@@ -33,6 +34,7 @@ const columnMeasurement = (m: string): "reps" | "time" =>
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
+type Tables = Database["public"]["Tables"];
 
 // Row ↔ domain mappers (tables use snake_case; jsonb columns hold documents).
 
@@ -94,7 +96,7 @@ const toProgramSummary = (r: Row): ProgramSummary => ({
   updatedAt: r.updated_at,
 });
 
-const fromProgram = (p: Program): Row => ({
+const fromProgram = (p: Program): Tables["programs"]["Insert"] => ({
   id: p.id,
   user_id: p.userId,
   name: p.name,
@@ -120,7 +122,7 @@ const toRun = (r: Row): ProgramRun => ({
   createdAt: r.created_at,
 });
 
-const fromRun = (r: ProgramRun): Row => ({
+const fromRun = (r: ProgramRun): Tables["runs"]["Insert"] => ({
   id: r.id,
   program_id: r.programId,
   user_id: r.userId,
@@ -157,7 +159,7 @@ const toSessionSummary = (r: Row): SessionSummary => ({
   hasEntries: r.has_entries ?? false,
 });
 
-const fromSession = (s: WorkoutSession): Row => ({
+const fromSession = (s: WorkoutSession): Tables["sessions"]["Insert"] => ({
   id: s.id,
   run_id: s.runId ?? null,
   custom_workout_id: s.customWorkoutId ?? null,
@@ -179,7 +181,7 @@ const toCustomWorkout = (r: Row): CustomWorkout => ({
   updatedAt: r.updated_at,
 });
 
-const fromCustomWorkout = (w: CustomWorkout): Row => ({
+const fromCustomWorkout = (w: CustomWorkout): Tables["custom_workouts"]["Insert"] => ({
   id: w.id,
   user_id: w.userId,
   title: w.title,
@@ -194,7 +196,7 @@ function orThrow<T>(result: { data: T | null; error: { message: string } | null 
 }
 
 class SupabaseStore implements DataStore {
-  constructor(private db: SupabaseClient) {}
+  constructor(private db: SupabaseClient<Database>) {}
 
   // Admin-managed content ---------------------------------------------------
   async listExercises(): Promise<Exercise[]> {
@@ -248,9 +250,10 @@ class SupabaseStore implements DataStore {
     if (rows.length === 0) {
       return { id: "default", day: { exercises: [], groups: [] } };
     }
-    if (rows[0].day) return { id: "default", day: rows[0].day };
+    if (rows[0].day)
+      return { id: "default", day: rows[0].day as DefaultTemplate["day"] };
     // Legacy shape: a flat entries list, converted on read (0006 backfills).
-    const entries: Row[] = rows[0].entries ?? [];
+    const entries = (rows[0].entries ?? []) as Row[];
     return {
       id: "default",
       day: {

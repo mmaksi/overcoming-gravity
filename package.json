@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "export-seed": "node scripts/export-seed-sql.mjs > supabase/seed.sql",
     "db:reset": "node scripts/reset-dev-db.mjs",
+    "gen:types": "npx supabase@latest gen types typescript --project-id oyewssewymugflwbbxfo --schema public > src/lib/supabase/database.types.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
