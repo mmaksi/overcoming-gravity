@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   Attribute,
+  ATTRIBUTE_ORDER,
   ATTRIBUTES,
   CATEGORIES,
   FEEDBACK_TYPES,
@@ -16,6 +17,7 @@ import {
   REP_STYLES,
   SPLIT_TYPES,
   WEEK_FOCUSES,
+  WeekFocus,
   WEEKDAYS,
 } from "./types";
 
@@ -180,6 +182,61 @@ export function sectionOf(
   exercisesById: Map<string, Exercise>,
 ): Attribute {
   return we.section ?? exercisesById.get(we.exerciseId)?.attribute ?? "strength";
+}
+
+/** One rendered section of a workout day. */
+export type WorkoutDaySection = {
+  attribute: Attribute;
+  exercises: WorkoutExercise[];
+};
+
+/**
+ * The canonical display order of a workout day: sections in ATTRIBUTE_ORDER,
+ * original array order within each section. Every screen (designer, logger,
+ * home preview) renders this order and the save actions persist it back
+ * (see `normalizeWorkoutDay`), so the stored array and every view agree.
+ */
+export function daySections(
+  exercises: WorkoutExercise[],
+  exercisesById: Map<string, Exercise>,
+): WorkoutDaySection[] {
+  return ATTRIBUTE_ORDER.map((attribute) => ({
+    attribute,
+    exercises: exercises.filter(
+      (we) => sectionOf(we, exercisesById) === attribute,
+    ),
+  })).filter((s) => s.exercises.length > 0);
+}
+
+/** A day's exercises flattened into canonical display order. */
+export function orderDayExercises(
+  exercises: WorkoutExercise[],
+  exercisesById: Map<string, Exercise>,
+): WorkoutExercise[] {
+  return daySections(exercises, exercisesById).flatMap((s) => s.exercises);
+}
+
+/**
+ * Pin a day to what the athlete sees in the designer: every exercise gets an
+ * explicit `section` (resolved against the current catalog) and the array is
+ * stored in canonical display order. Without the pin, entries created before
+ * the `section` field (wizard/template days) resolve their section from the
+ * live catalog at render time — so an admin re-categorizing an exercise
+ * silently reshuffled already-designed workouts. Once pinned, the order
+ * created in the designer is exactly the order the workout runs in.
+ */
+export function normalizeWorkoutDay(
+  day: WorkoutDay,
+  exercisesById: Map<string, Exercise>,
+): WorkoutDay {
+  return {
+    ...day,
+    exercises: daySections(day.exercises, exercisesById).flatMap((s) =>
+      s.exercises.map((we) =>
+        we.section === s.attribute ? we : { ...we, section: s.attribute },
+      ),
+    ),
+  };
 }
 
 export const exerciseGroupSchema = z.object({
@@ -502,3 +559,14 @@ export type SessionSummary = Omit<WorkoutSession, "entries"> & {
 
 /** A custom workout without its day — history labels and lists. */
 export type CustomWorkoutSummary = Omit<CustomWorkout, "day">;
+
+/**
+ * One planned day plus its week's training context (deload / A&I focus) —
+ * what the workout logger and the dashboard's "up next" preview need, read
+ * without downloading the whole mesocycle.
+ */
+export type ProgramDayPlan = {
+  day: WorkoutDay;
+  isDeload: boolean;
+  focus?: WeekFocus;
+};

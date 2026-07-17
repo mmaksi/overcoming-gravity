@@ -8,10 +8,10 @@ import {
   Profile,
   ProfileStats,
   Program,
+  ProgramDayPlan,
   ProgramRun,
   ProgramSummary,
   SessionSummary,
-  WorkoutDay,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import { Weekday } from "@/lib/domain/types";
@@ -33,7 +33,6 @@ export interface DataStore {
   saveDefaultTemplate(template: DefaultTemplate): Promise<DefaultTemplate>;
 
   // User content --------------------------------------------------------------
-  listPrograms(userId: string): Promise<Program[]>;
   getProgram(id: string): Promise<Program | null>;
   createProgram(program: Program): Promise<Program>;
   updateProgram(program: Program): Promise<Program>;
@@ -45,12 +44,16 @@ export interface DataStore {
    */
   listProgramSummaries(userId: string): Promise<ProgramSummary[]>;
   getProgramSummary(id: string): Promise<ProgramSummary | null>;
-  /** A single planned day out of a program's mesocycle (dashboard "up next"). */
+  /**
+   * A single planned day (plus its week's deload/focus context) out of a
+   * program's mesocycle — the dashboard "up next" preview and the workout
+   * logger. Extracted in the database so the whole mesocycle never travels.
+   */
   getProgramDay(
     programId: string,
     weekIndex: number,
     weekday: Weekday,
-  ): Promise<WorkoutDay | null>;
+  ): Promise<ProgramDayPlan | null>;
 
   // Standalone workouts outside any program.
   listCustomWorkouts(userId: string): Promise<CustomWorkout[]>;
@@ -74,11 +77,6 @@ export interface DataStore {
   listSessionSummariesByRun(runId: string): Promise<SessionSummary[]>;
   /** Remove a run's not-yet-done sessions (used when a run is abandoned). */
   deletePlannedSessions(runId: string): Promise<void>;
-  listSessionsByUser(
-    userId: string,
-    fromDate: string,
-    toDate: string,
-  ): Promise<WorkoutSession[]>;
   /** Session summaries (no entries) in a date window — the calendar grid. */
   listSessionSummariesByUser(
     userId: string,
@@ -113,17 +111,22 @@ export interface DataStore {
   ): Promise<WorkoutSession[]>;
 
   /**
-   * Every finished schedule slot — completed **and** skipped — oldest first.
-   * Powers the workout streak (consecutive completions, broken by a skip).
+   * Every finished schedule slot — completed **and** skipped — oldest first,
+   * as summaries (the streak only reads statuses, never entries).
    */
-  listFinishedSessions(userId: string): Promise<WorkoutSession[]>;
+  listFinishedSessions(userId: string): Promise<SessionSummary[]>;
 
   /**
-   * A user's remembered notes per exercise progression. Saving upserts on
-   * (userId, exerciseId, progressionId).
+   * A user's remembered notes per exercise progression, optionally scoped to
+   * the given exercises (the workout page only needs the day's exercises).
+   * Saving bulk-upserts on (userId, exerciseId, progressionId) in one round
+   * trip — a workout save writes every entry's note at once.
    */
-  listExerciseNotes(userId: string): Promise<ExerciseNote[]>;
-  saveExerciseNote(note: ExerciseNote): Promise<ExerciseNote>;
+  listExerciseNotes(
+    userId: string,
+    exerciseIds?: string[],
+  ): Promise<ExerciseNote[]>;
+  saveExerciseNotes(notes: ExerciseNote[]): Promise<void>;
 
   // Users -----------------------------------------------------------------
   getProfile(userId: string): Promise<Profile | null>;

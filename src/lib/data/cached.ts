@@ -1,10 +1,10 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import {
+  ProgramDayPlan,
   ProgramRun,
   ProgramSummary,
   SessionSummary,
-  WorkoutDay,
 } from "@/lib/domain/schemas";
 import { Weekday } from "@/lib/domain/types";
 import { DataStore } from "./store";
@@ -172,10 +172,13 @@ export function getCachedProgramDay(
   programId: string,
   weekIndex: number,
   weekday: Weekday,
-): Promise<WorkoutDay | null> {
+): Promise<ProgramDayPlan | null> {
   return unstable_cache(
     () => store.getProgramDay(programId, weekIndex, weekday),
-    ["program-day", programId, String(weekIndex), weekday],
+    // "-plan" versions the key: the cached shape changed from a bare
+    // WorkoutDay to ProgramDayPlan, and stale entries survive restarts and
+    // even deploys — a shape change must always change the key.
+    ["program-day-plan", programId, String(weekIndex), weekday],
     { tags: [userDashboardTag(userId)] },
   )();
 }

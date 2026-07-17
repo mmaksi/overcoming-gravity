@@ -11,7 +11,14 @@ import {
   userHistoryTag,
   userProgramsTag,
 } from "@/lib/data/cached";
-import { GoalItem, mesocycleSchema, Program } from "@/lib/domain/schemas";
+import {
+  GoalItem,
+  Mesocycle,
+  mesocycleSchema,
+  normalizeWorkoutDay,
+  Program,
+  Week,
+} from "@/lib/domain/schemas";
 import { GOAL_AREAS, GoalArea } from "@/lib/domain/types";
 import { buildMesocycle } from "@/lib/domain/build";
 import { WizardPayload, wizardPayloadSchema } from "@/lib/domain/wizard";
@@ -95,9 +102,25 @@ export async function saveMesocycle(input: {
   if (!program || program.userId !== user.id) {
     throw new Error("Program not found");
   }
+  // Pin every day to the order the designer displayed (explicit sections,
+  // canonical array order) so later catalog re-categorization can never
+  // reshuffle a designed workout. See `normalizeWorkoutDay`.
+  const exercises = await getCachedExercises(store);
+  const exercisesById = new Map(exercises.map((e) => [e.id, e]));
+  const normalized: Mesocycle = {
+    weeks: mesocycle.weeks.map((week): Week => {
+      const days: Week["days"] = {};
+      for (const [weekday, day] of Object.entries(week.days)) {
+        days[weekday as keyof Week["days"]] = day
+          ? normalizeWorkoutDay(day, exercisesById)
+          : day;
+      }
+      return { ...week, days };
+    }),
+  };
   const updated: Program = {
     ...program,
-    mesocycle,
+    mesocycle: normalized,
     updatedAt: new Date().toISOString(),
   };
   await store.updateProgram(updated);

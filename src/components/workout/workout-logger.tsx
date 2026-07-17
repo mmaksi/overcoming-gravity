@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import {
   ATTRIBUTE_LABELS,
-  ATTRIBUTE_ORDER,
   GROUP_TYPE_COLORS,
   GROUP_TYPE_LABELS,
   INTENSITY_LABELS,
@@ -32,10 +31,10 @@ import {
 } from "@/lib/domain/types";
 import {
   convertMeasureValue,
+  daySections,
   Exercise,
   exerciseNoteKey,
   measurementOf,
-  sectionOf,
   SessionEntry,
   VolumeStats,
   WorkoutDay,
@@ -43,7 +42,7 @@ import {
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import { statsKey } from "@/lib/domain/volume";
-import { saveWorkoutSession } from "@/lib/actions/runs";
+import { rememberExerciseNote, saveWorkoutSession } from "@/lib/actions/runs";
 import { queryKeys } from "@/lib/query/keys";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -262,17 +261,20 @@ export function WorkoutLogger({
     [exercises],
   );
 
+  // Live per-progression note texts for this workout, seeded from the server's
+  // remembered notes. Swapping progression mid-workout stashes the current
+  // text under the progression being left and surfaces the target
+  // progression's own note — notes never travel between progressions.
+  const notesByProgression = useRef<Record<string, string>>({ ...userNotes });
+
   // Exercises in designed order: warm-up → skill → strength → … → cool-down,
   // one visually separated block per section (an exercise may be planned
-  // into a section other than its own attribute).
-  const sections = useMemo(() => {
-    return ATTRIBUTE_ORDER.map((attribute) => ({
-      attribute,
-      exercises: plannedDay.exercises.filter(
-        (we) => sectionOf(we, exercisesById) === attribute,
-      ),
-    })).filter((s) => s.exercises.length > 0);
-  }, [plannedDay.exercises, exercisesById]);
+  // into a section other than its own attribute). `daySections` is the same
+  // canonical order the designer displays and persists.
+  const sections = useMemo(
+    () => daySections(plannedDay.exercises, exercisesById),
+    [plannedDay.exercises, exercisesById],
+  );
   const orderedExercises = useMemo(
     () => sections.flatMap((s) => s.exercises),
     [sections],
@@ -317,8 +319,11 @@ export function WorkoutLogger({
         progressionId: we.progressionId,
         interTechniqueId: we.interTechniqueId,
         measurement: we.measurement,
-        // Remembered note for this exercise progression always resurfaces.
-        notes: we.notes ?? userNotes[exerciseNoteKey(we.exerciseId, we.progressionId)],
+        // The remembered note for this exact progression resurfaces; the
+        // plan-level note is only a seed for progressions never noted before.
+        notes:
+          userNotes[exerciseNoteKey(we.exerciseId, we.progressionId)] ??
+          we.notes,
         // Start empty: the placeholder shows your past max for this
         // progression (or the plan target). Empty stays empty on "save
         // progress" and resolves to the placeholder on "complete".
@@ -519,6 +524,17 @@ export function WorkoutLogger({
     onMutate: () => setSaveStatus("saving"),
     onSuccess: () => setSaveStatus("saved"),
     onError: () => setSaveStatus("idle"),
+  });
+
+  // Fire-and-forget: persists the note of a progression the athlete is
+  // swapping away from (the session save only carries the final progression's
+  // note). Failures are silent — the note still lives in this session's state.
+  const rememberNoteMutation = useMutation({
+    mutationFn: (input: {
+      exerciseId: string;
+      progressionId: string;
+      note: string;
+    }) => rememberExerciseNote(input),
   });
 
   async function submit(action: "save" | "complete" | "skip") {
@@ -1171,16 +1187,32 @@ export function WorkoutLogger({
                   onChange={(patch) =>
                     updateEntry(we.id, (en) => {
                       const next = { ...en };
-                      if (patch.progressionId !== undefined) {
-                        next.progressionId = patch.progressionId;
-                        // Swapping progression surfaces that progression's own
-                        // remembered note, but only into an empty field.
-                        if (!en.notes?.trim()) {
-                          next.notes =
-                            userNotes[
-                              exerciseNoteKey(en.exerciseId, patch.progressionId)
-                            ];
+                      if (
+                        patch.progressionId !== undefined &&
+                        patch.progressionId !== en.progressionId
+                      ) {
+                        // Notes are per progression: stash the current text
+                        // under the progression being left (and persist it —
+                        // the session save only carries the final
+                        // progression's note), then surface the target
+                        // progression's own remembered note.
+                        const oldKey = exerciseNoteKey(
+                          en.exerciseId,
+                          en.progressionId,
+                        );
+                        notesByProgression.current[oldKey] = en.notes ?? "";
+                        if (en.notes?.trim()) {
+                          rememberNoteMutation.mutate({
+                            exerciseId: en.exerciseId,
+                            progressionId: en.progressionId,
+                            note: en.notes.trim(),
+                          });
                         }
+                        next.progressionId = patch.progressionId;
+                        next.notes =
+                          notesByProgression.current[
+                            exerciseNoteKey(en.exerciseId, patch.progressionId)
+                          ] || undefined;
                       }
                       if (patch.notes !== undefined) next.notes = patch.notes;
                       if (patch.interTechniqueId !== undefined) {
@@ -1190,7 +1222,7 @@ export function WorkoutLogger({
                         // progression when nothing has been typed yet.
                         if (!next.notes?.trim()) {
                           next.notes =
-                            userNotes[
+                            notesByProgression.current[
                               exerciseNoteKey(en.exerciseId, next.progressionId)
                             ];
                         }

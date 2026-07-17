@@ -147,18 +147,19 @@ export async function saveWorkoutSession(input: {
   // Notes belong to the user + exercise progression, so they resurface every
   // time that specific progression is trained (mid-workout progression swaps
   // are captured because the entry carries the progression actually performed).
+  // One bulk upsert — this runs on every save, including the 2.5s autosave.
   const now = new Date().toISOString();
-  for (const entry of entries) {
-    if (entry.notes?.trim()) {
-      await store.saveExerciseNote({
+  await store.saveExerciseNotes(
+    entries
+      .filter((entry) => entry.notes?.trim())
+      .map((entry) => ({
         userId: user.id,
         exerciseId: entry.exerciseId,
         progressionId: entry.progressionId,
-        note: entry.notes.trim(),
+        note: entry.notes!.trim(),
         updatedAt: now,
-      });
-    }
-  }
+      })),
+  );
 
   // A run is finished once no planned sessions remain. Custom-workout
   // sessions have no run to complete.
@@ -168,7 +169,8 @@ export async function saveWorkoutSession(input: {
     const run = await store.getRun(session.runId);
     if (run && run.status === "active") {
       programId = run.programId;
-      const sessions = await store.listSessionsByRun(run.id);
+      // Summaries: the check only reads statuses, never performed sets.
+      const sessions = await store.listSessionSummariesByRun(run.id);
       if (sessions.every((s) => s.status !== "planned")) {
         await store.updateRun({ ...run, status: "completed" });
         runCompleted = true;
@@ -192,6 +194,40 @@ export async function saveWorkoutSession(input: {
     revalidatePath("/");
   }
   return { runCompleted, programId };
+}
+
+const rememberNoteSchema = z.object({
+  exerciseId: z.string(),
+  progressionId: z.string(),
+  note: z.string().trim().min(1).max(4000),
+});
+
+/**
+ * Persist one progression's remembered note immediately. The logger calls
+ * this when the athlete swaps progression mid-workout with a note typed for
+ * the progression they're leaving — the session save only carries the note of
+ * the progression the entry ends on, so without this the just-typed note
+ * would be lost (or, before the per-progression fix, wrongly re-saved under
+ * every progression the athlete flipped through).
+ */
+export async function rememberExerciseNote(input: {
+  exerciseId: string;
+  progressionId: string;
+  note: string;
+}): Promise<void> {
+  const user = await requireUser();
+  const parsed = rememberNoteSchema.parse(input);
+  const store = await getStore();
+  await store.saveExerciseNotes([
+    {
+      userId: user.id,
+      exerciseId: parsed.exerciseId,
+      progressionId: parsed.progressionId,
+      note: parsed.note,
+      updatedAt: new Date().toISOString(),
+    },
+  ]);
+  // No cache tags: remembered notes are read per-request on the workout page.
 }
 
 /** Delete a logged workout from history. Does not touch the program plan. */

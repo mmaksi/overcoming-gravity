@@ -12,15 +12,11 @@ import {
 } from "@/lib/data/cached";
 import { toISODate } from "@/lib/domain/schedule";
 import { workoutStreak } from "@/lib/domain/streak";
-import {
-  ATTRIBUTES,
-  MEASUREMENT_UNIT,
-  WEEKDAY_LABELS,
-} from "@/lib/domain/types";
+import { MEASUREMENT_UNIT, WEEKDAY_LABELS } from "@/lib/domain/types";
 import {
   Exercise,
   measurementOf,
-  sectionOf,
+  orderDayExercises,
   SessionSummary,
   WorkoutDay,
 } from "@/lib/domain/schemas";
@@ -51,11 +47,8 @@ function UpcomingExercises({
   exercisesById: Map<string, Exercise>;
   isToday: boolean;
 }) {
-  const planned = [...day.exercises].sort(
-    (a, b) =>
-      ATTRIBUTES.indexOf(sectionOf(a, exercisesById)) -
-      ATTRIBUTES.indexOf(sectionOf(b, exercisesById)),
-  );
+  // Same canonical order the designer and the workout logger use.
+  const planned = orderDayExercises(day.exercises, exercisesById);
   if (planned.length === 0) return null;
 
   return (
@@ -138,14 +131,27 @@ export default async function DashboardPage() {
 
   const today = toISODate(new Date());
   // Stats are cached until a weigh-in changes in Settings; finished sessions
-  // (the streak) are cached until a workout is completed/skipped/deleted.
-  const [bodyweight, exercises, finished] = await Promise.all([
-    getCachedBodyweight(store, user.id),
-    getCachedExercises(store),
-    getCachedFinishedSessions(store, user.id),
-  ]);
+  // (the streak) are cached until a workout is completed/skipped/deleted;
+  // program summaries (the lifetime goal count) until a program/goal changes.
+  const [bodyweight, exercises, finished, { programs: allPrograms }] =
+    await Promise.all([
+      getCachedBodyweight(store, user.id),
+      getCachedExercises(store),
+      getCachedFinishedSessions(store, user.id),
+      getCachedUserPrograms(store, user.id),
+    ]);
   const streak = workoutStreak(finished);
   const totalWorkouts = finished.filter((s) => s.status === "completed").length;
+  // Lifetime achieved goals: every ticked goal across all programs (active,
+  // archived and completed alike).
+  const goalsAchieved = allPrograms.reduce(
+    (n, p) =>
+      n +
+      Object.values(p.goals ?? {})
+        .flat()
+        .filter((g) => g.done).length,
+    0,
+  );
   const exercisesById = new Map(exercises.map((e) => [e.id, e]));
   const programGoals: ProgramGoals[] = [];
 
@@ -211,7 +217,7 @@ export default async function DashboardPage() {
           </div>
           {upcoming && upcomingDay && (
             <UpcomingExercises
-              day={upcomingDay}
+              day={upcomingDay.day}
               session={upcoming}
               exercisesById={exercisesById}
               isToday={upcoming === todaySession}
@@ -270,6 +276,7 @@ export default async function DashboardPage() {
         targetWeightKg={user.targetWeightKg}
         streak={streak}
         totalWorkouts={totalWorkouts}
+        goalsAchieved={goalsAchieved}
       />
 
       <GoalsCard programs={programGoals} />

@@ -11,10 +11,10 @@ import {
   Profile,
   ProfileStats,
   Program,
+  ProgramDayPlan,
   ProgramRun,
   ProgramSummary,
   SessionSummary,
-  WorkoutDay,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import { Weekday } from "@/lib/domain/types";
@@ -278,15 +278,6 @@ class SupabaseStore implements DataStore {
 
 
   // User content --------------------------------------------------------------
-  async listPrograms(userId: string): Promise<Program[]> {
-    return orThrow(
-      await this.db
-        .from("programs")
-        .select(PROGRAM_COLS)
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false }),
-    ).map(toProgram);
-  }
   async getProgram(id: string): Promise<Program | null> {
     const rows = orThrow(
       await this.db.from("programs").select(PROGRAM_COLS).eq("id", id),
@@ -312,12 +303,27 @@ class SupabaseStore implements DataStore {
     programId: string,
     weekIndex: number,
     weekday: Weekday,
-  ): Promise<WorkoutDay | null> {
-    // Only the mesocycle column, then slice out the one planned day.
+  ): Promise<ProgramDayPlan | null> {
+    // jsonb path selection: Postgres extracts the one planned day and its
+    // week's context, so the (large) mesocycle document never leaves the
+    // database. `weekIndex` is a validated integer and `weekday` an enum, so
+    // interpolating them into the select list is safe.
+    const week = `mesocycle->weeks->${weekIndex}`;
     const rows = orThrow(
-      await this.db.from("programs").select("mesocycle").eq("id", programId),
+      await this.db
+        .from("programs")
+        .select(
+          `day:${week}->days->${weekday},is_deload:${week}->isDeload,focus:${week}->focus`,
+        )
+        .eq("id", programId),
     );
-    return rows[0]?.mesocycle?.weeks?.[weekIndex]?.days?.[weekday] ?? null;
+    const row = rows[0] as Row | undefined;
+    if (!row?.day) return null;
+    return {
+      day: row.day,
+      isDeload: row.is_deload === true,
+      focus: row.focus ?? undefined,
+    };
   }
   async createProgram(program: Program): Promise<Program> {
     orThrow(await this.db.from("programs").insert(fromProgram(program)).select());
@@ -461,21 +467,6 @@ class SupabaseStore implements DataStore {
         .order("date"),
     ).map(toSessionSummary);
   }
-  async listSessionsByUser(
-    userId: string,
-    fromDate: string,
-    toDate: string,
-  ): Promise<WorkoutSession[]> {
-    return orThrow(
-      await this.db
-        .from("sessions")
-        .select(SESSION_COLS)
-        .eq("user_id", userId)
-        .gte("date", fromDate)
-        .lte("date", toDate)
-        .order("date"),
-    ).map(toSession);
-  }
   async listSessionSummariesByUser(
     userId: string,
     fromDate: string,
@@ -545,21 +536,28 @@ class SupabaseStore implements DataStore {
     return ((data ?? []) as Row[]).map(toSession);
   }
 
-  async listFinishedSessions(userId: string): Promise<WorkoutSession[]> {
+  async listFinishedSessions(userId: string): Promise<SessionSummary[]> {
+    // Summaries only: the streak reads statuses, never performed sets.
     return orThrow(
       await this.db
         .from("sessions")
-        .select(SESSION_COLS)
+        .select(SESSION_SUMMARY_COLS)
         .eq("user_id", userId)
         .in("status", ["completed", "skipped"])
         .order("date", { ascending: true }),
-    ).map(toSession);
+    ).map(toSessionSummary);
   }
 
-  async listExerciseNotes(userId: string): Promise<ExerciseNote[]> {
-    return orThrow(
-      await this.db.from("exercise_notes").select().eq("user_id", userId),
-    ).map((r: Row) => ({
+  async listExerciseNotes(
+    userId: string,
+    exerciseIds?: string[],
+  ): Promise<ExerciseNote[]> {
+    let query = this.db.from("exercise_notes").select().eq("user_id", userId);
+    if (exerciseIds) {
+      if (exerciseIds.length === 0) return [];
+      query = query.in("exercise_id", exerciseIds);
+    }
+    return orThrow(await query).map((r: Row) => ({
       userId: r.user_id,
       exerciseId: r.exercise_id,
       // The `technique_id` column now carries the progression id (notes moved
@@ -569,21 +567,25 @@ class SupabaseStore implements DataStore {
       updatedAt: r.updated_at,
     }));
   }
-  async saveExerciseNote(note: ExerciseNote): Promise<ExerciseNote> {
+  async saveExerciseNotes(notes: ExerciseNote[]): Promise<void> {
+    if (notes.length === 0) return;
+    // One bulk upsert per save — a workout save used to fire one round trip
+    // per entry note (docs/performance-data-transfer-review.md, finding 8).
     orThrow(
       await this.db
         .from("exercise_notes")
-        .upsert({
-          user_id: note.userId,
-          exercise_id: note.exerciseId,
-          // Reused column: holds the progression id (see listExerciseNotes).
-          technique_id: note.progressionId,
-          note: note.note,
-          updated_at: note.updatedAt,
-        })
-        .select(),
+        .upsert(
+          notes.map((note) => ({
+            user_id: note.userId,
+            exercise_id: note.exerciseId,
+            // Reused column: holds the progression id (see listExerciseNotes).
+            technique_id: note.progressionId,
+            note: note.note,
+            updated_at: note.updatedAt,
+          })),
+        )
+        .select("exercise_id"),
     );
-    return note;
   }
 
   // Users -----------------------------------------------------------------

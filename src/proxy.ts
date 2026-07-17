@@ -58,7 +58,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except static assets and PWA files.
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw.js).*)",
+    // Everything except static assets and PWA files. The image-extension
+    // exclusion keeps public images (logos/, handstand.jpg, uploads/…)
+    // loadable on /login — without it the auth gate 307-redirects the logo
+    // request itself, so the login page showed only the image's alt text.
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw.js|.*\\.(?:png|jpe?g|gif|webp|avif|svg)$).*)",
   ],
 };

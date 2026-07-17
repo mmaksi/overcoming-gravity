@@ -79,22 +79,26 @@ export default async function CalendarPage({
     sessionsByDate.set(s.date, list);
   }
 
-  // Sport days of active runs (sport-mix programs).
+  // Sport days of active runs (sport-mix programs) — summaries fetched in
+  // parallel, one per active run.
   const runs = (await store.listRuns(user.id)).filter(
     (r) => r.status === "active",
   );
+  const activePrograms = await Promise.all(
+    runs.map((run) => store.getProgramSummary(run.programId)),
+  );
   const sportByDate = new Map<string, string>();
-  for (const run of runs) {
-    const program = await store.getProgramSummary(run.programId);
-    if (!program?.sport) continue;
+  runs.forEach((run, i) => {
+    const program = activePrograms[i];
+    if (!program?.sport) return;
     const start = parseISODate(run.startDate);
-    for (let i = 0; i < program.weeks * 7; i++) {
-      const date = addDays(start, i);
+    for (let j = 0; j < program.weeks * 7; j++) {
+      const date = addDays(start, j);
       if (program.sport.days.includes(weekdayOf(date))) {
         sportByDate.set(toISODate(date), program.sport.name);
       }
     }
-  }
+  });
 
   const prev =
     month === 1

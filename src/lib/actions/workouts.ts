@@ -14,6 +14,7 @@ import { buildDefaultWorkoutDay } from "@/lib/domain/defaults";
 import {
   CustomWorkout,
   customWorkoutSchema,
+  normalizeWorkoutDay,
   WorkoutSession,
   workoutDaySchema,
 } from "@/lib/domain/schemas";
@@ -68,11 +69,14 @@ export async function saveCustomWorkout(input: {
   if (!workout || workout.userId !== user.id) {
     throw new Error("Workout not found");
   }
+  // Pin the day to the order the editor displayed — see `normalizeWorkoutDay`.
+  const exercises = await getCachedExercises(store);
+  const exercisesById = new Map(exercises.map((e) => [e.id, e]));
   await store.updateCustomWorkout(
     customWorkoutSchema.parse({
       ...workout,
       title: parsed.title,
-      day: parsed.day,
+      day: normalizeWorkoutDay(parsed.day, exercisesById),
       updatedAt: new Date().toISOString(),
     }),
   );
@@ -107,7 +111,7 @@ export async function startCustomWorkout(id: string): Promise<string> {
   }
   const today = toISODate(new Date());
   const existing = (
-    await store.listSessionsByUser(user.id, today, today)
+    await store.listSessionSummariesByUser(user.id, today, today)
   ).find((s) => s.customWorkoutId === id && s.status === "planned");
   if (existing) return existing.id;
 

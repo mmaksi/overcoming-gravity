@@ -1,5 +1,10 @@
-import { ATTRIBUTE_ORDER } from "./types";
-import { DefaultTemplate, Exercise, sectionOf, WorkoutDay } from "./schemas";
+import {
+  DefaultTemplate,
+  Exercise,
+  normalizeWorkoutDay,
+  sectionOf,
+  WorkoutDay,
+} from "./schemas";
 
 /**
  * Build the prefilled workout day a user starts from in the mesocycle
@@ -24,14 +29,13 @@ export function buildDefaultWorkoutDay(
       return { ...we, id, sets: we.sets.map((s) => ({ ...s })) };
     });
 
-  exercises.sort(
-    (a, b) =>
-      ATTRIBUTE_ORDER.indexOf(sectionOf(a, exercisesById)) -
-      ATTRIBUTE_ORDER.indexOf(sectionOf(b, exercisesById)),
-  );
-
   const groups = (template.day.groups ?? []).filter((g) =>
     exercises.some((we) => we.groupId === g.id),
   );
-  return { exercises, groups: groups.map((g) => ({ ...g })) };
+  // Canonical display order with sections pinned, so the day keeps this exact
+  // order even if the catalog is re-categorized later.
+  return normalizeWorkoutDay(
+    { exercises, groups: groups.map((g) => ({ ...g })) },
+    exercisesById,
+  );
 }

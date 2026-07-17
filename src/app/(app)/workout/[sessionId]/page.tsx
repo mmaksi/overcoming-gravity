@@ -26,12 +26,16 @@ export default async function WorkoutPage({
   let weekFocus: WeekFocus | undefined;
   if (session.runId) {
     const run = await store.getRun(session.runId);
-    const program = run ? await store.getProgram(run.programId) : null;
-    if (!run || !program) notFound();
-    const week = program.mesocycle.weeks[session.weekIndex];
-    plannedDay = week?.days[session.weekday] ?? undefined;
-    isDeload = week?.isDeload ?? false;
-    weekFocus = week?.focus;
+    if (!run) notFound();
+    // Summary + one extracted day — the full mesocycle never travels here.
+    const [program, plan] = await Promise.all([
+      store.getProgramSummary(run.programId),
+      store.getProgramDay(run.programId, session.weekIndex, session.weekday),
+    ]);
+    if (!program) notFound();
+    plannedDay = plan?.day;
+    isDeload = plan?.isDeload ?? false;
+    weekFocus = plan?.focus;
     title = program.name;
   } else {
     const workout = session.customWorkoutId
@@ -51,7 +55,8 @@ export default async function WorkoutPage({
   const [exercises, completed, notes] = await Promise.all([
     getCachedExercises(store),
     store.listCompletedSessionsByExercises(user.id, plannedExerciseIds),
-    store.listExerciseNotes(user.id),
+    // Only the planned exercises' remembered notes, not the whole notebook.
+    store.listExerciseNotes(user.id, plannedExerciseIds),
   ]);
 
   // Stats for every progression of every planned exercise, so swapping

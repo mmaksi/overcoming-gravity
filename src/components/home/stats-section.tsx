@@ -6,6 +6,7 @@ import {
   Flame,
   TrendingDown,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { bmiOf, BodyweightEntry } from "@/lib/domain/schemas";
 import {
@@ -60,9 +61,10 @@ function WeightChart({ entries }: { entries: BodyweightEntry[] }) {
 }
 
 /**
- * The "Stats" block on Home: the workout streak on top, then the bodyweight
- * chart and BMI card side by side as two equal cards. Read-only — weigh-ins,
- * height and target weight are logged in Settings.
+ * The "Stats" block on Home: the workout streak and the all-time achieved
+ * goals side by side on top, then the bodyweight chart and BMI card as two
+ * equal cards. Read-only — weigh-ins, height and target weight are logged in
+ * Settings; goals are ticked on the dashboard's goals card.
  */
 export function StatsSection({
   entries,
@@ -70,12 +72,15 @@ export function StatsSection({
   targetWeightKg,
   streak,
   totalWorkouts,
+  goalsAchieved,
 }: {
   entries: BodyweightEntry[];
   heightCm?: number;
   targetWeightKg?: number;
   streak: number;
   totalWorkouts: number;
+  /** Goals ticked off across all programs, lifetime. */
+  goalsAchieved: number;
 }) {
   const latest = entries.at(-1);
   const first = entries[0];
@@ -93,27 +98,52 @@ export function StatsSection({
         <Activity className="size-5" /> Stats
       </h2>
 
-      {/* Streak sits on top, same card design as the two below it. */}
-      <Card className="gap-2 py-4">
-        <CardHeader className="px-4">
-          <CardTitle className="flex items-center gap-1.5 text-sm">
-            <Flame className="size-4 text-primary" /> Streak
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-4">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-bold tabular-nums">{streak}</span>
-            <span className="text-sm font-medium text-muted-foreground">
-              {streak === 1 ? "workout" : "workouts"} in a row
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {streak === 0
-              ? "Complete your next workout to start a streak — skipping one resets it."
-              : `${totalWorkouts} workout${totalWorkouts === 1 ? "" : "s"} completed all-time`}
-          </p>
-        </CardContent>
-      </Card>
+      {/* Streak and lifetime achieved goals sit on top, side by side. */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="gap-2 py-4">
+          <CardHeader className="px-4">
+            <CardTitle className="flex items-center gap-1.5 text-sm">
+              <Flame className="size-4 text-primary" /> Streak
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-bold tabular-nums">{streak}</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                in a row
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {streak === 0
+                ? "Complete your next workout to start a streak — skipping one resets it."
+                : `${totalWorkouts} workout${totalWorkouts === 1 ? "" : "s"} completed all-time`}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="gap-2 py-4">
+          <CardHeader className="px-4">
+            <CardTitle className="flex items-center gap-1.5 text-sm">
+              <Trophy className="size-4 text-primary" /> Goals achieved
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-bold tabular-nums">
+                {goalsAchieved}
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">
+                all-time
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {goalsAchieved === 0
+                ? "Tick off program goals below as you reach them."
+                : "Program goals ticked off since you started."}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="gap-2 py-4">

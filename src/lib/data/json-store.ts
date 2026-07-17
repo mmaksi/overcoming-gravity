@@ -12,10 +12,10 @@ import {
   Profile,
   ProfileStats,
   Program,
+  ProgramDayPlan,
   ProgramRun,
   ProgramSummary,
   SessionSummary,
-  WorkoutDay,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import { Weekday } from "@/lib/domain/types";
@@ -149,10 +149,6 @@ export class JsonStore implements DataStore {
 
 
   // User content --------------------------------------------------------------
-  async listPrograms(userId: string): Promise<Program[]> {
-    const db = await getDb();
-    return db.data.programs.filter((p) => p.userId === userId);
-  }
   async getProgram(id: string): Promise<Program | null> {
     return (await getDb()).data.programs.find((p) => p.id === id) ?? null;
   }
@@ -195,11 +191,14 @@ export class JsonStore implements DataStore {
     programId: string,
     weekIndex: number,
     weekday: Weekday,
-  ): Promise<WorkoutDay | null> {
+  ): Promise<ProgramDayPlan | null> {
     const program = (await getDb()).data.programs.find(
       (p) => p.id === programId,
     );
-    return program?.mesocycle.weeks[weekIndex]?.days[weekday] ?? null;
+    const week = program?.mesocycle.weeks[weekIndex];
+    const day = week?.days[weekday];
+    if (!week || !day) return null;
+    return { day, isDeload: week.isDeload, focus: week.focus };
   }
 
   // Standalone workouts ------------------------------------------------------
@@ -284,26 +283,18 @@ export class JsonStore implements DataStore {
   async listSessionSummariesByRun(runId: string): Promise<SessionSummary[]> {
     return (await this.listSessionsByRun(runId)).map(toSessionSummary);
   }
-  async listSessionsByUser(
-    userId: string,
-    fromDate: string,
-    toDate: string,
-  ): Promise<WorkoutSession[]> {
-    const db = await getDb();
-    return db.data.sessions
-      .filter(
-        (s) => s.userId === userId && s.date >= fromDate && s.date <= toDate,
-      )
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }
   async listSessionSummariesByUser(
     userId: string,
     fromDate: string,
     toDate: string,
   ): Promise<SessionSummary[]> {
-    return (await this.listSessionsByUser(userId, fromDate, toDate)).map(
-      toSessionSummary,
-    );
+    const db = await getDb();
+    return db.data.sessions
+      .filter(
+        (s) => s.userId === userId && s.date >= fromDate && s.date <= toDate,
+      )
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(toSessionSummary);
   }
   async getSession(id: string): Promise<WorkoutSession | null> {
     return (await getDb()).data.sessions.find((s) => s.id === id) ?? null;
@@ -349,7 +340,7 @@ export class JsonStore implements DataStore {
       .sort((a, b) => b.date.localeCompare(a.date));
   }
 
-  async listFinishedSessions(userId: string): Promise<WorkoutSession[]> {
+  async listFinishedSessions(userId: string): Promise<SessionSummary[]> {
     const db = await getDb();
     return db.data.sessions
       .filter(
@@ -357,26 +348,33 @@ export class JsonStore implements DataStore {
           s.userId === userId &&
           (s.status === "completed" || s.status === "skipped"),
       )
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(toSessionSummary);
   }
 
-  async listExerciseNotes(userId: string): Promise<ExerciseNote[]> {
+  async listExerciseNotes(
+    userId: string,
+    exerciseIds?: string[],
+  ): Promise<ExerciseNote[]> {
+    const wanted = exerciseIds ? new Set(exerciseIds) : null;
     return (await getDb()).data.exerciseNotes.filter(
-      (n) => n.userId === userId,
+      (n) => n.userId === userId && (!wanted || wanted.has(n.exerciseId)),
     );
   }
-  async saveExerciseNote(note: ExerciseNote): Promise<ExerciseNote> {
+  async saveExerciseNotes(notes: ExerciseNote[]): Promise<void> {
+    if (notes.length === 0) return;
     const db = await getDb();
-    const i = db.data.exerciseNotes.findIndex(
-      (n) =>
-        n.userId === note.userId &&
-        n.exerciseId === note.exerciseId &&
-        n.progressionId === note.progressionId,
-    );
-    if (i === -1) db.data.exerciseNotes.push(note);
-    else db.data.exerciseNotes[i] = note;
+    for (const note of notes) {
+      const i = db.data.exerciseNotes.findIndex(
+        (n) =>
+          n.userId === note.userId &&
+          n.exerciseId === note.exerciseId &&
+          n.progressionId === note.progressionId,
+      );
+      if (i === -1) db.data.exerciseNotes.push(note);
+      else db.data.exerciseNotes[i] = note;
+    }
     await db.write();
-    return note;
   }
 
   // Users -----------------------------------------------------------------
