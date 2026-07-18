@@ -89,6 +89,10 @@ export function ProgramWizard() {
     flexibility: [""],
     other: [""],
   });
+  // Highlight the missing title only after the athlete tried to continue,
+  // so the form doesn't open covered in red.
+  const [triedNext, setTriedNext] = useState(false);
+  const nameMissing = triedNext && !name.trim();
 
   // One goal in total (any area) is enough to continue.
   const goalsValid = GOAL_AREAS.some((area) =>
@@ -198,13 +202,29 @@ export function ProgramWizard() {
       {step === 0 && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="program-name">Program name</Label>
+            <Label htmlFor="program-name">
+              Program name{" "}
+              <span aria-hidden="true" className="text-destructive">
+                *
+              </span>
+            </Label>
             <Input
               id="program-name"
               placeholder="e.g. Front Lever Focus – Summer"
               value={name}
+              required
+              aria-required="true"
+              aria-invalid={nameMissing || undefined}
               onChange={(e) => setName(e.target.value)}
             />
+            <p
+              className={cn(
+                "text-xs",
+                nameMissing ? "font-medium text-destructive" : "text-muted-foreground",
+              )}
+            >
+              Required — give your program a name to continue.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -400,10 +420,21 @@ export function ProgramWizard() {
           </Button>
         )}
         {step < STEPS.length - 1 ? (
+          // On the Basics step the button stays tappable while invalid: a tap
+          // highlights the missing required title instead of silently doing
+          // nothing (a disabled button can't explain itself).
           <Button
-            className="flex-1"
-            disabled={!stepValid}
-            onClick={() => setStep((s) => s + 1)}
+            className={cn("flex-1", !stepValid && "opacity-50")}
+            disabled={step !== 0 && !stepValid}
+            aria-disabled={!stepValid || undefined}
+            onClick={() => {
+              if (!stepValid) {
+                setTriedNext(true);
+                return;
+              }
+              setTriedNext(false);
+              setStep((s) => s + 1);
+            }}
           >
             Next <ArrowRight className="size-4" />
           </Button>

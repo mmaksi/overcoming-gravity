@@ -95,6 +95,19 @@ export async function saveBodyStats(input: {
   revalidatePath("/settings");
 }
 
+/**
+ * Show or hide the welcome tour on the next visit. The tour page calls this
+ * with false when dismissed; the Settings toggle calls it either way.
+ */
+export async function setShowWelcome(show: boolean): Promise<void> {
+  const user = await requireUser();
+  const store = await getStore();
+  await store.updateProfileWelcome(user.id, z.boolean().parse(show));
+  revalidatePath("/");
+  revalidatePath("/welcome");
+  revalidatePath("/settings");
+}
+
 /** Dev-only: toggle admin rights on the mock session. */
 export async function setAdminMode(enabled: boolean): Promise<void> {
   if (dataBackend() === "supabase") {

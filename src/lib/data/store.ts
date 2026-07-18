@@ -134,6 +134,8 @@ export interface DataStore {
   updateProfileAvatar(userId: string, avatarUrl: string | null): Promise<void>;
   /** Body stats for BMI (height, target weight); null clears a value. */
   updateProfileStats(userId: string, stats: ProfileStats): Promise<void>;
+  /** Show/hide the welcome tour on the user's next visit. */
+  updateProfileWelcome(userId: string, showWelcome: boolean): Promise<void>;
 
   // Bodyweight tracking ---------------------------------------------------
   listBodyweightEntries(userId: string): Promise<BodyweightEntry[]>;

@@ -59,9 +59,10 @@ export default function LoginPage() {
         className="absolute inset-0 -z-10 bg-cover bg-center"
         style={{ backgroundImage: "url('/handstand.jpg')" }}
       />
-      <div className="absolute inset-0 -z-10 bg-black/60" />
+      <div className="absolute inset-0 -z-10 bg-black/40" />
 
-      <Card className="w-full max-w-md border-border/50 bg-card/90 backdrop-blur">
+      {/* Translucent card: the hero photo stays visible, blurred through it. */}
+      <Card className="w-full max-w-md border-white/15 bg-card/55 backdrop-blur-lg">
         <CardHeader className="text-center">
           <Logo className="mx-auto size-20" />
           <CardTitle className="text-xl">Strong Journal</CardTitle>

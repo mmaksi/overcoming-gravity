@@ -28,6 +28,8 @@ export async function getCurrentUser(): Promise<Profile | null> {
     avatarUrl: profile?.avatarUrl,
     heightCm: profile?.heightCm,
     targetWeightKg: profile?.targetWeightKg,
+    // Dev profiles created before the tour existed have no flag stored.
+    showWelcome: profile?.showWelcome ?? true,
   };
 }
 

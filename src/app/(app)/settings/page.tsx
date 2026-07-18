@@ -15,6 +15,7 @@ import { FeedbackForm } from "@/components/settings/feedback-form";
 import { NameForm } from "@/components/settings/name-form";
 import { SignOutButton } from "@/components/settings/sign-out-button";
 import { ThemePicker } from "@/components/settings/theme-picker";
+import { WelcomeToggle } from "@/components/settings/welcome-toggle";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -61,8 +62,9 @@ export default async function SettingsPage() {
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <ThemePicker />
+          <WelcomeToggle initialShow={user.showWelcome} />
         </CardContent>
       </Card>
       <Card>

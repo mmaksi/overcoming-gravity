@@ -291,8 +291,20 @@ const defaultTemplate: DefaultTemplate = {
 };
 
 const profiles: Profile[] = [
-  { id: "dev-athlete", email: "athlete@dev.local", name: "Dev Athlete", isAdmin: false },
-  { id: "dev-admin", email: "admin@dev.local", name: "Dev Admin", isAdmin: true },
+  {
+    id: "dev-athlete",
+    email: "athlete@dev.local",
+    name: "Dev Athlete",
+    isAdmin: false,
+    showWelcome: true,
+  },
+  {
+    id: "dev-admin",
+    email: "admin@dev.local",
+    name: "Dev Admin",
+    isAdmin: true,
+    showWelcome: true,
+  },
 ];
 
 export function seedData(): DbData {

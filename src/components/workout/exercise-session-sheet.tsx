@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Trophy } from "lucide-react";
+import { useState } from "react";
+import { Check, ChevronDown, SlidersHorizontal, Trophy } from "lucide-react";
 import {
   INTER_TECHNIQUES,
   MEASUREMENT_LABELS,
@@ -37,6 +38,30 @@ import { cn } from "@/lib/utils";
 const NONE = "none";
 
 /**
+ * The embeddable player URL for a YouTube link (watch, share, shorts or
+ * embed form), or null for anything else. Playing inline (`playsinline`)
+ * keeps the video inside the app; the player's own button goes fullscreen.
+ */
+function youtubeEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    let id: string | null = null;
+    if (host === "youtu.be") id = u.pathname.slice(1).split("/")[0];
+    else if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+      if (u.pathname === "/watch") id = u.searchParams.get("v");
+      else if (u.pathname.startsWith("/shorts/") || u.pathname.startsWith("/embed/") || u.pathname.startsWith("/live/")) {
+        id = u.pathname.split("/")[2] ?? null;
+      }
+    }
+    if (!id || !/^[\w-]{6,}$/.test(id)) return null;
+    return `https://www.youtube-nocookie.com/embed/${id}?playsinline=1&rel=0`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Mid-workout exercise sheet: read the progression descriptions, swap the
  * progression for this session, and set the inter-exercise technique + notes.
  * Changes affect only this session's log, never the program plan.
@@ -71,6 +96,16 @@ export function ExerciseSessionSheet({
   const technique = interTechniqueId
     ? TECHNIQUES_BY_ID.get(interTechniqueId)
     : undefined;
+  // Tempo, progression swapping and technique live behind this toggle so the
+  // sheet opens on what most athletes need: the tutorial and their notes.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Tutorial media follows the progression being trained right now.
+  const progression = exercise.progressions.find((p) => p.id === progressionId);
+  const embedUrl = progression?.videoUrl
+    ? youtubeEmbedUrl(progression.videoUrl)
+    : null;
+  const tutorialImage = progression?.imageUrl || exercise.imageUrl;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -88,16 +123,70 @@ export function ExerciseSessionSheet({
         </SheetHeader>
 
         <div className="space-y-5 px-4">
-          {exercise.imageUrl && (
-            <div className="flex justify-center overflow-hidden rounded-lg border bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={exercise.imageUrl}
-                alt={exercise.title}
-                className="max-h-64 w-full object-contain"
-              />
+          {(embedUrl || tutorialImage) && (
+            <div className="space-y-2">
+              <Label>Tutorial</Label>
+              {embedUrl && (
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  title={`${exercise.title} — ${progression?.name ?? "tutorial"} video`}
+                  className="aspect-video w-full rounded-lg border bg-muted"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              )}
+              {tutorialImage && (
+                <div className="flex justify-center overflow-hidden rounded-lg border bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={tutorialImage}
+                    alt={exercise.title}
+                    className="max-h-64 w-full object-contain"
+                  />
+                </div>
+              )}
             </div>
           )}
+
+          <button
+            type="button"
+            aria-expanded={advancedOpen}
+            onClick={() => setAdvancedOpen((o) => !o)}
+            className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors hover:border-foreground/30"
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="size-4 text-muted-foreground" />
+              Advanced settings
+            </span>
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform",
+                advancedOpen && "rotate-180",
+              )}
+            />
+          </button>
+
+          {advancedOpen && (
+          <>
+          <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+            {planned.tempo && (
+              <>
+                Tempo <span className="font-medium text-foreground">{planned.tempo}</span> ·{" "}
+              </>
+            )}
+            Rest{" "}
+            <span className="font-medium text-foreground">
+              {planned.restSeconds}s
+            </span>
+            {exercise.repStyle === "cluster" && (
+              <>
+                {" "}
+                · {planned.clusterRestSeconds ?? 15}s between cluster reps
+              </>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label>Progression — tap to use a different one today</Label>
@@ -186,6 +275,8 @@ export function ExerciseSessionSheet({
               </p>
             )}
           </div>
+          </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="session-notes">

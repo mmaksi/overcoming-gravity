@@ -559,7 +559,10 @@ export function WorkoutLogger({
       // Navigate here, after the await, so the push isn't swallowed by the
       // action's revalidation; this component then unmounts.
       if (result.runCompleted && result.programId) {
+        // The whole program just finished — its page is the bigger celebration.
         router.push(`/programs/${result.programId}`);
+      } else if (action === "complete") {
+        router.push(`/workout/${session.id}/congrats`);
       } else {
         router.push("/");
       }

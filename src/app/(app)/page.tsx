@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, Dumbbell, Play, Settings } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
@@ -30,6 +31,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { InstallAppButton } from "@/components/home/install-app-button";
+import { TrainingTip } from "@/components/home/training-tip";
 import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
 import { RunCarousel } from "@/components/home/run-carousel";
 import { StatsSection } from "@/components/home/stats-section";
@@ -93,6 +95,9 @@ function UpcomingExercises({
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  // First visit (or re-enabled in Settings): show the welcome tour before
+  // anything else. The tour clears the flag when dismissed.
+  if (user.showWelcome) redirect("/welcome");
   const store = await getStore();
 
   // Cached until the schedule actually changes (explicit workout save,
@@ -265,6 +270,11 @@ export default async function DashboardPage() {
           <Settings className="size-6" />
         </Link>
       </div>
+
+      {/* Server component: renders once per request, so reading the clock to
+          pick the day's tip is deterministic per response. */}
+      {/* eslint-disable-next-line react-hooks/purity */}
+      <TrainingTip seed={Math.floor(Date.now() / 86_400_000)} />
 
       <InstallAppButton />
 

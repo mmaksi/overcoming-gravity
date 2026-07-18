@@ -47,6 +47,10 @@ export const progressionSchema = z.object({
    * `measurementOf`.
    */
   measurement: measurementValue.optional(),
+  /** Optional YouTube tutorial, embedded in the workout logger's info sheet. */
+  videoUrl: z.string().url().or(z.literal("")).optional(),
+  /** Optional illustration for this progression (falls back to the exercise's). */
+  imageUrl: z.string().url().or(z.literal("")).optional(),
 });
 export type Progression = z.infer<typeof progressionSchema>;
 
@@ -480,6 +484,12 @@ export const profileSchema = z.object({
   /** Body stats for BMI: height and the weight the athlete is aiming for. */
   heightCm: z.number().positive().max(300).optional(),
   targetWeightKg: z.number().positive().max(1000).optional(),
+  /**
+   * Show the welcome tour on the next visit. True for new signups (and for
+   * everyone who existed before the tour shipped); dismissed after viewing.
+   * Settings can flip it back on.
+   */
+  showWelcome: z.boolean().default(true),
 });
 export type Profile = z.infer<typeof profileSchema>;
 

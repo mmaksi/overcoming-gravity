@@ -51,6 +51,10 @@ type DraftProgression = {
   order: number;
   description: string;
   measurement: Measurement;
+  /** Optional YouTube tutorial embedded in the workout logger's info sheet. */
+  videoUrl: string;
+  /** Optional illustration; falls back to the exercise image in the app. */
+  imageUrl: string;
 };
 
 type Draft = {
@@ -177,6 +181,8 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                   order: 0,
                   description: "",
                   measurement: "reps",
+                  videoUrl: "",
+                  imageUrl: "",
                 },
               ],
             })
@@ -247,6 +253,8 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                       // Resolve (and normalize legacy "time") the per-progression
                       // unit, falling back to the exercise-level default.
                       measurement: measurementOf(e, p.id),
+                      videoUrl: p.videoUrl ?? "",
+                      imageUrl: p.imageUrl ?? "",
                     })),
                   })
                 }
@@ -477,6 +485,36 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                         ))}
                       </div>
                     </div>
+                    <Input
+                      type="url"
+                      inputMode="url"
+                      placeholder="YouTube tutorial URL (optional)"
+                      aria-label="Tutorial video URL"
+                      value={p.videoUrl}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          progressions: draft.progressions.map((x, j) =>
+                            j === i ? { ...x, videoUrl: e.target.value } : x,
+                          ),
+                        })
+                      }
+                    />
+                    <Input
+                      type="url"
+                      inputMode="url"
+                      placeholder="Image URL (optional, falls back to the exercise image)"
+                      aria-label="Progression image URL"
+                      value={p.imageUrl}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          progressions: draft.progressions.map((x, j) =>
+                            j === i ? { ...x, imageUrl: e.target.value } : x,
+                          ),
+                        })
+                      }
+                    />
                   </div>
                 ))}
                 <Button
@@ -498,6 +536,8 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                           // default; the admin can flip it per progression.
                           measurement:
                             draft.progressions.at(-1)?.measurement ?? "reps",
+                          videoUrl: "",
+                          imageUrl: "",
                         },
                       ],
                     });

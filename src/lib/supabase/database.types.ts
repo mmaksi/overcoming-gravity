@@ -207,6 +207,7 @@ export type Database = {
           id: string
           is_admin: boolean
           name: string
+          show_welcome: boolean
           target_weight_kg: number | null
         }
         Insert: {
@@ -217,6 +218,7 @@ export type Database = {
           id: string
           is_admin?: boolean
           name?: string
+          show_welcome?: boolean
           target_weight_kg?: number | null
         }
         Update: {
@@ -227,6 +229,7 @@ export type Database = {
           id?: string
           is_admin?: boolean
           name?: string
+          show_welcome?: boolean
           target_weight_kg?: number | null
         }
         Relationships: []

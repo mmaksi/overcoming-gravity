@@ -409,6 +409,16 @@ export class JsonStore implements DataStore {
     profile.targetWeightKg = stats.targetWeightKg ?? undefined;
     await db.write();
   }
+  async updateProfileWelcome(
+    userId: string,
+    showWelcome: boolean,
+  ): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find((p) => p.id === userId);
+    if (!profile) return;
+    profile.showWelcome = showWelcome;
+    await db.write();
+  }
 
   // Bodyweight tracking ---------------------------------------------------
   async listBodyweightEntries(userId: string): Promise<BodyweightEntry[]> {

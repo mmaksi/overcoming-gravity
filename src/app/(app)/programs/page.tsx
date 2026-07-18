@@ -10,7 +10,6 @@ import {
 } from "@/lib/domain/types";
 import { Badge } from "@/components/ui/badge";
 import { IndividualWorkouts } from "@/components/workouts/individual-workouts";
-import { TrainingTip } from "@/components/programs/training-tip";
 
 export default async function ProgramsPage() {
   const user = await requireUser();
@@ -29,11 +28,6 @@ export default async function ProgramsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Programs</h1>
-
-      {/* Server component: renders once per request, so reading the clock to
-          pick the day's tip is deterministic per response. */}
-      {/* eslint-disable-next-line react-hooks/purity */}
-      <TrainingTip seed={Math.floor(Date.now() / 86_400_000)} />
 
       {/* Inviting create call-to-action in place of a small header button. */}
       <Link

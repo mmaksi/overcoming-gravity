@@ -10,7 +10,7 @@ export function SignOutButton() {
 
   return (
     <Button
-      variant="outline"
+      variant="destructive"
       className="w-full"
       disabled={pending}
       onClick={() => startTransition(() => signOut())}
