@@ -72,46 +72,27 @@ export function reorderExercises(
   return { ...day, exercises: next };
 }
 
-/** The per-mode timing/shape settings collected when a group is created. */
-export type GroupConfig = Pick<
-  ExerciseGroup,
-  "restSeconds" | "steps" | "workSeconds" | "rounds"
->;
-
 /**
  * Put the selected exercises in a mode (superset/pyramid/HIIT/…). How many
  * exercises each mode accepts is enforced by the UI (GROUP_TYPE_RULES).
  * Members are made contiguous at the position of the first selected
  * exercise; previous group membership of the selection is dissolved.
- * Pyramid/Ladder: the steps count becomes the exercise's set count and the
- * step rest becomes its rest, so logging works set-by-set as usual.
+ * Designing only picks the mode — its timing/shape settings are chosen at
+ * workout time in the logger, not stored on the plan.
  */
 export function groupExercises(
   day: WorkoutDay,
   ids: string[],
   type: ExerciseGroup["type"],
-  config?: GroupConfig,
 ): WorkoutDay {
   if (ids.length < 1) return day;
   const groupId = crypto.randomUUID();
   const selected = day.exercises.filter((we) => ids.includes(we.id));
   const rest = day.exercises.filter((we) => !ids.includes(we.id));
   const anchor = day.exercises.findIndex((we) => ids.includes(we.id));
-  const steppy = type === "pyramid" || type === "ladder";
-  const members = selected.map((we) => {
-    const member: WorkoutExercise = { ...we, groupId };
-    if (steppy && config?.steps) {
-      const last = we.sets[we.sets.length - 1] ?? { reps: 8 };
-      member.sets = Array.from(
-        { length: config.steps },
-        (_, i) => ({ ...(we.sets[i] ?? last) }),
-      );
-    }
-    if (steppy && config?.restSeconds) {
-      member.restSeconds = config.restSeconds;
-    }
-    return member;
-  });
+  const members = selected.map(
+    (we): WorkoutExercise => ({ ...we, groupId }),
+  );
   let exercises = [
     ...rest.slice(0, anchor),
     ...members,
@@ -135,7 +116,7 @@ export function groupExercises(
     ...(day.groups ?? []).filter(
       (g) => !stale.some((s) => s.id === g.id),
     ),
-    { id: groupId, type, ...config },
+    { id: groupId, type },
   ];
   return { ...day, exercises, groups };
 }

@@ -11,8 +11,10 @@ import {
   History,
   Info,
   Loader2,
+  Play,
   Plus,
   RotateCcw,
+  Settings2,
   SkipForward,
   Timer,
   Trophy,
@@ -65,9 +67,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Toast, useToast } from "@/components/ui/toast";
 import { ExerciseSessionSheet } from "./exercise-session-sheet";
 import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
+import { ClimbRunner } from "./climb-runner";
+import {
+  isConfigurableMode,
+  ModeSettings,
+  ModeSettingsDialog,
+  modeSettingsSummary,
+  seedModeSettings,
+} from "./mode-settings-dialog";
 import { cn } from "@/lib/utils";
 
 /** Short unit shown next to a set input: "sec" | "min" | "cluster reps" | "reps". */
@@ -176,6 +187,35 @@ function loadRest(sessionId: string): RestTimerState | null {
   }
 }
 
+/**
+ * localStorage key for a session's workout-time mode settings (superset rest,
+ * pyramid climb shape, …), so they survive leaving and returning to the page
+ * without a single server write.
+ */
+function modesKey(sessionId: string) {
+  return `strong-journal-modes:${sessionId}`;
+}
+
+function loadModeSettings(sessionId: string): Record<string, ModeSettings> {
+  try {
+    const raw = localStorage.getItem(modesKey(sessionId));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveModeSettings(
+  sessionId: string,
+  settings: Record<string, ModeSettings>,
+) {
+  try {
+    localStorage.setItem(modesKey(sessionId), JSON.stringify(settings));
+  } catch {
+    // Private mode / storage full — settings still hold for this visit.
+  }
+}
+
 function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -239,6 +279,17 @@ export function WorkoutLogger({
   const [openSheetFor, setOpenSheetFor] = useState<string | null>(null);
   const [timer, setTimer] = useState<RestTimerState | null>(null);
   const [stopwatchOpen, setStopwatchOpen] = useState(false);
+  // Workout-time mode settings, keyed by group id (session-local, never on
+  // the plan): the gear next to a mode badge edits them, the pyramid/ladder
+  // runner reads them.
+  const [modeSettings, setModeSettings] = useState<
+    Record<string, ModeSettings>
+  >({});
+  const [settingsFor, setSettingsFor] = useState<string | null>(null);
+  const [runnerFor, setRunnerFor] = useState<string | null>(null);
+  /** Bumped per opening so every run starts fresh (the runner is keyed). */
+  const [runnerRun, setRunnerRun] = useState(0);
+  const { message: toastMessage, toast } = useToast();
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle",
   );
@@ -270,6 +321,52 @@ export function WorkoutLogger({
     () => new Map(exercises.map((e) => [e.id, e])),
     [exercises],
   );
+
+  // Mount-only restore of this session's mode settings from localStorage:
+  // must run post-hydration (the server can't read localStorage).
+  useEffect(() => {
+    const stored = loadModeSettings(session.id);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (Object.keys(stored).length > 0) setModeSettings(stored);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (Object.keys(modeSettings).length === 0) return;
+    saveModeSettings(session.id, modeSettings);
+  }, [modeSettings, session.id]);
+
+  /** A group's effective settings: mode defaults ← plan legacy ← this session. */
+  function settingsOf(group: NonNullable<WorkoutDay["groups"]>[number]) {
+    return { ...seedModeSettings(group), ...modeSettings[group.id] };
+  }
+
+  /**
+   * A finished pyramid/ladder run lands as plain sets and reps in ONE state
+   * update — the debounced autosave then persists the whole run as a single
+   * request.
+   */
+  function recordClimb(
+    we: WorkoutExercise,
+    type: "pyramid" | "ladder",
+    reps: number[],
+  ) {
+    updateEntry(we.id, (en) => ({
+      ...en,
+      measurement: "reps",
+      sets: reps.map((r) => ({
+        reps: String(r),
+        weight: "",
+        done: true,
+        parts: [{ progressionId: en.progressionId, reps: "" }],
+        eccentricReps: "",
+      })),
+    }));
+    setRunnerFor(null);
+    const total = reps.reduce((n, r) => n + r, 0);
+    toast(
+      `${GROUP_TYPE_LABELS[type]} recorded — ${reps.length} sets · ${total} reps`,
+    );
+  }
 
   // Live per-progression note texts for this workout, seeded from the server's
   // remembered notes. Swapping progression mid-workout stashes the current
@@ -668,6 +765,21 @@ export function WorkoutLogger({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
+  const settingsGroup = settingsFor
+    ? (plannedDay.groups ?? []).find((g) => g.id === settingsFor)
+    : undefined;
+  const runnerGroup = runnerFor
+    ? (plannedDay.groups ?? []).find((g) => g.id === runnerFor)
+    : undefined;
+  const climbType =
+    runnerGroup?.type === "pyramid" || runnerGroup?.type === "ladder"
+      ? runnerGroup.type
+      : null;
+  // Pyramid/ladder groups hold exactly one exercise — the one being climbed.
+  const runnerExercise = runnerFor
+    ? plannedDay.exercises.find((we) => we.groupId === runnerFor)
+    : undefined;
+
   return (
     <div className="space-y-5">
       {/* Sticky header: always visible while scrolling through the workout. */}
@@ -808,11 +920,35 @@ export function WorkoutLogger({
                     >
                       {GROUP_TYPE_LABELS[group.type]}
                     </span>
-                    {groupConfigSummary(group) && (
-                      <span className="text-xs text-muted-foreground">
-                        {groupConfigSummary(group)}
-                      </span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                      {isConfigurableMode(group.type)
+                        ? modeSettingsSummary(group.type, settingsOf(group))
+                        : groupConfigSummary(group)}
+                    </span>
+                    {!readOnly && isConfigurableMode(group.type) && (
+                      <button
+                        type="button"
+                        aria-label={`${GROUP_TYPE_LABELS[group.type]} settings`}
+                        title="Mode settings"
+                        onClick={() => setSettingsFor(group.id)}
+                        className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <Settings2 className="size-4" />
+                      </button>
                     )}
+                    {!readOnly &&
+                      (group.type === "pyramid" || group.type === "ladder") && (
+                        <Button
+                          size="sm"
+                          className="h-7 shrink-0 rounded-full px-3"
+                          onClick={() => {
+                            setRunnerRun((n) => n + 1);
+                            setRunnerFor(group.id);
+                          }}
+                        >
+                          <Play className="size-3.5" /> Start
+                        </Button>
+                      )}
                   </div>
                 )}
                 <Card
@@ -1346,6 +1482,41 @@ export function WorkoutLogger({
       {/* Centered stopwatch modal (clock icon in the header). Always
           mounted so it keeps running while the modal is closed. */}
       <Stopwatch open={stopwatchOpen} onOpenChange={setStopwatchOpen} />
+
+      {/* Workout-time mode settings (gear next to a mode badge). Keyed per
+          opening so the fields start from the group's current settings. */}
+      <ModeSettingsDialog
+        key={settingsFor ?? "closed"}
+        type={settingsGroup?.type ?? null}
+        value={settingsGroup ? settingsOf(settingsGroup) : {}}
+        onOpenChange={(open) => !open && setSettingsFor(null)}
+        onSave={(s) => {
+          if (settingsFor) {
+            setModeSettings((prev) => ({ ...prev, [settingsFor]: s }));
+          }
+        }}
+      />
+
+      {/* The live pyramid/ladder run (play button on the mode badge). */}
+      {runnerGroup && runnerExercise && climbType && (
+        <ClimbRunner
+          key={`${runnerGroup.id}-${runnerRun}`}
+          open
+          onOpenChange={(open) => !open && setRunnerFor(null)}
+          type={climbType}
+          exerciseTitle={
+            exercisesById.get(runnerExercise.exerciseId)?.title ?? "Exercise"
+          }
+          settings={{
+            startReps: settingsOf(runnerGroup).startReps ?? 1,
+            increment: settingsOf(runnerGroup).increment ?? 1,
+            intervalSeconds: settingsOf(runnerGroup).intervalSeconds ?? 60,
+          }}
+          onRecord={(reps) => recordClimb(runnerExercise, climbType, reps)}
+        />
+      )}
+
+      <Toast message={toastMessage} />
     </div>
   );
 }

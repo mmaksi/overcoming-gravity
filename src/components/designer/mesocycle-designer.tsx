@@ -371,10 +371,10 @@ export function MesocycleDesigner({
                   ),
                 )
               }
-              onGroup={(ids, type, config) =>
+              onGroup={(ids, type) =>
                 apply(
                   updateDay(meso, weekIndex, weekday, (d) =>
-                    groupExercises(d, ids, type, config),
+                    groupExercises(d, ids, type),
                   ),
                 )
               }

@@ -46,20 +46,14 @@ describe("cloneDay", () => {
 });
 
 describe("groupExercises", () => {
-  it("stores the mode's config on the group", () => {
-    const result = groupExercises(day("x"), ["x"], "hiit", {
-      workSeconds: 30,
-      restSeconds: 30,
-      rounds: 8,
-    });
+  it("stores only the mode on the group — settings are a workout-time concern", () => {
+    const result = groupExercises(day("x"), ["x"], "pyramid");
     expect(result.groups).toEqual([
-      expect.objectContaining({
-        type: "hiit",
-        workSeconds: 30,
-        restSeconds: 30,
-        rounds: 8,
-      }),
+      { id: result.groups[0].id, type: "pyramid" },
     ]);
+    // the exercise's planned sets stay untouched
+    expect(result.exercises[0].sets.map((s) => s.reps)).toEqual([5, 4]);
+    expect(result.exercises[0].groupId).toBe(result.groups[0].id);
   });
 
   it("dissolves a group left below its mode's minimum size", () => {
@@ -70,9 +64,7 @@ describe("groupExercises", () => {
         { ...day("b").exercises[0], id: "b" },
       ],
     };
-    const paired = groupExercises(base, ["a", "b"], "superset", {
-      restSeconds: 90,
-    });
+    const paired = groupExercises(base, ["a", "b"], "superset");
     // pulling one exercise into its own mode leaves a 1-member superset,
     // which is meaningless — it must dissolve
     const result = groupExercises(paired, ["a"], "to_failure");
@@ -80,19 +72,6 @@ describe("groupExercises", () => {
     expect(result.groups[0].type).toBe("to_failure");
     const b = result.exercises.find((we) => we.id === "b")!;
     expect(b.groupId).toBeUndefined();
-  });
-
-  it("pyramid steps become the exercise's set count and step rest its rest", () => {
-    const result = groupExercises(day("x"), ["x"], "pyramid", {
-      steps: 5,
-      restSeconds: 60,
-    });
-    const we = result.exercises[0];
-    expect(we.sets).toHaveLength(5);
-    // existing set targets are kept, the rest pad out from the last one
-    expect(we.sets.map((s) => s.reps)).toEqual([5, 4, 4, 4, 4]);
-    expect(we.restSeconds).toBe(60);
-    expect(we.groupId).toBe(result.groups[0].id);
   });
 });
 

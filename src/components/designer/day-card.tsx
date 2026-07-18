@@ -36,7 +36,6 @@ import {
   GroupType,
   GROUP_TYPES,
   INTENSITY_LABELS,
-  TABATA,
   Weekday,
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
@@ -49,11 +48,6 @@ import {
   WorkoutExercise,
 } from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
-import {
-  ConfigurableGroupType,
-  GroupConfigDialog,
-} from "./group-config-dialog";
-import { GroupConfig } from "./meso-utils";
 import { cn } from "@/lib/utils";
 
 function setsSummary(we: WorkoutExercise, exercise: Exercise): string {
@@ -100,7 +94,7 @@ export function DayCard({
   onEditExercise: (workoutExerciseId: string) => void;
   onRemoveExercise: (workoutExerciseId: string) => void;
   onReorder: (fromId: string, toId: string) => void;
-  onGroup: (ids: string[], type: GroupType, config?: GroupConfig) => void;
+  onGroup: (ids: string[], type: GroupType) => void;
   onUngroup: (groupId: string) => void;
 }) {
   return (
@@ -181,21 +175,16 @@ export function DaySections({
   onEditExercise: (workoutExerciseId: string) => void;
   onRemoveExercise: (workoutExerciseId: string) => void;
   onReorder: (fromId: string, toId: string) => void;
-  onGroup: (ids: string[], type: GroupType, config?: GroupConfig) => void;
+  onGroup: (ids: string[], type: GroupType) => void;
   onUngroup: (groupId: string) => void;
 }) {
   // Selection mode is scoped to one section: exercises can only be grouped
   // (and reordered) inside their own section.
   const [selecting, setSelecting] = useState<Attribute | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  // A mode that needs its settings collected before the group is created.
-  const [pendingType, setPendingType] = useState<ConfigurableGroupType | null>(
-    null,
-  );
 
-  function finishGrouping(type: GroupType, config?: GroupConfig) {
-    onGroup(selected, type, config);
-    setPendingType(null);
+  function finishGrouping(type: GroupType) {
+    onGroup(selected, type);
     setSelecting(null);
     setSelected([]);
   }
@@ -225,26 +214,9 @@ export function DaySections({
                 s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
               )
             }
-            onGroup={(type) => {
-              // Modes with settings collect them first; Tabata is fixed by
-              // definition; to-failure and circuit need nothing.
-              if (
-                type === "superset" ||
-                type === "pyramid" ||
-                type === "ladder" ||
-                type === "hiit"
-              ) {
-                setPendingType(type);
-              } else if (type === "tabata") {
-                finishGrouping(type, {
-                  workSeconds: TABATA.workSeconds,
-                  restSeconds: TABATA.restSeconds,
-                  rounds: TABATA.rounds,
-                });
-              } else {
-                finishGrouping(type);
-              }
-            }}
+            // Designing only picks the mode; its settings (rest, rounds,
+            // steps…) are chosen at workout time in the logger.
+            onGroup={finishGrouping}
             onUngroup={onUngroup}
             onAddExercise={() => onAddExercise(attribute)}
             onRemoveSection={() => onRemoveSection(attribute)}
@@ -254,15 +226,6 @@ export function DaySections({
           />
         );
       })}
-
-      <GroupConfigDialog
-        key={pendingType ?? "closed"}
-        type={pendingType}
-        onOpenChange={(open) => !open && setPendingType(null)}
-        onConfirm={(config) => {
-          if (pendingType) finishGrouping(pendingType, config);
-        }}
-      />
     </>
   );
 }
