@@ -32,20 +32,28 @@ import {
   ATTRIBUTE_ORDER,
   GROUP_TYPE_COLORS,
   GROUP_TYPE_LABELS,
+  GROUP_TYPE_RULES,
   GroupType,
   GROUP_TYPES,
   INTENSITY_LABELS,
+  TABATA,
   Weekday,
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
 import {
   Exercise,
+  groupConfigSummary,
   measurementOf,
   sectionOf,
   WorkoutDay,
   WorkoutExercise,
 } from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
+import {
+  ConfigurableGroupType,
+  GroupConfigDialog,
+} from "./group-config-dialog";
+import { GroupConfig } from "./meso-utils";
 import { cn } from "@/lib/utils";
 
 function setsSummary(we: WorkoutExercise, exercise: Exercise): string {
@@ -92,7 +100,7 @@ export function DayCard({
   onEditExercise: (workoutExerciseId: string) => void;
   onRemoveExercise: (workoutExerciseId: string) => void;
   onReorder: (fromId: string, toId: string) => void;
-  onGroup: (ids: string[], type: GroupType) => void;
+  onGroup: (ids: string[], type: GroupType, config?: GroupConfig) => void;
   onUngroup: (groupId: string) => void;
 }) {
   return (
@@ -173,13 +181,24 @@ export function DaySections({
   onEditExercise: (workoutExerciseId: string) => void;
   onRemoveExercise: (workoutExerciseId: string) => void;
   onReorder: (fromId: string, toId: string) => void;
-  onGroup: (ids: string[], type: GroupType) => void;
+  onGroup: (ids: string[], type: GroupType, config?: GroupConfig) => void;
   onUngroup: (groupId: string) => void;
 }) {
   // Selection mode is scoped to one section: exercises can only be grouped
   // (and reordered) inside their own section.
   const [selecting, setSelecting] = useState<Attribute | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  // A mode that needs its settings collected before the group is created.
+  const [pendingType, setPendingType] = useState<ConfigurableGroupType | null>(
+    null,
+  );
+
+  function finishGrouping(type: GroupType, config?: GroupConfig) {
+    onGroup(selected, type, config);
+    setPendingType(null);
+    setSelecting(null);
+    setSelected([]);
+  }
 
   return (
     <>
@@ -207,9 +226,24 @@ export function DaySections({
               )
             }
             onGroup={(type) => {
-              onGroup(selected, type);
-              setSelecting(null);
-              setSelected([]);
+              // Modes with settings collect them first; Tabata is fixed by
+              // definition; to-failure and circuit need nothing.
+              if (
+                type === "superset" ||
+                type === "pyramid" ||
+                type === "ladder" ||
+                type === "hiit"
+              ) {
+                setPendingType(type);
+              } else if (type === "tabata") {
+                finishGrouping(type, {
+                  workSeconds: TABATA.workSeconds,
+                  restSeconds: TABATA.restSeconds,
+                  rounds: TABATA.rounds,
+                });
+              } else {
+                finishGrouping(type);
+              }
             }}
             onUngroup={onUngroup}
             onAddExercise={() => onAddExercise(attribute)}
@@ -220,6 +254,15 @@ export function DaySections({
           />
         );
       })}
+
+      <GroupConfigDialog
+        key={pendingType ?? "closed"}
+        type={pendingType}
+        onOpenChange={(open) => !open && setPendingType(null)}
+        onConfirm={(config) => {
+          if (pendingType) finishGrouping(pendingType, config);
+        }}
+      />
     </>
   );
 }
@@ -301,6 +344,37 @@ function DaySection({
         )}
       </div>
 
+      {/* The mode palette sits right under the section name. Every mode is
+          always visible in its own colour; ones that don't fit the current
+          selection count are dimmed with their requirement as the tooltip. */}
+      {selecting && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-sm text-muted-foreground">
+            {selected.length} selected ·
+          </span>
+          {GROUP_TYPES.map((type) => {
+            const rule = GROUP_TYPE_RULES[type];
+            const enabled = rule.accepts(selected.length);
+            return (
+              <button
+                key={type}
+                type="button"
+                disabled={!enabled}
+                title={enabled ? undefined : `Needs ${rule.requirement}`}
+                onClick={() => onGroup(type)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-xs font-semibold transition-opacity",
+                  GROUP_TYPE_COLORS[type].badge,
+                  !enabled && "opacity-35",
+                )}
+              >
+                {GROUP_TYPE_LABELS[type]}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <DndContext
         id={`day-dnd-${dndIdPrefix}-${attribute}`}
         sensors={sensors}
@@ -334,6 +408,11 @@ function DaySection({
                       >
                         {GROUP_TYPE_LABELS[group.type]}
                       </span>
+                      {groupConfigSummary(group) && (
+                        <span className="text-xs text-muted-foreground">
+                          {groupConfigSummary(group)}
+                        </span>
+                      )}
                       <button
                         type="button"
                         className="text-muted-foreground hover:text-foreground"
@@ -360,26 +439,6 @@ function DaySection({
           </div>
         </SortableContext>
       </DndContext>
-
-      {selecting && selected.length >= 1 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-sm text-muted-foreground">
-            Mode for {selected.length}:
-          </span>
-          {GROUP_TYPES.filter(
-            (type) => type !== "superset" || selected.length >= 2,
-          ).map((type) => (
-            <Button
-              key={type}
-              size="sm"
-              variant="outline"
-              onClick={() => onGroup(type)}
-            >
-              {GROUP_TYPE_LABELS[type]}
-            </Button>
-          ))}
-        </div>
-      )}
 
       {!selecting && (
         <button

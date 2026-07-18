@@ -207,6 +207,7 @@ export type Database = {
           id: string
           is_admin: boolean
           name: string
+          show_designer_intro: boolean
           show_welcome: boolean
           target_weight_kg: number | null
         }
@@ -218,6 +219,7 @@ export type Database = {
           id: string
           is_admin?: boolean
           name?: string
+          show_designer_intro?: boolean
           show_welcome?: boolean
           target_weight_kg?: number | null
         }
@@ -229,6 +231,7 @@ export type Database = {
           id?: string
           is_admin?: boolean
           name?: string
+          show_designer_intro?: boolean
           show_welcome?: boolean
           target_weight_kg?: number | null
         }

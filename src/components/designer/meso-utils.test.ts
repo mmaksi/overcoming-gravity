@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Mesocycle, WorkoutDay } from "@/lib/domain/schemas";
-import { cloneDay, copyDayToDays, copyWeekToWeeks } from "./meso-utils";
+import {
+  cloneDay,
+  copyDayToDays,
+  copyWeekToWeeks,
+  groupExercises,
+} from "./meso-utils";
 
 function day(marker: string, intensity?: "high" | "low"): WorkoutDay {
   return {
@@ -37,6 +42,57 @@ describe("cloneDay", () => {
     expect(copy.exercises[0].sets).toEqual(source.exercises[0].sets);
     copy.exercises[0].sets[0].reps = 99;
     expect(source.exercises[0].sets[0].reps).toBe(5);
+  });
+});
+
+describe("groupExercises", () => {
+  it("stores the mode's config on the group", () => {
+    const result = groupExercises(day("x"), ["x"], "hiit", {
+      workSeconds: 30,
+      restSeconds: 30,
+      rounds: 8,
+    });
+    expect(result.groups).toEqual([
+      expect.objectContaining({
+        type: "hiit",
+        workSeconds: 30,
+        restSeconds: 30,
+        rounds: 8,
+      }),
+    ]);
+  });
+
+  it("dissolves a group left below its mode's minimum size", () => {
+    const base: WorkoutDay = {
+      groups: [],
+      exercises: [
+        { ...day("a").exercises[0], id: "a" },
+        { ...day("b").exercises[0], id: "b" },
+      ],
+    };
+    const paired = groupExercises(base, ["a", "b"], "superset", {
+      restSeconds: 90,
+    });
+    // pulling one exercise into its own mode leaves a 1-member superset,
+    // which is meaningless — it must dissolve
+    const result = groupExercises(paired, ["a"], "to_failure");
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].type).toBe("to_failure");
+    const b = result.exercises.find((we) => we.id === "b")!;
+    expect(b.groupId).toBeUndefined();
+  });
+
+  it("pyramid steps become the exercise's set count and step rest its rest", () => {
+    const result = groupExercises(day("x"), ["x"], "pyramid", {
+      steps: 5,
+      restSeconds: 60,
+    });
+    const we = result.exercises[0];
+    expect(we.sets).toHaveLength(5);
+    // existing set targets are kept, the rest pad out from the last one
+    expect(we.sets.map((s) => s.reps)).toEqual([5, 4, 4, 4, 4]);
+    expect(we.restSeconds).toBe(60);
+    expect(we.groupId).toBe(result.groups[0].id);
   });
 });
 

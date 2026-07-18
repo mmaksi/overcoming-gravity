@@ -102,17 +102,48 @@ export type RepStyle = (typeof REP_STYLES)[number];
 
 /**
  * Training modes an exercise (or a run of exercises) can be performed in.
- * Superset needs at least two exercises; every other mode works with one.
+ * How many exercises each mode accepts is defined by GROUP_TYPE_RULES.
  */
 export const GROUP_TYPES = [
   "superset",
   "circuit",
   "pyramid",
-  "hiit",
   "ladder",
   "to_failure",
+  "hiit",
+  "tabata",
 ] as const;
 export type GroupType = (typeof GROUP_TYPES)[number];
+
+/**
+ * Which selection sizes each mode accepts, plus the short requirement shown
+ * when it doesn't: superset is a strict pair, a circuit rotates 3+, the
+ * single-exercise schemes take exactly one, HIIT takes any, and Tabata's 8
+ * intervals must divide evenly over the exercises (1, 2, 4 or 8).
+ */
+export const GROUP_TYPE_RULES: Record<
+  GroupType,
+  { accepts: (count: number) => boolean; requirement: string }
+> = {
+  superset: { accepts: (n) => n === 2, requirement: "exactly 2 exercises" },
+  circuit: { accepts: (n) => n > 2, requirement: "3 or more exercises" },
+  pyramid: { accepts: (n) => n === 1, requirement: "exactly 1 exercise" },
+  ladder: { accepts: (n) => n === 1, requirement: "exactly 1 exercise" },
+  to_failure: { accepts: (n) => n === 1, requirement: "exactly 1 exercise" },
+  hiit: { accepts: (n) => n >= 1, requirement: "1 or more exercises" },
+  tabata: {
+    accepts: (n) => [1, 2, 4, 8].includes(n),
+    requirement: "1, 2, 4 or 8 exercises",
+  },
+};
+
+/** Tabata is fixed by definition: 8 × (20s work + 10s rest) = 4 minutes. */
+export const TABATA = {
+  workSeconds: 20,
+  restSeconds: 10,
+  rounds: 8,
+  totalMinutes: 4,
+} as const;
 
 /** Areas the athlete sets goals for when creating a program. */
 export const GOAL_AREAS = [
@@ -287,6 +318,7 @@ export const GROUP_TYPE_LABELS: Record<GroupType, string> = {
   hiit: "HIIT",
   ladder: "Ladder",
   to_failure: "To-Failure",
+  tabata: "Tabata",
 };
 
 /** One distinct colour per mode (left border + badge tint). */
@@ -317,6 +349,10 @@ export const GROUP_TYPE_COLORS: Record<
   to_failure: {
     border: "border-l-fuchsia-500",
     badge: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400",
+  },
+  tabata: {
+    border: "border-l-teal-500",
+    badge: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
   },
 };
 

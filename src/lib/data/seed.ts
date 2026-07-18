@@ -297,6 +297,7 @@ const profiles: Profile[] = [
     name: "Dev Athlete",
     isAdmin: false,
     showWelcome: true,
+    showDesignerIntro: true,
   },
   {
     id: "dev-admin",
@@ -304,6 +305,7 @@ const profiles: Profile[] = [
     name: "Dev Admin",
     isAdmin: true,
     showWelcome: true,
+    showDesignerIntro: true,
   },
 ];
 

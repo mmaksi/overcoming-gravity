@@ -136,6 +136,8 @@ export interface DataStore {
   updateProfileStats(userId: string, stats: ProfileStats): Promise<void>;
   /** Show/hide the welcome tour on the user's next visit. */
   updateProfileWelcome(userId: string, showWelcome: boolean): Promise<void>;
+  /** Show/hide the workout-designer intro carousel. */
+  updateProfileDesignerIntro(userId: string, show: boolean): Promise<void>;
 
   // Bodyweight tracking ---------------------------------------------------
   listBodyweightEntries(userId: string): Promise<BodyweightEntry[]>;

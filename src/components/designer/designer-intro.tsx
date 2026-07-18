@@ -1,7 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowRight, Copy, Dumbbell, Layers, ListChecks } from "lucide-react";
+import { useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Copy,
+  Dumbbell,
+  GripVertical,
+  Layers,
+  ListChecks,
+  Trash2,
+} from "lucide-react";
+import { setShowDesignerIntro } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,9 +21,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-
-/** Shown once per device — the designer is dense on first sight. */
-const SEEN_KEY = "strong-journal-designer-intro-seen";
 
 const SLIDES = [
   {
@@ -34,6 +42,18 @@ const SLIDES = [
     body: "Select several exercises in a section to turn them into a superset, circuit or pyramid.",
   },
   {
+    key: "delete",
+    icon: <Trash2 className="size-6" />,
+    title: "Swipe left to delete",
+    body: "Don't want an exercise? Swipe it to the left and it's gone.",
+  },
+  {
+    key: "reorder",
+    icon: <GripVertical className="size-6" />,
+    title: "Drag to reorder",
+    body: "Hold an exercise by its grip handle and drag it to change the order within its section.",
+  },
+  {
     key: "copy",
     icon: <Copy className="size-6" />,
     title: "Copy to save time",
@@ -43,33 +63,28 @@ const SLIDES = [
 
 /**
  * First-visit tour of the workout designer, so the page doesn't overwhelm.
- * Opens once (localStorage flag) and never again — closing it in any way
- * counts as seen.
+ * Shown while the profile's showDesignerIntro flag is set; closing it in any
+ * way clears the flag in the database, so it appears once per account (not
+ * per device).
  */
-export function DesignerIntro() {
-  const [open, setOpen] = useState(false);
+export function DesignerIntro({ show }: { show: boolean }) {
+  const [open, setOpen] = useState(show);
   const [active, setActive] = useState(0);
+  const touchStartX = useRef<number | null>(null);
 
-  // localStorage is unreadable on the server, so the check must run
-  // post-hydration; opening in an effect is intended here.
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (!localStorage.getItem(SEEN_KEY)) setOpen(true);
-    } catch {
-      // Private mode — skip the tour rather than show it on every visit.
-    }
-  }, []);
+  // Fire-and-forget: the dialog closes immediately; a failed write just means
+  // the intro shows again next visit, which is harmless.
+  const dismissMutation = useMutation({
+    mutationFn: () => setShowDesignerIntro(false),
+  });
 
   function handleOpenChange(next: boolean) {
-    if (!next) {
-      try {
-        localStorage.setItem(SEEN_KEY, "1");
-      } catch {
-        // ignore
-      }
-    }
+    if (!next && open) dismissMutation.mutate();
     setOpen(next);
+  }
+
+  function goTo(index: number) {
+    setActive(Math.max(0, Math.min(SLIDES.length - 1, index)));
   }
 
   const slide = SLIDES[active];
@@ -84,7 +99,18 @@ export function DesignerIntro() {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 py-2 text-center">
+        <div
+          className="space-y-3 py-2 text-center"
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0].clientX;
+          }}
+          onTouchEnd={(e) => {
+            if (touchStartX.current === null) return;
+            const delta = e.changedTouches[0].clientX - touchStartX.current;
+            touchStartX.current = null;
+            if (Math.abs(delta) > 40) goTo(active + (delta < 0 ? 1 : -1));
+          }}
+        >
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/15 text-primary">
             {slide.icon}
           </div>
@@ -100,7 +126,7 @@ export function DesignerIntro() {
               key={s.key}
               type="button"
               aria-label={`Go to slide ${i + 1}`}
-              onClick={() => setActive(i)}
+              onClick={() => goTo(i)}
               className={cn(
                 "size-2 rounded-full transition-colors",
                 i === active ? "bg-primary" : "bg-muted-foreground/30",
@@ -110,15 +136,29 @@ export function DesignerIntro() {
         </div>
 
         <div className="space-y-2">
-          {last ? (
-            <Button className="w-full" onClick={() => handleOpenChange(false)}>
-              Start designing <ArrowRight className="size-4" />
-            </Button>
-          ) : (
-            <Button className="w-full" onClick={() => setActive((a) => a + 1)}>
-              Next <ArrowRight className="size-4" />
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {active > 0 && (
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => goTo(active - 1)}
+              >
+                <ArrowLeft className="size-4" /> Back
+              </Button>
+            )}
+            {last ? (
+              <Button
+                className="flex-1"
+                onClick={() => handleOpenChange(false)}
+              >
+                Start designing <ArrowRight className="size-4" />
+              </Button>
+            ) : (
+              <Button className="flex-1" onClick={() => goTo(active + 1)}>
+                Next <ArrowRight className="size-4" />
+              </Button>
+            )}
+          </div>
           {!last && (
             <Button
               variant="ghost"

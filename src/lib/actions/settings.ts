@@ -108,6 +108,17 @@ export async function setShowWelcome(show: boolean): Promise<void> {
   revalidatePath("/settings");
 }
 
+/**
+ * Dismiss (or re-arm) the workout-designer intro carousel. Called with false
+ * when the athlete closes the intro on their first designer visit.
+ */
+export async function setShowDesignerIntro(show: boolean): Promise<void> {
+  const user = await requireUser();
+  const store = await getStore();
+  await store.updateProfileDesignerIntro(user.id, z.boolean().parse(show));
+  revalidatePath("/programs");
+}
+
 /** Dev-only: toggle admin rights on the mock session. */
 export async function setAdminMode(enabled: boolean): Promise<void> {
   if (dataBackend() === "supabase") {

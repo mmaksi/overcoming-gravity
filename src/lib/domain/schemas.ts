@@ -246,8 +246,63 @@ export function normalizeWorkoutDay(
 export const exerciseGroupSchema = z.object({
   id: z.string(),
   type: z.enum(GROUP_TYPES),
+  /**
+   * Mode timing, meaning depends on the type: superset — rest after each
+   * round of the pair; pyramid/ladder — rest between steps; HIIT — rest
+   * between work intervals; Tabata — always 10.
+   */
+  restSeconds: z.number().int().positive().optional(),
+  /** Pyramid/Ladder: how many steps (= sets the athlete climbs through). */
+  steps: z.number().int().positive().optional(),
+  /** HIIT/Tabata: the work interval (Tabata is always 20). */
+  workSeconds: z.number().int().positive().optional(),
+  /** HIIT/Tabata: how many work intervals (Tabata is always 8). */
+  rounds: z.number().int().positive().optional(),
 });
 export type ExerciseGroup = z.infer<typeof exerciseGroupSchema>;
+
+/** "90s" for odd amounts, "2 min" for whole minutes. */
+function shortDuration(seconds: number): string {
+  return seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds}s`;
+}
+
+/**
+ * Compact human summary of a group's mode settings ("rest 2 min",
+ * "5 steps · rest 60s", "30s/30s × 8 · 4 min total"), or null when the
+ * group carries none. Shown beside the mode badge in the designer and logger.
+ */
+export function groupConfigSummary(group: ExerciseGroup): string | null {
+  switch (group.type) {
+    case "superset":
+      return group.restSeconds
+        ? `rest ${shortDuration(group.restSeconds)}`
+        : null;
+    case "pyramid":
+    case "ladder": {
+      const parts = [
+        group.steps != null ? `${group.steps} steps` : null,
+        group.restSeconds != null
+          ? `rest ${shortDuration(group.restSeconds)}`
+          : null,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : null;
+    }
+    case "hiit": {
+      if (!group.workSeconds || !group.restSeconds || !group.rounds)
+        return null;
+      const totalMin =
+        (group.rounds * (group.workSeconds + group.restSeconds)) / 60;
+      const total = Number.isInteger(totalMin)
+        ? String(totalMin)
+        : totalMin.toFixed(1);
+      return `${group.workSeconds}s/${group.restSeconds}s × ${group.rounds} · ${total} min total`;
+    }
+    case "tabata":
+      return "20s/10s × 8 · 4 min total";
+    default:
+      return null;
+  }
+}
 
 export const workoutDaySchema = z.object({
   intensity: z.enum(INTENSITIES).optional(),
@@ -490,6 +545,8 @@ export const profileSchema = z.object({
    * Settings can flip it back on.
    */
   showWelcome: z.boolean().default(true),
+  /** Show the workout-designer intro carousel; dismissed after first view. */
+  showDesignerIntro: z.boolean().default(true),
 });
 export type Profile = z.infer<typeof profileSchema>;
 

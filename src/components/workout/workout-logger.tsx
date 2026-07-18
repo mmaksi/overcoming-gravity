@@ -35,6 +35,7 @@ import {
   daySections,
   Exercise,
   exerciseNoteKey,
+  groupConfigSummary,
   measurementOf,
   SessionEntry,
   VolumeStats,
@@ -798,14 +799,21 @@ export function WorkoutLogger({
             return (
               <div key={we.id}>
                 {isGroupStart && group && (
-                  <span
-                    className={cn(
-                      "mb-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                      GROUP_TYPE_COLORS[group.type].badge,
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                        GROUP_TYPE_COLORS[group.type].badge,
+                      )}
+                    >
+                      {GROUP_TYPE_LABELS[group.type]}
+                    </span>
+                    {groupConfigSummary(group) && (
+                      <span className="text-xs text-muted-foreground">
+                        {groupConfigSummary(group)}
+                      </span>
                     )}
-                  >
-                    {GROUP_TYPE_LABELS[group.type]}
-                  </span>
+                  </div>
                 )}
                 <Card
                   className={cn(
@@ -886,9 +894,23 @@ export function WorkoutLogger({
                               toggleSetDone(we, j, e.target.checked)
                             }
                           />
-                          <span className="w-9 shrink-0 text-xs text-muted-foreground">
-                            Set {j + 1}
-                          </span>
+                          {/* To-Failure: the last set is the one taken to
+                              failure — labelled so it can't be missed. */}
+                          {group?.type === "to_failure" &&
+                          j === entry.sets.length - 1 ? (
+                            <span
+                              className={cn(
+                                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                                GROUP_TYPE_COLORS.to_failure.badge,
+                              )}
+                            >
+                              To-Failure
+                            </span>
+                          ) : (
+                            <span className="w-9 shrink-0 text-xs text-muted-foreground">
+                              Set {j + 1}
+                            </span>
+                          )}
                           {!isHybrid && (
                             <Input
                               type="text"

@@ -419,6 +419,16 @@ export class JsonStore implements DataStore {
     profile.showWelcome = showWelcome;
     await db.write();
   }
+  async updateProfileDesignerIntro(
+    userId: string,
+    show: boolean,
+  ): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find((p) => p.id === userId);
+    if (!profile) return;
+    profile.showDesignerIntro = show;
+    await db.write();
+  }
 
   // Bodyweight tracking ---------------------------------------------------
   async listBodyweightEntries(userId: string): Promise<BodyweightEntry[]> {

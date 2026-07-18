@@ -44,9 +44,12 @@ type SaveState = "saved" | "dirty" | "saving";
 export function MesocycleDesigner({
   program,
   exercises,
+  showIntro = false,
 }: {
   program: Program;
   exercises: Exercise[];
+  /** Profile flag: open the first-visit intro carousel. */
+  showIntro?: boolean;
 }) {
   const router = useRouter();
   const [meso, setMeso] = useState<Mesocycle>(program.mesocycle);
@@ -145,7 +148,7 @@ export function MesocycleDesigner({
   return (
     <div className="space-y-4">
       {/* First visit ever: a quick how-this-page-works tour. */}
-      <DesignerIntro />
+      <DesignerIntro show={showIntro} />
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
@@ -365,10 +368,10 @@ export function MesocycleDesigner({
                   ),
                 )
               }
-              onGroup={(ids, type) =>
+              onGroup={(ids, type, config) =>
                 apply(
                   updateDay(meso, weekIndex, weekday, (d) =>
-                    groupExercises(d, ids, type),
+                    groupExercises(d, ids, type, config),
                   ),
                 )
               }

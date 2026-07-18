@@ -18,5 +18,11 @@ export default async function DesignPage({
 
   const exercises = await getCachedExercises(store);
 
-  return <MesocycleDesigner program={program} exercises={exercises} />;
+  return (
+    <MesocycleDesigner
+      program={program}
+      exercises={exercises}
+      showIntro={user.showDesignerIntro}
+    />
+  );
 }

@@ -128,7 +128,9 @@ export function DefaultsManager({
           onReorder={(fromId, toId) =>
             apply(reorderExercises(day, fromId, toId))
           }
-          onGroup={(ids, type) => apply(groupExercises(day, ids, type))}
+          onGroup={(ids, type, config) =>
+            apply(groupExercises(day, ids, type, config))
+          }
           onUngroup={(groupId) => apply(ungroupExercises(day, groupId))}
         />
       </div>

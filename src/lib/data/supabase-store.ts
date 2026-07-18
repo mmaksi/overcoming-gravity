@@ -606,6 +606,7 @@ class SupabaseStore implements DataStore {
       heightCm: rows[0].height_cm ?? undefined,
       targetWeightKg: rows[0].target_weight_kg ?? undefined,
       showWelcome: rows[0].show_welcome ?? true,
+      showDesignerIntro: rows[0].show_designer_intro ?? true,
     };
   }
   async updateProfileName(userId: string, name: string): Promise<void> {
@@ -649,6 +650,18 @@ class SupabaseStore implements DataStore {
       await this.db
         .from("profiles")
         .update({ show_welcome: showWelcome })
+        .eq("id", userId)
+        .select("id"),
+    );
+  }
+  async updateProfileDesignerIntro(
+    userId: string,
+    show: boolean,
+  ): Promise<void> {
+    orThrow(
+      await this.db
+        .from("profiles")
+        .update({ show_designer_intro: show })
         .eq("id", userId)
         .select("id"),
     );
