@@ -27,6 +27,7 @@ import {
   INTENSITY_LABELS,
   Measurement,
   MEASUREMENT_UNIT,
+  TABATA,
   TECHNIQUES_BY_ID,
   WEEK_FOCUS_LABELS,
   WeekFocus,
@@ -72,6 +73,7 @@ import { ExerciseSessionSheet } from "./exercise-session-sheet";
 import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
 import { ClimbRunner } from "./climb-runner";
+import { IntervalRunner } from "./interval-runner";
 import {
   isConfigurableMode,
   ModeSettings,
@@ -779,6 +781,31 @@ export function WorkoutLogger({
   const runnerExercise = runnerFor
     ? plannedDay.exercises.find((we) => we.groupId === runnerFor)
     : undefined;
+  const intervalType =
+    runnerGroup?.type === "hiit" || runnerGroup?.type === "tabata"
+      ? runnerGroup.type
+      : null;
+  // HIIT/Tabata rounds rotate through the group's exercises in planned order.
+  const intervalExerciseTitles = runnerFor
+    ? plannedDay.exercises
+        .filter((we) => we.groupId === runnerFor)
+        .map((we) => exercisesById.get(we.exerciseId)?.title ?? "Exercise")
+    : [];
+  // Tabata is fixed by definition; HIIT reads this session's settings.
+  const intervalSettings =
+    intervalType === "tabata"
+      ? {
+          workSeconds: TABATA.workSeconds,
+          restSeconds: TABATA.restSeconds,
+          rounds: TABATA.rounds,
+        }
+      : runnerGroup
+        ? {
+            workSeconds: settingsOf(runnerGroup).workSeconds ?? 30,
+            restSeconds: settingsOf(runnerGroup).restSeconds ?? 30,
+            rounds: settingsOf(runnerGroup).rounds ?? 8,
+          }
+        : null;
 
   return (
     <div className="space-y-5">
@@ -937,7 +964,10 @@ export function WorkoutLogger({
                       </button>
                     )}
                     {!readOnly &&
-                      (group.type === "pyramid" || group.type === "ladder") && (
+                      (group.type === "pyramid" ||
+                        group.type === "ladder" ||
+                        group.type === "hiit" ||
+                        group.type === "tabata") && (
                         <Button
                           size="sm"
                           className="h-7 shrink-0 rounded-full px-3"
@@ -1513,6 +1543,18 @@ export function WorkoutLogger({
             intervalSeconds: settingsOf(runnerGroup).intervalSeconds ?? 60,
           }}
           onRecord={(reps) => recordClimb(runnerExercise, climbType, reps)}
+        />
+      )}
+
+      {/* The live HIIT/Tabata run (same play button on the mode badge). */}
+      {runnerGroup && intervalType && intervalSettings && (
+        <IntervalRunner
+          key={`${runnerGroup.id}-${runnerRun}`}
+          open
+          onOpenChange={(open) => !open && setRunnerFor(null)}
+          type={intervalType}
+          exerciseTitles={intervalExerciseTitles}
+          settings={intervalSettings}
         />
       )}
 

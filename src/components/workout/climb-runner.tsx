@@ -18,6 +18,8 @@ import {
   startClimb,
   totalReps,
 } from "./climb";
+import { PREP_SECONDS } from "./interval";
+import { COUNTDOWN_SRC, createSound, playSound } from "./sounds";
 import { cn } from "@/lib/utils";
 
 /** Best-effort haptic tick when a new step begins. */
@@ -37,7 +39,8 @@ function vibrate() {
  * completed steps are handed to `onRecord` in one batch at the end, so the
  * logger's autosave persists the whole run as a single request.
  *
- * Mount with a fresh `key` per opening — the run starts immediately.
+ * Mount with a fresh `key` per opening — the run starts with a short
+ * get-ready countdown (with its "4… 3… 2… 1" sound), then the first step.
  */
 export function ClimbRunner({
   open,
@@ -57,13 +60,26 @@ export function ClimbRunner({
   const [climb, setClimb] = useState(() => startClimb(settings));
   /** Current step's reps are done — riding out the interval as rest. */
   const [resting, setResting] = useState(false);
-  const [stepStartedAt, setStepStartedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(stepStartedAt);
+  /** Get-ready lead-in; the first step's interval starts when it ends. */
+  const [prepping, setPrepping] = useState(true);
+  const [stepStartedAt, setStepStartedAt] = useState(
+    () => Date.now() + PREP_SECONDS * 1000,
+  );
+  const [now, setNow] = useState(() => Date.now());
 
   const intervalMs = settings.intervalSeconds * 1000;
   const intervalEnd = stepStartedAt + intervalMs;
   const remaining = Math.max(0, (intervalEnd - now) / 1000);
-  const overtime = !resting && remaining <= 0;
+  const prepRemaining = Math.max(0, (stepStartedAt - now) / 1000);
+  const overtime = !prepping && !resting && remaining <= 0;
+
+  // The countdown voice belongs to the get-ready phase; play it as the
+  // runner opens (still inside the Start tap's activation window).
+  useEffect(() => {
+    const countdown = createSound(COUNTDOWN_SRC);
+    playSound(countdown);
+    return () => countdown?.pause();
+  }, []);
 
   // The clock tick, kept in a ref so the interval below always runs the
   // latest render's version. When the interval ends while resting, the next
@@ -74,6 +90,11 @@ export function ClimbRunner({
     tickRef.current = () => {
       const t = Date.now();
       setNow(t);
+      if (prepping && t >= stepStartedAt) {
+        setPrepping(false);
+        vibrate();
+        return;
+      }
       if (!climb.finished && resting && t >= intervalEnd) {
         setResting(false);
         setStepStartedAt(t - intervalEnd < 3000 ? intervalEnd : t);
@@ -176,12 +197,23 @@ export function ClimbRunner({
           <div className="space-y-4 py-2 text-center">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {resting ? "Rest · next step" : `Step ${climb.completed.length + 1}`}
+                {prepping
+                  ? "Get ready"
+                  : resting
+                    ? "Rest · next step"
+                    : `Step ${climb.completed.length + 1}`}
               </p>
-              <p className="text-6xl font-bold tabular-nums text-primary">
-                {climb.target}
+              <p
+                className={cn(
+                  "text-6xl font-bold tabular-nums",
+                  prepping ? "text-amber-500" : "text-primary",
+                )}
+              >
+                {prepping ? Math.ceil(prepRemaining) : climb.target}
               </p>
-              <p className="text-sm text-muted-foreground">reps</p>
+              <p className="text-sm text-muted-foreground">
+                {prepping ? `first step: ${climb.target} reps` : "reps"}
+              </p>
             </div>
 
             {/* Interval countdown: the next step starts when it empties. */}
@@ -190,20 +222,30 @@ export function ClimbRunner({
                 <div
                   className={cn(
                     "h-full rounded-full",
-                    resting ? "bg-sky-500" : "bg-primary",
+                    prepping
+                      ? "bg-amber-500"
+                      : resting
+                        ? "bg-sky-500"
+                        : "bg-primary",
                   )}
                   style={{
-                    width: `${(remaining / settings.intervalSeconds) * 100}%`,
+                    width: `${
+                      prepping
+                        ? (prepRemaining / PREP_SECONDS) * 100
+                        : (remaining / settings.intervalSeconds) * 100
+                    }%`,
                     transition: "width 250ms linear",
                   }}
                 />
               </div>
               <p className="text-sm tabular-nums text-muted-foreground">
-                {overtime
-                  ? "Interval over — finish the step when you can"
-                  : resting
-                    ? `Next step in ${Math.ceil(remaining)}s`
-                    : `${Math.ceil(remaining)}s left in this interval`}
+                {prepping
+                  ? `Starting in ${Math.ceil(prepRemaining)}s`
+                  : overtime
+                    ? "Interval over — finish the step when you can"
+                    : resting
+                      ? `Next step in ${Math.ceil(remaining)}s`
+                      : `${Math.ceil(remaining)}s left in this interval`}
               </p>
             </div>
 
@@ -213,7 +255,7 @@ export function ClimbRunner({
               </p>
             )}
 
-            {resting ? (
+            {prepping ? null : resting ? (
               <Button
                 variant="outline"
                 className="w-full"

@@ -36,8 +36,46 @@ export default function AppError({
     console.error(error);
   }, [error]);
 
+  // Stale-deploy recovery: returning to a backgrounded PWA after a deploy
+  // can leave the page asking for JS chunks that no longer exist (the
+  // service worker's cached shell points at the old build). That's fixed by
+  // a hard reload, so do it automatically — once per error, session-guarded
+  // so a genuinely broken build doesn't reload-loop.
+  const isStale =
+    /chunk|dynamically imported module|importing a module script|failed to fetch/i.test(
+      error.message,
+    );
+  useEffect(() => {
+    if (!isStale) return;
+    const guard = `strong-journal-reloaded:${error.digest ?? error.message}`;
+    try {
+      if (sessionStorage.getItem(guard)) return;
+      sessionStorage.setItem(guard, "1");
+    } catch {
+      return; // no storage — don't risk a reload loop
+    }
+    window.location.reload();
+  }, [isStale, error]);
+
   // Session expiry throws "Not authenticated" — send them to sign in instead.
   const isAuth = /not authenticated|unauthorized|auth/i.test(error.message);
+
+  if (isStale) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-6 px-6 text-center">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold">Getting the latest version…</h1>
+          <p className="text-muted-foreground">
+            The app was updated while you were away. Reloading to catch up —
+            your workout is saved.
+          </p>
+        </div>
+        <Button size="lg" onClick={() => window.location.reload()}>
+          <RotateCcw className="size-4" /> Reload now
+        </Button>
+      </div>
+    );
+  }
 
   // Stable pick derived from the error itself (no impure Math.random in render).
   const seed = error.digest ?? error.message ?? "";

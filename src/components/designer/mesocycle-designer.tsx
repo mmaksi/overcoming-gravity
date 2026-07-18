@@ -3,12 +3,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Check, CloudUpload, Copy, Loader2 } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CloudUpload,
+  Copy,
+  Loader2,
+} from "lucide-react";
 import {
   Attribute,
   WEEK_FOCUS_LABELS,
   Weekday,
   WEEKDAY_LABELS,
+  WEEKDAY_SHORT,
   WEEKDAYS,
 } from "@/lib/domain/types";
 import {
@@ -56,6 +64,9 @@ export function MesocycleDesigner({
   const router = useRouter();
   const [meso, setMeso] = useState<Mesocycle>(program.mesocycle);
   const [weekIndex, setWeekIndex] = useState(0);
+  // The days of a week render as a carousel, one day at a time. The index
+  // survives week switches so you land on the same day when comparing weeks.
+  const [dayIndex, setDayIndex] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>("saved");
 
   // Editor / picker / copy-dialog targets
@@ -141,6 +152,14 @@ export function MesocycleDesigner({
       .then(() => router.push(`/programs/${program.id}`))
       .catch(() => undefined);
   }
+
+  // Clamped so shrinking the training days (or switching programs) can't
+  // point past the end; the same index carries across week switches.
+  const activeDayIndex = Math.min(
+    dayIndex,
+    Math.max(0, orderedDays.length - 1),
+  );
+  const activeWeekday: Weekday | undefined = orderedDays[activeDayIndex];
 
   const editingExercise: WorkoutExercise | null = editing
     ? (week?.days[editing.weekday]?.exercises.find(
@@ -297,12 +316,33 @@ export function MesocycleDesigner({
         </Button>
       </div>
 
-      {/* Days — separated by generous spacing rather than boxes. In
-          Accumulation & Intensification the whole week gets a phase tint so
-          which phase you're editing reads at a glance. */}
+      {/* Days — a carousel showing one day at a time: tap a day pill to
+          jump, or use the arrows fixed on the screen edges to step. (No
+          horizontal swipe here — that gesture belongs to the exercise rows'
+          swipe-to-delete.) In Accumulation & Intensification the day keeps
+          the week's phase tint. */}
+      {orderedDays.length > 1 && (
+        <div className="flex items-center justify-center gap-1.5">
+          {orderedDays.map((d, i) => (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={i === activeDayIndex}
+              onClick={() => setDayIndex(i)}
+              className={cn(
+                "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                i === activeDayIndex
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "hover:border-foreground/30",
+              )}
+            >
+              {WEEKDAY_SHORT[d]}
+            </button>
+          ))}
+        </div>
+      )}
       <div
         className={cn(
-          "space-y-10",
           weekPeriodized &&
             !week?.isDeload &&
             "-mx-2 rounded-2xl p-3 transition-colors",
@@ -313,9 +353,10 @@ export function MesocycleDesigner({
               : "bg-sky-500/[0.06]"),
         )}
       >
-        {orderedDays.map((weekday) => {
-          const day = week?.days[weekday];
-          if (!day) return null;
+        {(() => {
+          const weekday = activeWeekday;
+          const day = weekday ? week?.days[weekday] : undefined;
+          if (!weekday || !day) return null;
           return (
             <DayCard
               key={weekday}
@@ -387,8 +428,32 @@ export function MesocycleDesigner({
               }
             />
           );
-        })}
+        })()}
       </div>
+
+      {/* Day-stepping arrows, fixed to the screen edges. */}
+      {orderedDays.length > 1 && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous day"
+            disabled={activeDayIndex === 0}
+            onClick={() => setDayIndex(activeDayIndex - 1)}
+            className="fixed left-2 top-1/2 z-30 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border bg-background/85 shadow-lg backdrop-blur transition-opacity hover:border-foreground/30 disabled:opacity-30"
+          >
+            <ChevronLeft className="size-6" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next day"
+            disabled={activeDayIndex === orderedDays.length - 1}
+            onClick={() => setDayIndex(activeDayIndex + 1)}
+            className="fixed right-2 top-1/2 z-30 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border bg-background/85 shadow-lg backdrop-blur transition-opacity hover:border-foreground/30 disabled:opacity-30"
+          >
+            <ChevronRight className="size-6" />
+          </button>
+        </>
+      )}
 
       {/* Sheets & dialogs */}
       <ExercisePicker

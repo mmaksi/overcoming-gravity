@@ -9,9 +9,14 @@ export function ServiceWorkerRegister() {
       process.env.NODE_ENV === "production" &&
       "serviceWorker" in navigator
     ) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // PWA is progressive enhancement; ignore registration failures.
-      });
+      // updateViaCache "none": always check the network for a new sw.js, so
+      // a deploy rolls out to installed PWAs on their next open instead of
+      // whenever the HTTP cache feels like revalidating.
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch(() => {
+          // PWA is progressive enhancement; ignore registration failures.
+        });
     }
   }, []);
   return null;
