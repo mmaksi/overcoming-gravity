@@ -12,13 +12,16 @@ export async function getSupabaseUser(): Promise<Profile | null> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select(
       "id, email, name, is_admin, avatar_url, height_cm, target_weight_kg, show_welcome, show_designer_intro",
     )
     .eq("id", user.id)
     .single();
+  // The fallback below masks a broken query (e.g. schema drift: a selected
+  // column missing in the database) — make that failure visible in the logs.
+  if (error) console.error("profiles query failed:", error.message);
   if (!profile) {
     return {
       id: user.id,

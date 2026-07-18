@@ -8,6 +8,7 @@ import {
   Attribute,
   WEEK_FOCUS_LABELS,
   Weekday,
+  WEEKDAY_LABELS,
   WEEKDAYS,
 } from "@/lib/domain/types";
 import {
@@ -23,6 +24,7 @@ import { activateProgram, saveMesocycle } from "@/lib/actions/programs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Toast, useToast } from "@/components/ui/toast";
 import { DayCard } from "./day-card";
 import { DesignerIntro } from "./designer-intro";
 import { ExercisePicker } from "./exercise-picker";
@@ -67,6 +69,7 @@ export function MesocycleDesigner({
   } | null>(null);
   const [copyingDay, setCopyingDay] = useState<Weekday | null>(null);
   const [copyingWeek, setCopyingWeek] = useState(false);
+  const { message: toastMessage, toast } = useToast();
 
   const exercisesById = useMemo(
     () => new Map(exercises.map((e) => [e.id, e])),
@@ -460,6 +463,11 @@ export function MesocycleDesigner({
         onCopy={(targets) => {
           if (!copyingDay) return;
           apply(copyDayToDays(meso, weekIndex, copyingDay, targets));
+          toast(
+            targets.length === 1
+              ? `Workout copied to ${WEEKDAY_LABELS[targets[0]]}`
+              : `Workout copied to ${targets.length} days`,
+          );
         }}
       />
 
@@ -469,8 +477,17 @@ export function MesocycleDesigner({
         sourceIndex={weekIndex}
         weekCount={meso.weeks.length}
         deloadIndex={meso.weeks.length - 1}
-        onCopy={(targets) => apply(copyWeekToWeeks(meso, weekIndex, targets))}
+        onCopy={(targets) => {
+          apply(copyWeekToWeeks(meso, weekIndex, targets));
+          toast(
+            targets.length === 1
+              ? `Week ${weekIndex + 1} copied to week ${targets[0] + 1}`
+              : `Week ${weekIndex + 1} copied to ${targets.length} weeks`,
+          );
+        }}
       />
+
+      <Toast message={toastMessage} />
     </div>
   );
 }
