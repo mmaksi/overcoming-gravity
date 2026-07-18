@@ -96,8 +96,8 @@ export function ExerciseSessionSheet({
   const technique = interTechniqueId
     ? TECHNIQUES_BY_ID.get(interTechniqueId)
     : undefined;
-  // Tempo, progression swapping and technique live behind this toggle so the
-  // sheet opens on what most athletes need: the tutorial and their notes.
+  // Progression swapping and technique live behind this toggle so the sheet
+  // opens on what most athletes need: the current plan, tutorial and notes.
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Tutorial media follows the progression being trained right now.
@@ -123,6 +123,46 @@ export function ExerciseSessionSheet({
         </SheetHeader>
 
         <div className="space-y-5 px-4">
+          {/* What you're doing right now — progression, plan and description
+              stay visible without opening anything. */}
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <p className="text-sm">
+              <span className="font-semibold text-sky-600 dark:text-sky-400">
+                {progression?.name}
+              </span>
+              {progression && progression.id !== planned.progressionId && (
+                <span className="text-muted-foreground"> (swapped)</span>
+              )}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {planned.tempo && (
+                <>
+                  Tempo{" "}
+                  <span className="font-medium text-foreground">
+                    {planned.tempo}
+                  </span>{" "}
+                  ·{" "}
+                </>
+              )}
+              Rest{" "}
+              <span className="font-medium text-foreground">
+                {planned.restSeconds}s
+              </span>
+              {exercise.repStyle === "cluster" && (
+                <>
+                  {" "}
+                  · {planned.clusterRestSeconds ?? 15}s between cluster reps
+                </>
+              )}
+            </p>
+            {progression?.description && (
+              <ExpandableText
+                text={progression.description}
+                className="text-sm"
+              />
+            )}
+          </div>
+
           {(embedUrl || tutorialImage) && (
             <div className="space-y-2">
               <Label>Tutorial</Label>
@@ -170,24 +210,6 @@ export function ExerciseSessionSheet({
 
           {advancedOpen && (
           <>
-          <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-            {planned.tempo && (
-              <>
-                Tempo <span className="font-medium text-foreground">{planned.tempo}</span> ·{" "}
-              </>
-            )}
-            Rest{" "}
-            <span className="font-medium text-foreground">
-              {planned.restSeconds}s
-            </span>
-            {exercise.repStyle === "cluster" && (
-              <>
-                {" "}
-                · {planned.clusterRestSeconds ?? 15}s between cluster reps
-              </>
-            )}
-          </div>
-
           <div className="space-y-2">
             <Label>Progression — tap to use a different one today</Label>
             <div className="space-y-2">

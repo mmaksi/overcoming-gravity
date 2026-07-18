@@ -89,8 +89,8 @@ export function ProgramWizard() {
     flexibility: [""],
     other: [""],
   });
-  // Highlight the missing title only after the athlete tried to continue,
-  // so the form doesn't open covered in red.
+  // Highlight what's missing only after the athlete tried to continue,
+  // so no step opens covered in red. Reset on every step change.
   const [triedNext, setTriedNext] = useState(false);
   const nameMissing = triedNext && !name.trim();
 
@@ -277,11 +277,23 @@ export function ProgramWizard() {
 
       {step === 1 && (
         <div className="space-y-5">
-          <div>
+          <div className="space-y-1">
             <h2 className="font-semibold">Your goals</h2>
             <p className="text-sm text-muted-foreground">
-              Up to 2 goals per area — one goal in total is enough. You&apos;ll
-              see them on your dashboard and tick them off as you get there.
+              Up to 2 goals per area — all areas are optional. You&apos;ll see
+              your goals on the dashboard and tick them off as you get there.
+            </p>
+            {/* No asterisks here: the areas are individually optional, it's
+                the total that matters — so the requirement is one sentence. */}
+            <p
+              className={cn(
+                "text-sm",
+                triedNext && !goalsValid
+                  ? "font-medium text-destructive"
+                  : "text-muted-foreground",
+              )}
+            >
+              Add at least one goal — any area counts.
             </p>
           </div>
           {GOAL_AREAS.map((area) => (
@@ -364,6 +376,17 @@ export function ProgramWizard() {
                   : undefined
               }
             />
+            <p
+              className={cn(
+                "text-xs",
+                triedNext && trainingDays.length === 0
+                  ? "font-medium text-destructive"
+                  : "text-muted-foreground",
+              )}
+            >
+              Select the days you&apos;ll train — tip: 2–4 days a week is the
+              sweet spot for progress and recovery.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -394,9 +417,11 @@ export function ProgramWizard() {
           <Alert>
             <AlertTitle>Deload week</AlertTitle>
             <AlertDescription>
-              Week {weeks} is your deload: same movements, roughly half the
-              volume, so you recover and come back stronger. Don&apos;t skip
-              this.
+              {/* Explicit joiner: this Next fork's JSX transform drops the
+                  plain space between an expression and the text after it. */}
+              Week {weeks}
+              {" is your deload: same movements, roughly half the volume, so "}
+              you recover and come back stronger. Don&apos;t skip this.
             </AlertDescription>
           </Alert>
         </div>
@@ -414,18 +439,20 @@ export function ProgramWizard() {
             variant="outline"
             className="flex-1"
             disabled={pending}
-            onClick={() => setStep((s) => s - 1)}
+            onClick={() => {
+              setTriedNext(false);
+              setStep((s) => s - 1);
+            }}
           >
             <ArrowLeft className="size-4" /> Back
           </Button>
         )}
         {step < STEPS.length - 1 ? (
-          // On the Basics step the button stays tappable while invalid: a tap
-          // highlights the missing required title instead of silently doing
-          // nothing (a disabled button can't explain itself).
+          // The button stays tappable while invalid: a tap highlights what's
+          // missing on the current step instead of silently doing nothing
+          // (a disabled button can't explain itself).
           <Button
             className={cn("flex-1", !stepValid && "opacity-50")}
-            disabled={step !== 0 && !stepValid}
             aria-disabled={!stepValid || undefined}
             onClick={() => {
               if (!stepValid) {
@@ -440,9 +467,16 @@ export function ProgramWizard() {
           </Button>
         ) : (
           <Button
-            className="flex-1"
-            disabled={!stepValid || pending}
-            onClick={finish}
+            className={cn("flex-1", !stepValid && "opacity-50")}
+            disabled={pending}
+            aria-disabled={!stepValid || undefined}
+            onClick={() => {
+              if (!stepValid) {
+                setTriedNext(true);
+                return;
+              }
+              finish();
+            }}
           >
             {pending ? (
               <Loader2 className="size-4 animate-spin" />

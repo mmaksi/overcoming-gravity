@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DayCard } from "./day-card";
+import { DesignerIntro } from "./designer-intro";
 import { ExercisePicker } from "./exercise-picker";
 import { ExerciseEditor } from "./exercise-editor";
 import { CopyDayDialog, CopyWeekDialog } from "./copy-dialogs";
@@ -143,6 +144,9 @@ export function MesocycleDesigner({
 
   return (
     <div className="space-y-4">
+      {/* First visit ever: a quick how-this-page-works tour. */}
+      <DesignerIntro />
+
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">

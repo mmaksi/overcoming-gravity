@@ -12,6 +12,7 @@ import {
   Info,
   Loader2,
   Plus,
+  RotateCcw,
   SkipForward,
   Timer,
   Trophy,
@@ -245,8 +246,8 @@ export function WorkoutLogger({
   // Workout duration: accumulated seconds from previous visits (frozen at
   // mount) plus the time this page has been open. Persisted on every save,
   // so backgrounding the app pauses instead of losing the timer.
-  const [baseSeconds] = useState(session.durationSeconds ?? 0);
-  const [openedAt] = useState(() => Date.now());
+  const [baseSeconds, setBaseSeconds] = useState(session.durationSeconds ?? 0);
+  const [openedAt, setOpenedAt] = useState(() => Date.now());
   const [now, setNow] = useState(openedAt);
   useEffect(() => {
     if (readOnly) return;
@@ -255,6 +256,14 @@ export function WorkoutLogger({
   }, [readOnly]);
   const elapsedSeconds =
     baseSeconds + Math.max(0, Math.floor((now - openedAt) / 1000));
+
+  /** Start the workout duration over from 0:00 (e.g. opened the page early). */
+  function resetWorkoutTimer() {
+    const t = Date.now();
+    setBaseSeconds(0);
+    setOpenedAt(t);
+    setNow(t);
+  }
 
   const exercisesById = useMemo(
     () => new Map(exercises.map((e) => [e.id, e])),
@@ -600,7 +609,8 @@ export function WorkoutLogger({
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-  }, [entries, readOnly]);
+    // openedAt changes only on a timer reset — autosave persists the reset.
+  }, [entries, openedAt, readOnly]);
   useEffect(() => {
     function onHide() {
       if (document.visibilityState === "hidden") {
@@ -697,6 +707,15 @@ export function WorkoutLogger({
               <span className="flex items-center gap-1 font-medium tabular-nums text-foreground">
                 <Timer className="size-4 text-primary" />
                 {formatDuration(elapsedSeconds)}
+                <button
+                  type="button"
+                  aria-label="Reset workout timer"
+                  title="Reset workout timer"
+                  onClick={resetWorkoutTimer}
+                  className="p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <RotateCcw className="size-3.5" />
+                </button>
               </span>
             )}
             {!readOnly && saveStatus !== "idle" && (
