@@ -44,10 +44,11 @@ function minutesLabel(seconds: number): string {
 /**
  * Runs a HIIT or Tabata block live: a get-ready countdown (with its
  * "4… 3… 2… 1" sound), then work/rest rounds driven purely by the clock —
- * so waking up from a backgrounded tab lands on the right round. Every
- * work phase opens with the start beep. With several exercises in the
- * group, the rounds rotate through them in order. Nothing is recorded;
- * the athlete logs their sets as usual afterwards.
+ * so waking up from a backgrounded tab lands on the right round. The start
+ * beep marks both edges of every work interval — except the very first
+ * start, where the countdown sound already ends in its own go cue. With
+ * several exercises in the group, the rounds rotate through them in order.
+ * Nothing is recorded; the athlete logs their sets as usual afterwards.
  *
  * Mount with a fresh `key` per opening — the run starts immediately.
  */
@@ -87,7 +88,9 @@ export function IntervalRunner({
   }, []);
 
   // Phase transitions are detected on the tick (not derived in render) so
-  // each one fires its cue exactly once — the beep on every work start.
+  // each one fires its cue exactly once. The beep marks both edges of a
+  // work interval; the first work start is silent because the get-ready
+  // countdown already ends in its own go cue.
   const lastPhaseRef = useRef<string>("prep");
   const tickRef = useRef<() => void>(() => undefined);
   useEffect(() => {
@@ -98,10 +101,13 @@ export function IntervalRunner({
       const id = next.kind === "prep" || next.kind === "finished"
         ? next.kind
         : `${next.kind}-${next.round}`;
-      if (id !== lastPhaseRef.current) {
+      const prev = lastPhaseRef.current;
+      if (id !== prev) {
         lastPhaseRef.current = id;
         vibrate();
-        if (next.kind === "work") playSound(beepRef.current);
+        const workStarts = next.kind === "work" && prev !== "prep";
+        const workEnds = prev.startsWith("work");
+        if (workStarts || workEnds) playSound(beepRef.current);
       }
     };
   });

@@ -119,6 +119,23 @@ export async function setShowDesignerIntro(show: boolean): Promise<void> {
   revalidatePath("/programs");
 }
 
+/**
+ * Master switch for the in-app tips: the welcome tour and the workout-
+ * designer intro together. Each tip still dismisses only itself when
+ * closed; this Settings toggle re-arms or silences both at once.
+ */
+export async function setShowTips(show: boolean): Promise<void> {
+  const user = await requireUser();
+  const parsed = z.boolean().parse(show);
+  const store = await getStore();
+  await store.updateProfileWelcome(user.id, parsed);
+  await store.updateProfileDesignerIntro(user.id, parsed);
+  revalidatePath("/");
+  revalidatePath("/welcome");
+  revalidatePath("/programs");
+  revalidatePath("/settings");
+}
+
 /** Dev-only: toggle admin rights on the mock session. */
 export async function setAdminMode(enabled: boolean): Promise<void> {
   if (dataBackend() === "supabase") {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -417,8 +417,9 @@ function DaySection({
 }
 
 /**
- * One exercise row: draggable by its grip handle, tap to edit, swipe left to
- * delete, checkbox in selection mode.
+ * One exercise row: draggable by its grip handle, tap to edit, red trash
+ * button to delete, checkbox in selection mode. (No swipe gesture here —
+ * horizontal swipes page through the days of the week.)
  */
 function SortableExerciseRow({
   we,
@@ -441,39 +442,10 @@ function SortableExerciseRow({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: we.id, disabled: selecting });
-  const [swipeX, setSwipeX] = useState(0);
-  const touch = useRef<{ x: number; y: number; swiping: boolean } | null>(null);
 
   const progression = exercise.progressions.find(
     (p) => p.id === we.progressionId,
   );
-
-  function onTouchStart(e: React.TouchEvent) {
-    if (selecting) return;
-    touch.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-      swiping: false,
-    };
-  }
-  function onTouchMove(e: React.TouchEvent) {
-    if (!touch.current) return;
-    const dx = e.touches[0].clientX - touch.current.x;
-    const dy = e.touches[0].clientY - touch.current.y;
-    if (!touch.current.swiping && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      touch.current.swiping = true;
-    }
-    if (touch.current.swiping) {
-      setSwipeX(Math.min(0, Math.max(-112, dx)));
-    }
-  }
-  function onTouchEnd() {
-    if (swipeX < -80) {
-      onRemove();
-    }
-    setSwipeX(0);
-    touch.current = null;
-  }
 
   return (
     <div
@@ -484,21 +456,12 @@ function SortableExerciseRow({
       }}
       className={cn("relative", isDragging && "z-10 opacity-90")}
     >
-      {/* swipe reveal */}
-      <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-destructive pr-4">
-        <Trash2 className="size-4 text-white" />
-      </div>
       <div
         className={cn(
-          // Opaque: the swipe-to-delete red layer sits right behind this row.
-          "relative flex items-center gap-2 rounded-xl bg-muted p-3 transition-transform",
+          "flex items-center gap-2 rounded-xl bg-muted p-3",
           groupColor && `border-l-4 ${groupColor}`,
           selected && "ring-2 ring-primary",
         )}
-        style={{ transform: swipeX ? `translateX(${swipeX}px)` : undefined }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
       >
         {selecting ? (
           <button
@@ -541,6 +504,16 @@ function SortableExerciseRow({
             {progression?.name} · {setsSummary(we, exercise)}
           </p>
         </button>
+        {!selecting && (
+          <button
+            type="button"
+            aria-label={`Remove ${exercise.title}`}
+            onClick={onRemove}
+            className="shrink-0 rounded-lg p-2 text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        )}
       </div>
     </div>
   );

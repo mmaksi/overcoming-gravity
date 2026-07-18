@@ -44,8 +44,8 @@ const SLIDES = [
   {
     key: "delete",
     icon: <Trash2 className="size-6" />,
-    title: "Swipe left to delete",
-    body: "Don't want an exercise? Swipe it to the left and it's gone.",
+    title: "Remove with the bin",
+    body: "Don't want an exercise? Tap the red bin on its row. And to move between your training days, swipe sideways or use the arrows.",
   },
   {
     key: "reorder",

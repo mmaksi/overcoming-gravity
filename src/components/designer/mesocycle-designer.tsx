@@ -67,6 +67,8 @@ export function MesocycleDesigner({
   // The days of a week render as a carousel, one day at a time. The index
   // survives week switches so you land on the same day when comparing weeks.
   const [dayIndex, setDayIndex] = useState(0);
+  // Start of a horizontal swipe over the day card (pages through the days).
+  const daySwipe = useRef<{ x: number; y: number } | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("saved");
 
   // Editor / picker / copy-dialog targets
@@ -316,10 +318,9 @@ export function MesocycleDesigner({
         </Button>
       </div>
 
-      {/* Days — a carousel showing one day at a time: tap a day pill to
-          jump, or use the arrows fixed on the screen edges to step. (No
-          horizontal swipe here — that gesture belongs to the exercise rows'
-          swipe-to-delete.) In Accumulation & Intensification the day keeps
+      {/* Days — a carousel showing one day at a time: swipe horizontally,
+          tap a day pill to jump, or use the arrows fixed on the screen
+          edges to step. In Accumulation & Intensification the day keeps
           the week's phase tint. */}
       {orderedDays.length > 1 && (
         <div className="flex items-center justify-center gap-1.5">
@@ -352,6 +353,23 @@ export function MesocycleDesigner({
               ? "bg-orange-500/[0.06]"
               : "bg-sky-500/[0.06]"),
         )}
+        onTouchStart={(e) => {
+          daySwipe.current = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY,
+          };
+        }}
+        onTouchEnd={(e) => {
+          if (!daySwipe.current) return;
+          const dx = e.changedTouches[0].clientX - daySwipe.current.x;
+          const dy = e.changedTouches[0].clientY - daySwipe.current.y;
+          daySwipe.current = null;
+          // Clearly horizontal only, so scrolling and drag-to-reorder
+          // (vertical gestures) never flip the day by accident.
+          if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 2) return;
+          const next = activeDayIndex + (dx < 0 ? 1 : -1);
+          if (next >= 0 && next < orderedDays.length) setDayIndex(next);
+        }}
       >
         {(() => {
           const weekday = activeWeekday;

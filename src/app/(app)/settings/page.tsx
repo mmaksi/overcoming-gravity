@@ -15,7 +15,7 @@ import { FeedbackForm } from "@/components/settings/feedback-form";
 import { NameForm } from "@/components/settings/name-form";
 import { SignOutButton } from "@/components/settings/sign-out-button";
 import { ThemePicker } from "@/components/settings/theme-picker";
-import { WelcomeToggle } from "@/components/settings/welcome-toggle";
+import { TipsToggle } from "@/components/settings/tips-toggle";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -64,7 +64,10 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <ThemePicker />
-          <WelcomeToggle initialShow={user.showWelcome} />
+          {/* On while either tip is still pending; writes both together. */}
+          <TipsToggle
+            initialShow={user.showWelcome || user.showDesignerIntro}
+          />
         </CardContent>
       </Card>
       <Card>
