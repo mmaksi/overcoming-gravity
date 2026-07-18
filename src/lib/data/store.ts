@@ -12,6 +12,8 @@ import {
   ProgramRun,
   ProgramSummary,
   SessionSummary,
+  SubscriptionSnapshot,
+  Voucher,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import { Weekday } from "@/lib/domain/types";
@@ -138,6 +140,36 @@ export interface DataStore {
   updateProfileWelcome(userId: string, showWelcome: boolean): Promise<void>;
   /** Show/hide the workout-designer intro carousel. */
   updateProfileDesignerIntro(userId: string, show: boolean): Promise<void>;
+
+  // Billing -----------------------------------------------------------------
+  // Billing columns are server-managed: in Supabase a trigger rejects writes
+  // from user-scoped sessions, so these two are only ever called on the
+  // service store (see getServiceStore).
+  /** Remember which payment provider customer backs this user's billing. */
+  setProfileBillingCustomer(
+    userId: string,
+    provider: string,
+    customerId: string,
+  ): Promise<void>;
+  /**
+   * Write a subscription snapshot (null = no subscription) onto the profile
+   * owning this provider customer — how webhooks and the post-checkout sync
+   * flip a user between free and pro.
+   */
+  applySubscription(
+    provider: string,
+    customerId: string,
+    subscription: SubscriptionSnapshot | null,
+  ): Promise<void>;
+
+  // Vouchers ----------------------------------------------------------------
+  // Admin-managed discount codes. Reads for checkout validation go through
+  // the service store (regular users can't see the table).
+  listVouchers(): Promise<Voucher[]>;
+  getVoucherByCode(code: string): Promise<Voucher | null>;
+  createVoucher(voucher: Voucher): Promise<Voucher>;
+  deleteVoucher(id: string): Promise<void>;
+  incrementVoucherRedemptions(id: string): Promise<void>;
 
   // Bodyweight tracking ---------------------------------------------------
   listBodyweightEntries(userId: string): Promise<BodyweightEntry[]>;

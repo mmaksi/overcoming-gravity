@@ -9,6 +9,7 @@ import {
   ExerciseNote,
   Feedback,
   isTimeMeasurement,
+  planFromStatus,
   Profile,
   ProfileStats,
   Program,
@@ -16,6 +17,8 @@ import {
   ProgramRun,
   ProgramSummary,
   SessionSummary,
+  SubscriptionSnapshot,
+  Voucher,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import { Weekday } from "@/lib/domain/types";
@@ -37,6 +40,17 @@ type Row = Record<string, any>;
 type Tables = Database["public"]["Tables"];
 
 // Row ↔ domain mappers (tables use snake_case; jsonb columns hold documents).
+
+const toVoucher = (r: Row): Voucher => ({
+  id: r.id,
+  code: r.code,
+  percentOff: r.percent_off,
+  validFrom: r.valid_from ?? undefined,
+  validUntil: r.valid_until ?? undefined,
+  maxRedemptions: r.max_redemptions ?? undefined,
+  redemptions: r.redemptions,
+  createdAt: r.created_at,
+});
 
 const toExercise = (r: Row): Exercise => ({
   id: r.id,
@@ -607,6 +621,16 @@ class SupabaseStore implements DataStore {
       targetWeightKg: rows[0].target_weight_kg ?? undefined,
       showWelcome: rows[0].show_welcome ?? true,
       showDesignerIntro: rows[0].show_designer_intro ?? true,
+      plan: planFromStatus(rows[0].subscription_status),
+      planInterval:
+        rows[0].subscription_interval === "month" ||
+        rows[0].subscription_interval === "year"
+          ? rows[0].subscription_interval
+          : undefined,
+      planRenewsAt: rows[0].subscription_period_end ?? undefined,
+      planCancelAtPeriodEnd: rows[0].subscription_cancel_at_period_end ?? false,
+      billingProvider: rows[0].billing_provider ?? undefined,
+      billingCustomerId: rows[0].billing_customer_id ?? undefined,
     };
   }
   async updateProfileName(userId: string, name: string): Promise<void> {
@@ -663,6 +687,103 @@ class SupabaseStore implements DataStore {
         .from("profiles")
         .update({ show_designer_intro: show })
         .eq("id", userId)
+        .select("id"),
+    );
+  }
+
+  // Billing -----------------------------------------------------------------
+  // Only ever called on the service store: a profiles trigger rejects billing
+  // writes from user-scoped sessions (see 0013_billing_and_vouchers.sql).
+  async setProfileBillingCustomer(
+    userId: string,
+    provider: string,
+    customerId: string,
+  ): Promise<void> {
+    orThrow(
+      await this.db
+        .from("profiles")
+        .update({
+          billing_provider: provider,
+          billing_customer_id: customerId,
+        })
+        .eq("id", userId)
+        .select("id"),
+    );
+  }
+  async applySubscription(
+    provider: string,
+    customerId: string,
+    subscription: SubscriptionSnapshot | null,
+  ): Promise<void> {
+    orThrow(
+      await this.db
+        .from("profiles")
+        .update({
+          billing_subscription_id: subscription?.subscriptionId ?? null,
+          subscription_status: subscription?.status ?? null,
+          subscription_interval: subscription?.interval ?? null,
+          subscription_period_end: subscription?.periodEnd ?? null,
+          subscription_cancel_at_period_end:
+            subscription?.cancelAtPeriodEnd ?? false,
+        })
+        .eq("billing_provider", provider)
+        .eq("billing_customer_id", customerId)
+        .select("id"),
+    );
+  }
+
+  // Vouchers ----------------------------------------------------------------
+  async listVouchers(): Promise<Voucher[]> {
+    const rows = orThrow(
+      await this.db
+        .from("vouchers")
+        .select()
+        .order("created_at", { ascending: false }),
+    );
+    return rows.map(toVoucher);
+  }
+  async getVoucherByCode(code: string): Promise<Voucher | null> {
+    const rows = orThrow(
+      await this.db
+        .from("vouchers")
+        .select()
+        .eq("code", code.trim().toUpperCase()),
+    );
+    return rows.length > 0 ? toVoucher(rows[0]) : null;
+  }
+  async createVoucher(voucher: Voucher): Promise<Voucher> {
+    orThrow(
+      await this.db
+        .from("vouchers")
+        .insert({
+          id: voucher.id,
+          code: voucher.code,
+          percent_off: voucher.percentOff,
+          valid_from: voucher.validFrom ?? null,
+          valid_until: voucher.validUntil ?? null,
+          max_redemptions: voucher.maxRedemptions ?? null,
+          redemptions: voucher.redemptions,
+          created_at: voucher.createdAt,
+        })
+        .select("id"),
+    );
+    return voucher;
+  }
+  async deleteVoucher(id: string): Promise<void> {
+    orThrow(await this.db.from("vouchers").delete().eq("id", id).select("id"));
+  }
+  async incrementVoucherRedemptions(id: string): Promise<void> {
+    // Two racing redemptions can lose an increment; voucher counts are a
+    // cap, not accounting, so that is acceptable.
+    const rows = orThrow(
+      await this.db.from("vouchers").select("redemptions").eq("id", id),
+    );
+    if (rows.length === 0) return;
+    orThrow(
+      await this.db
+        .from("vouchers")
+        .update({ redemptions: rows[0].redemptions + 1 })
+        .eq("id", id)
         .select("id"),
     );
   }
@@ -744,5 +865,26 @@ class SupabaseStore implements DataStore {
 export async function createSupabaseStore(): Promise<DataStore> {
   const { createServerSupabase } = await import("@/lib/supabase/server");
   const supabase = await createServerSupabase();
+  return new SupabaseStore(supabase);
+}
+
+/**
+ * Service-role store: bypasses RLS. Only for server-side billing paths
+ * (verified provider webhooks, checkout, subscription sync, voucher
+ * validation) — never hand it identifiers taken from unverified input.
+ */
+export async function createServiceSupabaseStore(): Promise<DataStore> {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is not set — required for billing writes",
+    );
+  }
+  const { createClient } = await import("@supabase/supabase-js");
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    key,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
   return new SupabaseStore(supabase);
 }

@@ -10,6 +10,7 @@ import {
 import {
   defaultTemplateSchema,
   exerciseSchema,
+  voucherSchema,
 } from "@/lib/domain/schemas";
 
 function revalidateContent() {
@@ -58,5 +59,45 @@ export async function saveTemplate(input: unknown): Promise<void> {
   const store = await getStore();
   await store.saveDefaultTemplate(template);
   revalidateContent();
+}
+
+// Vouchers -------------------------------------------------------------------
+
+const createVoucherSchema = voucherSchema.pick({
+  code: true,
+  percentOff: true,
+  validFrom: true,
+  validUntil: true,
+  maxRedemptions: true,
+});
+
+/** Create a discount code (admin). Codes are stored uppercase. */
+export async function createVoucher(input: {
+  code: string;
+  percentOff: number;
+  validFrom?: string;
+  validUntil?: string;
+  maxRedemptions?: number;
+}): Promise<void> {
+  await requireAdmin();
+  const parsed = createVoucherSchema.parse(input);
+  if (parsed.validFrom && parsed.validUntil && parsed.validUntil < parsed.validFrom) {
+    throw new Error("The voucher would expire before it starts");
+  }
+  const store = await getStore();
+  await store.createVoucher({
+    id: crypto.randomUUID(),
+    ...parsed,
+    redemptions: 0,
+    createdAt: new Date().toISOString(),
+  });
+  revalidatePath("/admin/vouchers");
+}
+
+export async function removeVoucher(id: string): Promise<void> {
+  await requireAdmin();
+  const store = await getStore();
+  await store.deleteVoucher(id);
+  revalidatePath("/admin/vouchers");
 }
 

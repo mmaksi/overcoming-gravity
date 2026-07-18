@@ -20,6 +20,7 @@ import {
   Week,
 } from "@/lib/domain/schemas";
 import { GOAL_AREAS, GoalArea } from "@/lib/domain/types";
+import { isPro } from "@/lib/billing/entitlements";
 import { buildMesocycle } from "@/lib/domain/build";
 import { WizardPayload, wizardPayloadSchema } from "@/lib/domain/wizard";
 
@@ -35,6 +36,11 @@ export async function createProgramFromWizard(
   payload: WizardPayload,
 ): Promise<string> {
   const user = await requireUser();
+  // The designer is a full-app feature; the UI shows a paywall before ever
+  // calling this — the check here backstops direct calls.
+  if (!isPro(user)) {
+    throw new Error("Creating programs needs the full app — upgrade to continue.");
+  }
   const parsed = wizardPayloadSchema.parse(payload);
   const store = await getStore();
 

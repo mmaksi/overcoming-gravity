@@ -9,6 +9,7 @@ import {
   Profile,
   Program,
   ProgramRun,
+  Voucher,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 
@@ -24,6 +25,7 @@ export type DbData = {
   customWorkouts: CustomWorkout[];
   bodyweightEntries: BodyweightEntry[];
   feedback: Feedback[];
+  vouchers: Voucher[];
 };
 
 function ex(
@@ -298,6 +300,8 @@ const profiles: Profile[] = [
     isAdmin: false,
     showWelcome: true,
     showDesignerIntro: true,
+    plan: "free",
+    planCancelAtPeriodEnd: false,
   },
   {
     id: "dev-admin",
@@ -306,6 +310,8 @@ const profiles: Profile[] = [
     isAdmin: true,
     showWelcome: true,
     showDesignerIntro: true,
+    plan: "free",
+    planCancelAtPeriodEnd: false,
   },
 ];
 
@@ -321,5 +327,6 @@ export function seedData(): DbData {
     customWorkouts: [],
     bodyweightEntries: [],
     feedback: [],
+    vouchers: [],
   };
 }

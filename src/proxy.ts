@@ -59,10 +59,12 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except static assets and PWA files. The image-extension
-    // exclusion keeps public images (logos/, handstand.jpg, uploads/…)
-    // loadable on /login — without it the auth gate 307-redirects the logo
-    // request itself, so the login page showed only the image's alt text.
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw.js|.*\\.(?:png|jpe?g|gif|webp|avif|svg)$).*)",
+    // Everything except static assets, PWA files and provider webhooks.
+    // The extension exclusion keeps public assets (logos/, handstand.jpg,
+    // sound-effects/…) loadable on /login — without it the auth gate
+    // 307-redirects the asset request itself. /api/billing is excluded
+    // because payment-provider webhooks arrive without a user session
+    // (they authenticate with their own signatures).
+    "/((?!api/billing/|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw.js|.*\\.(?:png|jpe?g|gif|webp|avif|svg|mp3)$).*)",
   ],
 };

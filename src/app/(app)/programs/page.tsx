@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { getCachedUserPrograms } from "@/lib/data/cached";
+import { isPro } from "@/lib/billing/entitlements";
 import {
   PERIODIZATION_LABELS,
   PROGRAM_TYPE_LABELS,
   SPLIT_TYPE_LABELS,
 } from "@/lib/domain/types";
 import { Badge } from "@/components/ui/badge";
+import { CreateProgramCta } from "@/components/programs/create-program-cta";
 import { IndividualWorkouts } from "@/components/workouts/individual-workouts";
 
 export default async function ProgramsPage() {
@@ -29,22 +31,8 @@ export default async function ProgramsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Programs</h1>
 
-      {/* Inviting create call-to-action in place of a small header button. */}
-      <Link
-        href="/programs/new"
-        className="group flex items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-4 transition-colors hover:border-primary hover:bg-primary/10"
-      >
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary transition-transform group-hover:scale-105">
-          <Plus className="size-6" />
-        </span>
-        <span className="min-w-0">
-          <span className="block font-semibold">Create a program</span>
-          <span className="block text-sm text-muted-foreground">
-            Pick a type, choose your skills, design the mesocycle.
-          </span>
-        </span>
-        <ChevronRight className="ml-auto size-5 shrink-0 text-muted-foreground" />
-      </Link>
+      {/* Inviting create call-to-action; paywalled on the free plan. */}
+      <CreateProgramCta locked={!isPro(user)} />
 
       {programs.length === 0 ? (
         <div className="space-y-1 py-8 text-center">
@@ -83,7 +71,7 @@ export default async function ProgramsPage() {
       )}
 
       {/* Standalone workouts: a title + exercises, no goals/periodization. */}
-      <IndividualWorkouts workouts={customWorkouts} />
+      <IndividualWorkouts workouts={customWorkouts} isProUser={isPro(user)} />
     </div>
   );
 }

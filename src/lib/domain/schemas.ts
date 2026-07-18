@@ -547,8 +547,89 @@ export const profileSchema = z.object({
   showWelcome: z.boolean().default(true),
   /** Show the workout-designer intro carousel; dismissed after first view. */
   showDesignerIntro: z.boolean().default(true),
+  /**
+   * Billing, kept provider-neutral (the payment provider seam lives in
+   * lib/billing): "pro" while a subscription entitles full access. Free
+   * accounts can log workouts but not design programs, and create at most
+   * FREE_CUSTOM_WORKOUT_LIMIT custom workouts.
+   */
+  plan: z.enum(["free", "pro"]).default("free"),
+  planInterval: z.enum(["month", "year"]).optional(),
+  /** When the current billing period renews (or ends, when cancelled). */
+  planRenewsAt: z.string().optional(),
+  planCancelAtPeriodEnd: z.boolean().default(false),
+  /** Which payment provider owns this user's billing (e.g. "stripe"). */
+  billingProvider: z.string().optional(),
+  /** The provider's customer reference (e.g. a Stripe customer id). */
+  billingCustomerId: z.string().optional(),
 });
 export type Profile = z.infer<typeof profileSchema>;
+
+/**
+ * A subscription's provider-normalized state, as reported by a webhook or a
+ * post-checkout sync. Written onto the profile by the server only.
+ */
+export type SubscriptionSnapshot = {
+  subscriptionId: string;
+  /** Provider-normalized: "active" | "trialing" | "past_due" | "canceled" | … */
+  status: string;
+  interval: "month" | "year";
+  /** ISO timestamp the current period ends (renewal or expiry). */
+  periodEnd?: string;
+  cancelAtPeriodEnd: boolean;
+};
+
+/** Statuses that entitle full access — past_due keeps access as a grace. */
+export function planFromStatus(status: string | null | undefined): "free" | "pro" {
+  return status === "active" || status === "trialing" || status === "past_due"
+    ? "pro"
+    : "free";
+}
+
+// ---------------------------------------------------------------------------
+// Vouchers
+
+/**
+ * Admin-created discount codes, owned by the app (not the payment provider,
+ * which merely gets told the percentage at checkout). A voucher can be
+ * limited to a validity window and a number of redemptions.
+ */
+export const voucherSchema = z.object({
+  id: z.string(),
+  /** Stored uppercase; matching is case-insensitive. */
+  code: z
+    .string()
+    .trim()
+    .min(3)
+    .max(32)
+    .regex(/^[A-Za-z0-9_-]+$/, "letters, numbers, - and _ only")
+    .transform((c) => c.toUpperCase()),
+  percentOff: z.number().int().min(1).max(100),
+  /** ISO date (inclusive) the code starts working; unset = immediately. */
+  validFrom: z.string().optional(),
+  /** ISO date (inclusive) the code stops working; unset = no expiry. */
+  validUntil: z.string().optional(),
+  maxRedemptions: z.number().int().positive().optional(),
+  redemptions: z.number().int().min(0).default(0),
+  createdAt: z.string(),
+});
+export type Voucher = z.infer<typeof voucherSchema>;
+
+/** Why a voucher can't be redeemed today — null means it's good to use. */
+export function voucherProblem(
+  voucher: Voucher,
+  todayISO: string,
+): "not yet valid" | "expired" | "fully redeemed" | null {
+  if (voucher.validFrom && todayISO < voucher.validFrom) return "not yet valid";
+  if (voucher.validUntil && todayISO > voucher.validUntil) return "expired";
+  if (
+    voucher.maxRedemptions !== undefined &&
+    voucher.redemptions >= voucher.maxRedemptions
+  ) {
+    return "fully redeemed";
+  }
+  return null;
+}
 
 /** Body stats editable in Settings (null clears a value). */
 export type ProfileStats = {

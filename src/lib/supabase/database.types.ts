@@ -201,6 +201,9 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          billing_customer_id: string | null
+          billing_provider: string | null
+          billing_subscription_id: string | null
           created_at: string
           email: string | null
           height_cm: number | null
@@ -209,10 +212,17 @@ export type Database = {
           name: string
           show_designer_intro: boolean
           show_welcome: boolean
+          subscription_cancel_at_period_end: boolean
+          subscription_interval: string | null
+          subscription_period_end: string | null
+          subscription_status: string | null
           target_weight_kg: number | null
         }
         Insert: {
           avatar_url?: string | null
+          billing_customer_id?: string | null
+          billing_provider?: string | null
+          billing_subscription_id?: string | null
           created_at?: string
           email?: string | null
           height_cm?: number | null
@@ -221,10 +231,17 @@ export type Database = {
           name?: string
           show_designer_intro?: boolean
           show_welcome?: boolean
+          subscription_cancel_at_period_end?: boolean
+          subscription_interval?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           target_weight_kg?: number | null
         }
         Update: {
           avatar_url?: string | null
+          billing_customer_id?: string | null
+          billing_provider?: string | null
+          billing_subscription_id?: string | null
           created_at?: string
           email?: string | null
           height_cm?: number | null
@@ -233,6 +250,10 @@ export type Database = {
           name?: string
           show_designer_intro?: boolean
           show_welcome?: boolean
+          subscription_cancel_at_period_end?: boolean
+          subscription_interval?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           target_weight_kg?: number | null
         }
         Relationships: []
@@ -417,6 +438,39 @@ export type Database = {
           description?: string
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      vouchers: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          max_redemptions: number | null
+          percent_off: number
+          redemptions: number
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          max_redemptions?: number | null
+          percent_off: number
+          redemptions?: number
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          max_redemptions?: number | null
+          percent_off?: number
+          redemptions?: number
+          valid_from?: string | null
+          valid_until?: string | null
         }
         Relationships: []
       }

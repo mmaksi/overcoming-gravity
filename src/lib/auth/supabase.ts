@@ -1,5 +1,5 @@
 import "server-only";
-import { Profile } from "@/lib/domain/schemas";
+import { planFromStatus, Profile } from "@/lib/domain/schemas";
 
 /**
  * Supabase-backed auth (production). Reads the session from cookies via
@@ -15,7 +15,7 @@ export async function getSupabaseUser(): Promise<Profile | null> {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, name, is_admin, avatar_url, height_cm, target_weight_kg, show_welcome, show_designer_intro",
+      "id, email, name, is_admin, avatar_url, height_cm, target_weight_kg, show_welcome, show_designer_intro, subscription_status, subscription_interval, subscription_period_end, subscription_cancel_at_period_end, billing_provider, billing_customer_id",
     )
     .eq("id", user.id)
     .single();
@@ -30,6 +30,8 @@ export async function getSupabaseUser(): Promise<Profile | null> {
       isAdmin: false,
       showWelcome: true,
       showDesignerIntro: true,
+      plan: "free",
+      planCancelAtPeriodEnd: false,
     };
   }
   return {
@@ -42,5 +44,15 @@ export async function getSupabaseUser(): Promise<Profile | null> {
     targetWeightKg: profile.target_weight_kg ?? undefined,
     showWelcome: profile.show_welcome ?? true,
     showDesignerIntro: profile.show_designer_intro ?? true,
+    plan: planFromStatus(profile.subscription_status),
+    planInterval:
+      profile.subscription_interval === "month" ||
+      profile.subscription_interval === "year"
+        ? profile.subscription_interval
+        : undefined,
+    planRenewsAt: profile.subscription_period_end ?? undefined,
+    planCancelAtPeriodEnd: profile.subscription_cancel_at_period_end ?? false,
+    billingProvider: profile.billing_provider ?? undefined,
+    billingCustomerId: profile.billing_customer_id ?? undefined,
   };
 }

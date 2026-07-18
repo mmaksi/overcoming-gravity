@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { signInWithGoogle } from "@/lib/auth/actions";
 import { Logo } from "@/components/shell/logo";
@@ -51,6 +51,21 @@ export default function LoginPage() {
       else if (result.url) window.location.href = result.url;
     });
   }
+
+  // The landing page links here as /login?provider=google: start the Google
+  // flow immediately so signing up from the marketing site is one hop. The
+  // OAuth (PKCE) flow must begin and end on this app's domain — that's why
+  // the landing page can't call Supabase itself.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("provider") === "google") {
+      autoStarted.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      signIn();
+    }
+  }, []);
 
   return (
     <div className="relative flex min-h-dvh w-full flex-col items-center justify-center px-4">

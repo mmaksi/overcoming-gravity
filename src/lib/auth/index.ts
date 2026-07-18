@@ -31,6 +31,12 @@ export async function getCurrentUser(): Promise<Profile | null> {
     // Dev profiles created before the tours existed have no flags stored.
     showWelcome: profile?.showWelcome ?? true,
     showDesignerIntro: profile?.showDesignerIntro ?? true,
+    plan: profile?.plan ?? "free",
+    planInterval: profile?.planInterval,
+    planRenewsAt: profile?.planRenewsAt,
+    planCancelAtPeriodEnd: profile?.planCancelAtPeriodEnd ?? false,
+    billingProvider: profile?.billingProvider,
+    billingCustomerId: profile?.billingCustomerId,
   };
 }
 

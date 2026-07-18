@@ -4,12 +4,14 @@ import { useOptimistic, useState, useTransition } from "react";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Loader2, Plus, Trash2, Zap } from "lucide-react";
+import { ChevronRight, Loader2, Lock, Plus, Trash2, Zap } from "lucide-react";
 import { CustomWorkout } from "@/lib/domain/schemas";
 import {
   createCustomWorkout,
   deleteCustomWorkout,
 } from "@/lib/actions/workouts";
+import { FREE_CUSTOM_WORKOUT_LIMIT } from "@/lib/billing/entitlements";
+import { PaywallDialog } from "@/components/billing/paywall";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,18 +29,24 @@ import {
  */
 export function IndividualWorkouts({
   workouts,
+  isProUser,
 }: {
   workouts: CustomWorkout[];
+  isProUser: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState<CustomWorkout | null>(
     null,
   );
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [optimistic, removeOptimistic] = useOptimistic(
     workouts,
     (state, deletedId: string) => state.filter((w) => w.id !== deletedId),
   );
+  // Free plan: a taste of the feature, then the paywall (server backstops).
+  const atFreeLimit =
+    !isProUser && optimistic.length >= FREE_CUSTOM_WORKOUT_LIMIT;
 
   // Create then navigate to the new editor. Navigation happens after the
   // awaited mutation (see `createWorkout`), not in onSuccess: a router.push
@@ -70,12 +78,14 @@ export function IndividualWorkouts({
       <button
         type="button"
         disabled={createMutation.isPending}
-        onClick={createWorkout}
+        onClick={() => (atFreeLimit ? setPaywallOpen(true) : createWorkout())}
         className="group flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-left transition-colors hover:border-primary hover:bg-primary/10 disabled:opacity-70"
       >
         <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary transition-transform group-hover:scale-105">
           {createMutation.isPending ? (
             <Loader2 className="size-5 animate-spin" />
+          ) : atFreeLimit ? (
+            <Lock className="size-5" />
           ) : (
             <Plus className="size-6" />
           )}
@@ -83,11 +93,19 @@ export function IndividualWorkouts({
         <span className="min-w-0">
           <span className="block font-semibold">Create a workout</span>
           <span className="block text-sm text-muted-foreground">
-            A one-off session outside your programs.
+            {atFreeLimit
+              ? `Free plan: ${FREE_CUSTOM_WORKOUT_LIMIT} of ${FREE_CUSTOM_WORKOUT_LIMIT} workouts used — upgrade for unlimited.`
+              : "A one-off session outside your programs."}
           </span>
         </span>
         <ChevronRight className="ml-auto size-5 shrink-0 text-muted-foreground" />
       </button>
+
+      <PaywallDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        feature={`More than ${FREE_CUSTOM_WORKOUT_LIMIT} custom workouts`}
+      />
 
       {optimistic.length > 0 && (
         <div className="space-y-4">

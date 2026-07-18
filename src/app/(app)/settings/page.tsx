@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/auth";
 import { dataBackend, getStore } from "@/lib/data";
 import { toISODate } from "@/lib/domain/schedule";
+import { syncSubscriptionForUser } from "@/lib/billing/sync";
+import { BillingSection } from "@/components/settings/billing-section";
 import { BodyStatsForm } from "@/components/settings/body-stats-form";
 import {
   Card,
@@ -17,8 +19,21 @@ import { SignOutButton } from "@/components/settings/sign-out-button";
 import { ThemePicker } from "@/components/settings/theme-picker";
 import { TipsToggle } from "@/components/settings/tips-toggle";
 
-export default async function SettingsPage() {
-  const user = await requireUser();
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
+  let user = await requireUser();
+  const { checkout } = await searchParams;
+
+  // Back from a completed checkout: pull the subscription straight from the
+  // provider so the new plan shows immediately, webhook or not.
+  if (checkout === "success") {
+    await syncSubscriptionForUser(user);
+    user = await requireUser();
+  }
+
   const backend = dataBackend();
   const store = await getStore();
   const bodyweight = await store.listBodyweightEntries(user.id);
@@ -42,6 +57,24 @@ export default async function SettingsPage() {
           ) : (
             <SignOutButton />
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan</CardTitle>
+          <CardDescription>
+            Your subscription, card and invoices.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BillingSection
+            isAdmin={user.isAdmin}
+            plan={user.plan}
+            planInterval={user.planInterval}
+            planRenewsAt={user.planRenewsAt}
+            planCancelAtPeriodEnd={user.planCancelAtPeriodEnd}
+            justUpgraded={checkout === "success" && user.plan === "pro"}
+          />
         </CardContent>
       </Card>
       <Card>

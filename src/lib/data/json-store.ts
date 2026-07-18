@@ -9,6 +9,7 @@ import {
   Exercise,
   ExerciseNote,
   Feedback,
+  planFromStatus,
   Profile,
   ProfileStats,
   Program,
@@ -16,6 +17,8 @@ import {
   ProgramRun,
   ProgramSummary,
   SessionSummary,
+  SubscriptionSnapshot,
+  Voucher,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import { Weekday } from "@/lib/domain/types";
@@ -73,6 +76,12 @@ function normalizeLegacy(data: DbData): void {
   data.customWorkouts ??= [];
   data.bodyweightEntries ??= [];
   data.feedback ??= [];
+  data.vouchers ??= [];
+  // Billing shipped after the first profiles existed.
+  for (const profile of data.profiles) {
+    profile.plan ??= "free";
+    profile.planCancelAtPeriodEnd ??= false;
+  }
   // "cardio" was removed as an attribute; conditioning belongs to warm-up.
   for (const exercise of data.exercises) {
     if ((exercise.attribute as string) === "cardio") {
@@ -427,6 +436,71 @@ export class JsonStore implements DataStore {
     const profile = db.data.profiles.find((p) => p.id === userId);
     if (!profile) return;
     profile.showDesignerIntro = show;
+    await db.write();
+  }
+
+  // Billing -----------------------------------------------------------------
+  async setProfileBillingCustomer(
+    userId: string,
+    provider: string,
+    customerId: string,
+  ): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find((p) => p.id === userId);
+    if (!profile) return;
+    profile.billingProvider = provider;
+    profile.billingCustomerId = customerId;
+    await db.write();
+  }
+  async applySubscription(
+    provider: string,
+    customerId: string,
+    subscription: SubscriptionSnapshot | null,
+  ): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find(
+      (p) =>
+        p.billingProvider === provider && p.billingCustomerId === customerId,
+    );
+    if (!profile) return;
+    profile.plan = planFromStatus(subscription?.status);
+    profile.planInterval = subscription?.interval;
+    profile.planRenewsAt = subscription?.periodEnd;
+    profile.planCancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+    await db.write();
+  }
+
+  // Vouchers ----------------------------------------------------------------
+  async listVouchers(): Promise<Voucher[]> {
+    const db = await getDb();
+    return [...db.data.vouchers].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+  }
+  async getVoucherByCode(code: string): Promise<Voucher | null> {
+    const db = await getDb();
+    const needle = code.trim().toUpperCase();
+    return db.data.vouchers.find((v) => v.code === needle) ?? null;
+  }
+  async createVoucher(voucher: Voucher): Promise<Voucher> {
+    const db = await getDb();
+    if (db.data.vouchers.some((v) => v.code === voucher.code)) {
+      throw new Error("A voucher with this code already exists");
+    }
+    db.data.vouchers.push(voucher);
+    await db.write();
+    return voucher;
+  }
+  async deleteVoucher(id: string): Promise<void> {
+    const db = await getDb();
+    db.data.vouchers = db.data.vouchers.filter((v) => v.id !== id);
+    await db.write();
+  }
+  async incrementVoucherRedemptions(id: string): Promise<void> {
+    const db = await getDb();
+    const voucher = db.data.vouchers.find((v) => v.id === id);
+    if (!voucher) return;
+    voucher.redemptions += 1;
     await db.write();
   }
 

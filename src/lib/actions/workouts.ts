@@ -10,6 +10,10 @@ import {
   userProgramsTag,
 } from "@/lib/data/cached";
 import { weekdayOf, toISODate } from "@/lib/domain/schedule";
+import {
+  FREE_CUSTOM_WORKOUT_LIMIT,
+  isPro,
+} from "@/lib/billing/entitlements";
 import { buildDefaultWorkoutDay } from "@/lib/domain/defaults";
 import {
   CustomWorkout,
@@ -29,6 +33,16 @@ import {
 export async function createCustomWorkout(): Promise<string> {
   const user = await requireUser();
   const store = await getStore();
+  // Free accounts get a taste: the UI paywalls beyond the limit, and this
+  // backstops direct calls.
+  if (!isPro(user)) {
+    const existing = await store.listCustomWorkouts(user.id);
+    if (existing.length >= FREE_CUSTOM_WORKOUT_LIMIT) {
+      throw new Error(
+        `The free plan includes ${FREE_CUSTOM_WORKOUT_LIMIT} custom workouts — upgrade for unlimited.`,
+      );
+    }
+  }
   const [template, exercises] = await Promise.all([
     getCachedDefaultTemplate(store),
     getCachedExercises(store),
