@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Layers } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { getCachedExercises, getCachedUserPrograms } from "@/lib/data/cached";
@@ -31,6 +31,17 @@ export default async function ProgramsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Training</h1>
+
+      {/* Layered weeks: a mesocycle stacked into a program. */}
+      <div>
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <Layers className="size-5 text-primary" /> Programs
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Design a full mesocycle — goals, periodization and a week-by-week
+          plan.
+        </p>
+      </div>
 
       {/* Inviting create call-to-action; paywalled on the free plan. */}
       <CreateProgramCta locked={!isPro(user)} />

@@ -21,7 +21,8 @@ export function ExerciseThumb({
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
-  const showImage = imageUrl?.startsWith("https://") && !broken;
+  const showImage =
+    imageUrl !== undefined && imageUrl.startsWith("https://") && !broken;
 
   return (
     <div
