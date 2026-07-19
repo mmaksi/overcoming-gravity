@@ -57,6 +57,19 @@ export function ExerciseEditor({
   onChange: (we: WorkoutExercise) => void;
   onRemove: () => void;
 }) {
+  // Tempo + progression method live behind this toggle. Reset per opening
+  // (during render, not in an effect): start expanded only when the exercise
+  // already uses one of them, so the setting is visible when it matters.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    setAdvancedOpen(
+      open &&
+        (Boolean(value?.tempo) || value?.progressionMethod === "inter"),
+    );
+  }
+
   if (!exercise || !value) return null;
 
   const set = (patch: Partial<WorkoutExercise>) =>
@@ -254,19 +267,6 @@ export function ExerciseEditor({
             </div>
           </div>
 
-          {/* Tempo */}
-          <div className="space-y-2">
-            <Label htmlFor="tempo">Tempo (optional)</Label>
-            <Input
-              id="tempo"
-              placeholder="e.g. 31X1 — 3s down, 1s pause, explode up, 1s hold"
-              value={value.tempo ?? ""}
-              onChange={(e) =>
-                set({ tempo: e.target.value || undefined })
-              }
-            />
-          </div>
-
           {isCluster && (
             <div className="space-y-2">
               <Label htmlFor="cluster-rest">
@@ -294,6 +294,38 @@ export function ExerciseEditor({
               </p>
             </div>
           )}
+
+          {/* Advanced settings: tempo + progression method, collapsed by
+              default so the common path stays short. */}
+          <button
+            type="button"
+            aria-expanded={advancedOpen}
+            onClick={() => setAdvancedOpen((v) => !v)}
+            className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors hover:border-foreground/30"
+          >
+            Advanced settings
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform",
+                advancedOpen && "rotate-180",
+              )}
+            />
+          </button>
+
+          {advancedOpen && (
+          <>
+          {/* Tempo */}
+          <div className="space-y-2">
+            <Label htmlFor="tempo">Tempo (optional)</Label>
+            <Input
+              id="tempo"
+              placeholder="e.g. 31X1 — 3s down, 1s pause, explode up, 1s hold"
+              value={value.tempo ?? ""}
+              onChange={(e) =>
+                set({ tempo: e.target.value || undefined })
+              }
+            />
+          </div>
 
           {/* Progression method */}
           <div className="space-y-2">
@@ -351,6 +383,8 @@ export function ExerciseEditor({
                 You&apos;ll take notes on this technique during the workout.
               </p>
             </div>
+          )}
+          </>
           )}
 
           <div className="flex gap-2 pt-2">

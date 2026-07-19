@@ -68,11 +68,28 @@ export const exerciseSchema = z.object({
   measurement: measurementValue.default("reps"),
   /** Cluster style marks eccentric work: rest between single reps in a set. */
   repStyle: z.enum(REP_STYLES).default("standard"),
+  /**
+   * The sport this exercise belongs to ("Calisthenics", "Parkour", …) — a
+   * free-form admin-managed name, so new sports need no code change. Optional
+   * for back-compat: exercises saved before sports existed are calisthenics.
+   * Resolve the effective value with `exerciseSport`.
+   */
+  sport: z.string().min(1).optional(),
   /** Optional illustration shown in the picker; admin-managed. */
   imageUrl: z.string().url().or(z.literal("")).optional(),
   progressions: z.array(progressionSchema).min(1),
 });
 export type Exercise = z.infer<typeof exerciseSchema>;
+
+/** Exercises saved before sports existed are calisthenics — the app's core. */
+export const DEFAULT_SPORT = "Calisthenics";
+
+/** The exercise's effective sport (legacy rows default to calisthenics). */
+export function exerciseSport(
+  exercise: Pick<Exercise, "sport">,
+): string {
+  return exercise.sport?.trim() || DEFAULT_SPORT;
+}
 
 // defaultTemplateSchema is defined below the program section: the template
 // is a full WorkoutDay so the defaults admin page is the designer day UI.

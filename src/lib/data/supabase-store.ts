@@ -60,6 +60,7 @@ const toExercise = (r: Row): Exercise => ({
   attribute: r.attribute === "cardio" ? "warmup" : r.attribute,
   measurement: r.measurement ?? "reps",
   repStyle: r.rep_style ?? "standard",
+  sport: r.sport ?? undefined,
   imageUrl: r.image_url ?? undefined,
   progressions: r.progressions,
 });
@@ -229,6 +230,7 @@ class SupabaseStore implements DataStore {
         attribute: exercise.attribute,
         measurement: columnMeasurement(exercise.measurement),
         rep_style: exercise.repStyle,
+        sport: exercise.sport || null,
         image_url: exercise.imageUrl || null,
         progressions: exercise.progressions,
       }).select(),
@@ -245,6 +247,7 @@ class SupabaseStore implements DataStore {
           attribute: exercise.attribute,
           measurement: columnMeasurement(exercise.measurement),
           rep_style: exercise.repStyle,
+          sport: exercise.sport || null,
           image_url: exercise.imageUrl || null,
           progressions: exercise.progressions,
         })

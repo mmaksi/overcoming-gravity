@@ -17,11 +17,21 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
+ * One circuit station = one exercise's target inside every round: either a
+ * rep count (advance by hand) or seconds of work (advances on the clock).
+ */
+export type CircuitStation = {
+  mode: "reps" | "seconds";
+  amount: number;
+};
+
+/**
  * A mode's timing/shape settings, chosen at workout time (the designer only
  * picks the mode). Which fields matter depends on the mode: superset — rest
  * after each round; HIIT — work/rest/rounds; pyramid & ladder — the climb's
- * start, increment and interval. Settings live in the logger's client state
- * (persisted per session in localStorage), never on the plan.
+ * start, increment and interval; circuit — rounds plus one station per
+ * exercise. Settings live in the logger's client state (persisted per
+ * session in localStorage), never on the plan.
  */
 export type ModeSettings = {
   restSeconds?: number;
@@ -30,6 +40,8 @@ export type ModeSettings = {
   startReps?: number;
   increment?: number;
   intervalSeconds?: number;
+  /** Circuit only: per-exercise targets, in the group's planned order. */
+  stations?: CircuitStation[];
 };
 
 /** Modes with settings to adjust at workout time (the rest have none). */
@@ -37,8 +49,24 @@ export function isConfigurableMode(type: GroupType): boolean {
   return (
     type === "superset" ||
     type === "hiit" ||
+    type === "circuit" ||
     type === "pyramid" ||
     type === "ladder"
+  );
+}
+
+/**
+ * The circuit's per-exercise stations, normalized to the group's exercise
+ * count: saved stations win position by position, new exercises fall back to
+ * a 10-rep default.
+ */
+export function circuitStations(
+  settings: ModeSettings,
+  exerciseCount: number,
+): CircuitStation[] {
+  return Array.from(
+    { length: exerciseCount },
+    (_, i) => settings.stations?.[i] ?? { mode: "reps", amount: 10 },
   );
 }
 
@@ -59,6 +87,8 @@ export function seedModeSettings(group: ExerciseGroup): ModeSettings {
     case "pyramid":
     case "ladder":
       return { startReps: 1, increment: 1, intervalSeconds: 60 };
+    case "circuit":
+      return { rounds: 3 };
     default:
       return {};
   }
@@ -92,6 +122,14 @@ export function modeSettingsSummary(
     }
     case "tabata":
       return "20s/10s × 8 · 4 min total";
+    case "circuit": {
+      const rounds = `${s.rounds ?? 3} rounds`;
+      if (!s.stations || s.stations.length === 0) return rounds;
+      const stations = s.stations
+        .map((st) => (st.mode === "seconds" ? `${st.amount}s` : `${st.amount}`))
+        .join("/");
+      return `${rounds} · ${stations}`;
+    }
     default:
       return null;
   }
@@ -153,12 +191,15 @@ function NumberField({
 export function ModeSettingsDialog({
   type,
   value,
+  exerciseTitles = [],
   onOpenChange,
   onSave,
 }: {
   /** The mode being configured; null keeps the dialog closed. */
   type: GroupType | null;
   value: ModeSettings;
+  /** Circuit only: the group's exercises in order — one station each. */
+  exerciseTitles?: string[];
   onOpenChange: (open: boolean) => void;
   onSave: (settings: ModeSettings) => void;
 }) {
@@ -173,6 +214,15 @@ export function ModeSettingsDialog({
   const [increment, setIncrement] = useState(String(value.increment ?? 1));
   const [intervalSeconds, setIntervalSeconds] = useState(
     String(value.intervalSeconds ?? 60),
+  );
+  // Circuit stations as editable text, one row per exercise in the group.
+  const [stations, setStations] = useState<
+    { mode: "reps" | "seconds"; amount: string }[]
+  >(() =>
+    circuitStations(value, exerciseTitles.length).map((st) => ({
+      mode: st.mode,
+      amount: String(st.amount),
+    })),
   );
 
   const num = (v: string, fallback: number) => {
@@ -193,6 +243,14 @@ export function ModeSettingsDialog({
         startReps: num(startReps, 1),
         increment: num(increment, 1),
         intervalSeconds: num(intervalSeconds, 60),
+      });
+    } else if (type === "circuit") {
+      onSave({
+        rounds: num(rounds, 3),
+        stations: stations.map((st) => ({
+          mode: st.mode,
+          amount: num(st.amount, st.mode === "seconds" ? 30 : 10),
+        })),
       });
     } else {
       onSave({
@@ -288,6 +346,69 @@ export function ModeSettingsDialog({
                 num(startReps, 1) + 2 * num(increment, 1)
               } reps, rest…`}
             />
+          </div>
+        )}
+
+        {type === "circuit" && (
+          <div className="space-y-4">
+            <NumberField
+              id="circuit-rounds"
+              label="Rounds"
+              value={rounds}
+              onChange={setRounds}
+              hint="One round = every exercise once, in order."
+            />
+            <div className="space-y-2">
+              <Label>Per exercise — reps, or seconds of work</Label>
+              {stations.map((st, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {exerciseTitles[i] ?? `Exercise ${i + 1}`}
+                  </span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    aria-label={`${exerciseTitles[i] ?? `Exercise ${i + 1}`} amount`}
+                    className="w-16 shrink-0"
+                    value={st.amount}
+                    onChange={(e) =>
+                      setStations((prev) =>
+                        prev.map((x, j) =>
+                          j === i
+                            ? { ...x, amount: e.target.value.replace(/\D/g, "") }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                  <div className="flex shrink-0 gap-1">
+                    {(["reps", "seconds"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={st.mode === mode}
+                        onClick={() =>
+                          setStations((prev) =>
+                            prev.map((x, j) =>
+                              j === i ? { ...x, mode } : x,
+                            ),
+                          )
+                        }
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-xs font-medium transition-colors",
+                          st.mode === mode
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:border-foreground/30",
+                        )}
+                      >
+                        {mode === "reps" ? "reps" : "sec"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -23,7 +23,12 @@ import {
   MEASUREMENTS,
   RepStyle,
 } from "@/lib/domain/types";
-import { Exercise, measurementOf } from "@/lib/domain/schemas";
+import {
+  DEFAULT_SPORT,
+  Exercise,
+  exerciseSport,
+  measurementOf,
+} from "@/lib/domain/schemas";
 import { removeExercise, saveExercise } from "@/lib/actions/admin";
 import { ExerciseThumb } from "@/components/exercise/exercise-thumb";
 import { Button } from "@/components/ui/button";
@@ -64,6 +69,8 @@ type Draft = {
   attribute: Attribute;
   measurement: Measurement;
   repStyle: RepStyle;
+  /** Free-form sport name ("Calisthenics", "Parkour", …). */
+  sport: string;
   imageUrl: string;
   progressions: DraftProgression[];
 };
@@ -76,13 +83,24 @@ function titleCase(value: string): string {
 export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
   const [query, setQuery] = useState("");
   const [attribute, setAttribute] = useState<Attribute | null>(null);
+  const [sport, setSport] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Every sport in the library (calisthenics first) — filter chips plus
+  // suggestions for the draft's sport input.
+  const sports = useMemo(() => {
+    const others = [
+      ...new Set(exercises.map(exerciseSport)),
+    ].filter((s) => s !== DEFAULT_SPORT);
+    return [DEFAULT_SPORT, ...others.sort()];
+  }, [exercises]);
 
   const saveMutation = useMutation({
     mutationFn: (d: Draft) =>
       saveExercise({
         ...d,
+        sport: d.sport.trim() || DEFAULT_SPORT,
         // Keep the exercise-level default aligned with the first progression,
         // so any legacy reader without a progression still gets a sane unit.
         measurement: d.progressions[0]?.measurement ?? d.measurement,
@@ -102,9 +120,10 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
     () =>
       exercises.filter((e) => {
         if (attribute && e.attribute !== attribute) return false;
+        if (sport && exerciseSport(e) !== sport) return false;
         return e.title.toLowerCase().includes(query.toLowerCase());
       }),
-    [exercises, query, attribute],
+    [exercises, query, attribute, sport],
   );
 
   const isEdit = exercises.some((e) => e.id === draft?.id);
@@ -173,6 +192,9 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
               attribute: "strength",
               measurement: "reps",
               repStyle: "standard",
+              // New exercises inherit the active sport filter (adding a
+              // batch of parkour moves shouldn't need retyping the sport).
+              sport: sport ?? DEFAULT_SPORT,
               imageUrl: "",
               progressions: [
                 {
@@ -191,6 +213,25 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
           <Plus className="size-4" /> Add
         </Button>
       </div>
+
+      {sports.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {sports.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSport(sport === s ? null : s)}
+              className={
+                sport === s
+                  ? "rounded-full border border-primary bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                  : "rounded-full border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-foreground/30"
+              }
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-1.5">
         {ATTRIBUTES.map((a) => (
@@ -228,6 +269,9 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                 <Badge variant="secondary" className="text-[10px]">
                   {ATTRIBUTE_LABELS[e.attribute]}
                 </Badge>
+                {exerciseSport(e) !== DEFAULT_SPORT && (
+                  <Badge className="text-[10px]">{exerciseSport(e)}</Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 {e.progressions.map((p) => p.name).join(" → ")}
@@ -246,6 +290,7 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                     attribute: e.attribute,
                     measurement: measurementOf(e, e.progressions[0]?.id),
                     repStyle: e.repStyle ?? "standard",
+                    sport: exerciseSport(e),
                     imageUrl: e.imageUrl ?? "",
                     progressions: e.progressions.map((p) => ({
                       ...p,
@@ -377,6 +422,28 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ex-sport">Sport</Label>
+                <Input
+                  id="ex-sport"
+                  list="ex-sport-options"
+                  placeholder={DEFAULT_SPORT}
+                  value={draft.sport}
+                  onChange={(e) =>
+                    setDraft({ ...draft, sport: titleCase(e.target.value) })
+                  }
+                />
+                <datalist id="ex-sport-options">
+                  {sports.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-muted-foreground">
+                  Pick an existing sport or type a new one (e.g. Parkour) —
+                  athletes can filter the library by it.
+                </p>
               </div>
 
               <div className="space-y-2">

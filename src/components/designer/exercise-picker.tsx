@@ -9,7 +9,11 @@ import {
   Category,
   CATEGORY_LABELS,
 } from "@/lib/domain/types";
-import { Exercise } from "@/lib/domain/schemas";
+import {
+  DEFAULT_SPORT,
+  Exercise,
+  exerciseSport,
+} from "@/lib/domain/schemas";
 import {
   Sheet,
   SheetContent,
@@ -43,17 +47,28 @@ export function ExercisePicker({
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [attribute, setAttribute] = useState<Attribute | null>(section);
+  const [sport, setSport] = useState<string | null>(null);
+
+  // Sport chips appear only once the library actually spans several sports
+  // (calisthenics first).
+  const sports = useMemo(() => {
+    const others = [
+      ...new Set(exercises.map(exerciseSport)),
+    ].filter((s) => s !== DEFAULT_SPORT);
+    return others.length > 0 ? [DEFAULT_SPORT, ...others.sort()] : [];
+  }, [exercises]);
 
   const filtered = useMemo(
     () =>
       exercises.filter((e) => {
         if (category && e.category !== category) return false;
         if (attribute && e.attribute !== attribute) return false;
+        if (sport && exerciseSport(e) !== sport) return false;
         if (query && !e.title.toLowerCase().includes(query.toLowerCase()))
           return false;
         return true;
       }),
-    [exercises, category, attribute, query],
+    [exercises, category, attribute, sport, query],
   );
 
   return (
@@ -87,6 +102,18 @@ export function ExercisePicker({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            {sports.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {sports.map((s) => (
+                  <FilterChip
+                    key={s}
+                    label={s}
+                    active={sport === s}
+                    onClick={() => setSport(sport === s ? null : s)}
+                  />
+                ))}
+              </div>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {CATEGORIES.map((c) => (
                 <FilterChip
@@ -128,6 +155,10 @@ export function ExercisePicker({
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">{e.title}</span>
                       <span className="flex gap-1">
+                        {sport === null &&
+                          exerciseSport(e) !== DEFAULT_SPORT && (
+                            <Badge>{exerciseSport(e)}</Badge>
+                          )}
                         <Badge variant="outline">
                           {CATEGORY_LABELS[e.category]}
                         </Badge>

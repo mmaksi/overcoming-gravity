@@ -7,7 +7,9 @@ import { Logo } from "@/components/shell/logo";
  */
 export default function Loading() {
   return (
-    <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-6 px-6 text-center">
+    // The logo PNG carries its own whitespace, so the tiny gap keeps the
+    // tagline visually attached to the mark.
+    <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-1 px-6 text-center">
       <Logo className="size-40 animate-pulse" />
       <p className="text-2xl font-bold tracking-tight text-foreground">
         Redefine Your Impossible

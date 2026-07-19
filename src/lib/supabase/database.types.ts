@@ -142,6 +142,7 @@ export type Database = {
           measurement: string
           progressions: Json
           rep_style: string
+          sport: string | null
           title: string
         }
         Insert: {
@@ -152,6 +153,7 @@ export type Database = {
           measurement?: string
           progressions?: Json
           rep_style?: string
+          sport?: string | null
           title: string
         }
         Update: {
@@ -162,6 +164,7 @@ export type Database = {
           measurement?: string
           progressions?: Json
           rep_style?: string
+          sport?: string | null
           title?: string
         }
         Relationships: []

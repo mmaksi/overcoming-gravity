@@ -74,7 +74,9 @@ import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
 import { ClimbRunner } from "./climb-runner";
 import { IntervalRunner } from "./interval-runner";
+import { CircuitRunner } from "./circuit-runner";
 import {
+  circuitStations,
   isConfigurableMode,
   ModeSettings,
   ModeSettingsDialog,
@@ -804,10 +806,17 @@ export function WorkoutLogger({
     runnerGroup?.type === "hiit" || runnerGroup?.type === "tabata"
       ? runnerGroup.type
       : null;
-  // HIIT/Tabata rounds rotate through the group's exercises in planned order.
-  const intervalExerciseTitles = runnerFor
+  // HIIT/Tabata/circuit runs rotate through the group's exercises in planned
+  // order.
+  const runnerExerciseTitles = runnerFor
     ? plannedDay.exercises
         .filter((we) => we.groupId === runnerFor)
+        .map((we) => exercisesById.get(we.exerciseId)?.title ?? "Exercise")
+    : [];
+  // The circuit settings dialog shows one station row per group exercise.
+  const settingsExerciseTitles = settingsFor
+    ? plannedDay.exercises
+        .filter((we) => we.groupId === settingsFor)
         .map((we) => exercisesById.get(we.exerciseId)?.title ?? "Exercise")
     : [];
   // Tabata is fixed by definition; HIIT reads this session's settings.
@@ -986,7 +995,8 @@ export function WorkoutLogger({
                       (group.type === "pyramid" ||
                         group.type === "ladder" ||
                         group.type === "hiit" ||
-                        group.type === "tabata") && (
+                        group.type === "tabata" ||
+                        group.type === "circuit") && (
                         <Button
                           size="sm"
                           className="h-7 shrink-0 rounded-full px-3"
@@ -1538,6 +1548,7 @@ export function WorkoutLogger({
         key={settingsFor ?? "closed"}
         type={settingsGroup?.type ?? null}
         value={settingsGroup ? settingsOf(settingsGroup) : {}}
+        exerciseTitles={settingsExerciseTitles}
         onOpenChange={(open) => !open && setSettingsFor(null)}
         onSave={(s) => {
           if (settingsFor) {
@@ -1572,8 +1583,25 @@ export function WorkoutLogger({
           open
           onOpenChange={(open) => !open && setRunnerFor(null)}
           type={intervalType}
-          exerciseTitles={intervalExerciseTitles}
+          exerciseTitles={runnerExerciseTitles}
           settings={intervalSettings}
+        />
+      )}
+
+      {/* The live circuit run (same play button on the mode badge). */}
+      {runnerGroup && runnerGroup.type === "circuit" && (
+        <CircuitRunner
+          key={`${runnerGroup.id}-${runnerRun}`}
+          open
+          onOpenChange={(open) => !open && setRunnerFor(null)}
+          exerciseTitles={runnerExerciseTitles}
+          settings={{
+            rounds: settingsOf(runnerGroup).rounds ?? 3,
+            stations: circuitStations(
+              settingsOf(runnerGroup),
+              runnerExerciseTitles.length,
+            ),
+          }}
         />
       )}
 
