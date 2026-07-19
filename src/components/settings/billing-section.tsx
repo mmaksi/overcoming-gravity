@@ -65,6 +65,13 @@ export function BillingSection({
             Payment received — welcome to the full app!
           </p>
         )}
+        {planCancelAtPeriodEnd && (
+          <p className="rounded-lg bg-orange-500/15 px-3 py-2 text-sm font-medium text-orange-600 dark:text-orange-400">
+            {`Your subscription is cancelled — you keep full access until ${
+              renewDate ?? "the end of the paid period"
+            }, then you're back on the free plan. Changed your mind? Resume it from the billing portal below.`}
+          </p>
+        )}
         <p className="flex items-center gap-2 text-sm">
           <Sparkles className="size-4 text-primary" />
           <span>

@@ -103,9 +103,11 @@ export async function openBillingManagement(): Promise<string> {
       `This subscription is managed by ${user.billingProvider}, not ${provider.name}`,
     );
   }
+  // The return URL carries a marker so Settings re-syncs from the provider
+  // — a cancellation made on the portal shows up immediately, webhook or not.
   return provider.createManagementUrl(
     user.billingCustomerId,
-    `${await appOrigin()}/settings`,
+    `${await appOrigin()}/settings?billing=updated`,
   );
 }
 

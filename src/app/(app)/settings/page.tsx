@@ -22,14 +22,15 @@ import { TipsToggle } from "@/components/settings/tips-toggle";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ checkout?: string }>;
+  searchParams: Promise<{ checkout?: string; billing?: string }>;
 }) {
   let user = await requireUser();
-  const { checkout } = await searchParams;
+  const { checkout, billing } = await searchParams;
 
-  // Back from a completed checkout: pull the subscription straight from the
-  // provider so the new plan shows immediately, webhook or not.
-  if (checkout === "success") {
+  // Back from a completed checkout or the management portal: pull the
+  // subscription straight from the provider so the change (new plan,
+  // cancellation) shows immediately, webhook or not.
+  if (checkout === "success" || billing === "updated") {
     await syncSubscriptionForUser(user);
     user = await requireUser();
   }

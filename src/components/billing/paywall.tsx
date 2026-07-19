@@ -67,10 +67,11 @@ function PriceTag({
 }
 
 /**
- * The two subscription offers with an optional voucher input, ending in a
- * hosted checkout. Used inside PaywallDialog and on the /programs/new
- * upgrade panel. Navigation happens after awaiting the action (external
- * URL, so window.location — not router.push).
+ * The two subscription offers (pick one, then "Unlock now") with an
+ * optional voucher input, ending in a hosted checkout. Used inside
+ * PaywallDialog and on the /programs/new upgrade panel. Navigation happens
+ * after awaiting the action (external URL, so window.location — not
+ * router.push).
  */
 export function PlanCards() {
   const [voucherCode, setVoucherCode] = useState("");
@@ -80,21 +81,21 @@ export function PlanCards() {
   } | null>(null);
   const [voucherMessage, setVoucherMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [chosen, setChosen] = useState<PlanInterval | null>(null);
+  // Tapping a card only selects it — checkout starts from the CTA below,
+  // so switching plans is free. Annual is preselected as the best value.
+  const [interval, setInterval] = useState<PlanInterval>("year");
 
   const checkoutMutation = useMutation({ mutationFn: startCheckout });
   const voucherMutation = useMutation({ mutationFn: previewVoucher });
 
-  function choose(interval: PlanInterval) {
+  function unlock() {
     setError(null);
-    setChosen(interval);
     checkoutMutation
       .mutateAsync({ interval, voucherCode: applied?.code })
       .then((url) => window.location.assign(url))
-      .catch((e: Error) => {
-        setChosen(null);
-        setError(e.message || "Could not start the checkout — try again.");
-      });
+      .catch((e: Error) =>
+        setError(e.message || "Could not start the checkout — try again."),
+      );
   }
 
   function applyVoucher() {
@@ -131,13 +132,19 @@ export function PlanCards() {
         {`Try everything free for ${TRIAL_DAYS} days — you won't be charged until the trial ends, and cancelling keeps you on the free plan.`}
       </p>
 
-      <div className="space-y-2">
-        {/* Annual first and visually recommended. */}
+      <div role="radiogroup" aria-label="Subscription plan" className="space-y-2">
+        {/* Annual first and preselected as the best value. */}
         <button
           type="button"
+          role="radio"
+          aria-checked={interval === "year"}
           disabled={pending}
-          onClick={() => choose("year")}
-          className="relative w-full rounded-xl border-2 border-primary bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10 disabled:opacity-70"
+          onClick={() => setInterval("year")}
+          className={`relative w-full rounded-xl border-2 p-4 text-left transition-colors disabled:opacity-70 ${
+            interval === "year"
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-foreground/30"
+          }`}
         >
           <span className="absolute -top-2.5 right-3 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
             Best value — save €{ANNUAL_SAVINGS_EUR}
@@ -153,20 +160,22 @@ export function PlanCards() {
               </span>
             </span>
             <span className="text-right">
-              {pending && chosen === "year" ? (
-                <Loader2 className="size-5 animate-spin text-primary" />
-              ) : (
-                <PriceTag interval="year" percentOff={applied?.percentOff} />
-              )}
+              <PriceTag interval="year" percentOff={applied?.percentOff} />
             </span>
           </span>
         </button>
 
         <button
           type="button"
+          role="radio"
+          aria-checked={interval === "month"}
           disabled={pending}
-          onClick={() => choose("month")}
-          className="w-full rounded-xl border p-4 text-left transition-colors hover:border-foreground/30 disabled:opacity-70"
+          onClick={() => setInterval("month")}
+          className={`w-full rounded-xl border-2 p-4 text-left transition-colors disabled:opacity-70 ${
+            interval === "month"
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-foreground/30"
+          }`}
         >
           <span className="flex items-center justify-between gap-2">
             <span>
@@ -178,11 +187,7 @@ export function PlanCards() {
               </span>
             </span>
             <span className="text-right">
-              {pending && chosen === "month" ? (
-                <Loader2 className="size-5 animate-spin text-primary" />
-              ) : (
-                <PriceTag interval="month" percentOff={applied?.percentOff} />
-              )}
+              <PriceTag interval="month" percentOff={applied?.percentOff} />
             </span>
           </span>
         </button>
@@ -221,6 +226,16 @@ export function PlanCards() {
           )}
         </div>
       )}
+
+      <Button size="lg" className="w-full" disabled={pending} onClick={unlock}>
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <>
+            <Lock className="size-4" /> Unlock now
+          </>
+        )}
+      </Button>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       <p className="text-xs text-muted-foreground">
