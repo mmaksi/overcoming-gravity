@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    /**
+     * Exercise images are admin-entered URLs on arbitrary hosts, so the
+     * optimizer accepts any https origin — the win is that a 40px thumbnail
+     * no longer downloads the full-size original (next/image resizes and
+     * re-encodes on demand). Only admins control which URLs actually render.
+     */
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
+  },
   experimental: {
     /**
      * Client router cache: re-use the RSC payload of visited pages so
