@@ -140,6 +140,12 @@ export interface DataStore {
   updateProfileWelcome(userId: string, showWelcome: boolean): Promise<void>;
   /** Show/hide the workout-designer intro carousel. */
   updateProfileDesignerIntro(userId: string, show: boolean): Promise<void>;
+  /**
+   * Record where a signup came from (`?source=` on the login URL).
+   * Write-once: a value already stored is never overwritten, so only the
+   * first sign-in attributes the account.
+   */
+  setProfileSignupSource(userId: string, source: string): Promise<void>;
 
   // Billing -----------------------------------------------------------------
   // Billing columns are server-managed: in Supabase a trigger rejects writes

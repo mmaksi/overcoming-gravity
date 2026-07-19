@@ -615,6 +615,8 @@ class SupabaseStore implements DataStore {
       id: rows[0].id,
       email: rows[0].email ?? undefined,
       name: rows[0].name,
+      firstName: rows[0].first_name ?? undefined,
+      lastName: rows[0].last_name ?? undefined,
       isAdmin: rows[0].is_admin,
       avatarUrl: rows[0].avatar_url ?? undefined,
       heightCm: rows[0].height_cm ?? undefined,
@@ -634,6 +636,7 @@ class SupabaseStore implements DataStore {
       hadSubscription:
         rows[0].billing_subscription_id != null ||
         rows[0].subscription_status != null,
+      signupSource: rows[0].signup_source ?? undefined,
     };
   }
   async updateProfileName(userId: string, name: string): Promise<void> {
@@ -690,6 +693,17 @@ class SupabaseStore implements DataStore {
         .from("profiles")
         .update({ show_designer_intro: show })
         .eq("id", userId)
+        .select("id"),
+    );
+  }
+  async setProfileSignupSource(userId: string, source: string): Promise<void> {
+    // Write-once: the null filter makes a second sign-in a no-op.
+    orThrow(
+      await this.db
+        .from("profiles")
+        .update({ signup_source: source })
+        .eq("id", userId)
+        .is("signup_source", null)
         .select("id"),
     );
   }

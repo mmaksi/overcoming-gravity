@@ -15,10 +15,40 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { createServerSupabase } = await import("@/lib/supabase/server");
     const supabase = await createServerSupabase();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}${next}`);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) {
+      await recordSignupSource(searchParams.get("source"), data.user);
+      return NextResponse.redirect(`${origin}${next}`);
+    }
   }
 
   // No code, or the exchange failed — back to login with a hint.
   return NextResponse.redirect(`${origin}/login?error=oauth`);
+}
+
+/**
+ * Signup attribution: `/login?source=instagram` rides through the OAuth
+ * round trip as a callback query param (see signInWithGoogle). Only a
+ * just-created account is attributed — an existing user following a
+ * campaign link keeps a null source — and the store's write-once rule
+ * backstops that. Never blocks the login itself.
+ */
+async function recordSignupSource(
+  rawSource: string | null,
+  user: { id: string; created_at: string } | null,
+) {
+  const { normalizeSignupSource } = await import("@/lib/domain/schemas");
+  const source = normalizeSignupSource(rawSource);
+  if (!source || !user) return;
+  const isNewSignup =
+    Date.now() - new Date(user.created_at).getTime() < 10 * 60_000;
+  if (!isNewSignup) return;
+  try {
+    // Service store: the profile row was created by a DB trigger in this
+    // same request — don't depend on the fresh session cookies for RLS.
+    const { getServiceStore } = await import("@/lib/data");
+    await (await getServiceStore()).setProfileSignupSource(user.id, source);
+  } catch (error) {
+    console.error("signup source write failed:", error);
+  }
 }

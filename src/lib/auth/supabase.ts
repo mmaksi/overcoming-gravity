@@ -15,7 +15,7 @@ export async function getSupabaseUser(): Promise<Profile | null> {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, name, is_admin, avatar_url, height_cm, target_weight_kg, show_welcome, show_designer_intro, subscription_status, subscription_interval, subscription_period_end, subscription_cancel_at_period_end, billing_provider, billing_customer_id, billing_subscription_id",
+      "id, email, name, first_name, last_name, is_admin, avatar_url, height_cm, target_weight_kg, show_welcome, show_designer_intro, subscription_status, subscription_interval, subscription_period_end, subscription_cancel_at_period_end, billing_provider, billing_customer_id, billing_subscription_id",
     )
     .eq("id", user.id)
     .single();
@@ -39,6 +39,8 @@ export async function getSupabaseUser(): Promise<Profile | null> {
     id: profile.id,
     email: profile.email ?? undefined,
     name: profile.name ?? user.email ?? "Athlete",
+    firstName: profile.first_name ?? undefined,
+    lastName: profile.last_name ?? undefined,
     isAdmin: profile.is_admin,
     avatarUrl: profile.avatar_url ?? undefined,
     heightCm: profile.height_cm ?? undefined,

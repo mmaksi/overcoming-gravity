@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { dataBackend } from "@/lib/data";
+import { normalizeSignupSource } from "@/lib/domain/schemas";
 
 /**
  * Auth server actions — the only place the app talks to the auth provider.
@@ -17,7 +18,7 @@ import { dataBackend } from "@/lib/data";
 
 export type AuthResult = { error?: string; url?: string };
 
-export async function signInWithGoogle(): Promise<AuthResult> {
+export async function signInWithGoogle(source?: string): Promise<AuthResult> {
   // Dev (JSON backend) is always "signed in" — skip OAuth, land on the app.
   if (dataBackend() === "json") return { url: "/" };
 
@@ -25,13 +26,21 @@ export async function signInWithGoogle(): Promise<AuthResult> {
   const origin =
     (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "";
 
+  // An acquisition source (`/login?source=instagram`) rides through the
+  // OAuth round trip as a callback query param — same channel as `next`.
+  // The callback stores it on brand-new profiles (signup attribution).
+  const signupSource = normalizeSignupSource(source);
+  const callbackUrl = `${origin}/auth/callback${
+    signupSource ? `?source=${signupSource}` : ""
+  }`;
+
   const { createServerSupabase } = await import("@/lib/supabase/server");
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     // Google sends the user back here with a code; the callback route
     // exchanges it for a session cookie (src/app/(auth)/auth/callback).
-    options: { redirectTo: `${origin}/auth/callback` },
+    options: { redirectTo: callbackUrl },
   });
   if (error) return { error: error.message };
   if (!data.url) return { error: "Could not start Google sign-in." };

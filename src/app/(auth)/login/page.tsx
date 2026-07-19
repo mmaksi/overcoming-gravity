@@ -44,7 +44,11 @@ export default function LoginPage() {
   function signIn() {
     setMessage(null);
     startTransition(async () => {
-      const result = await signInWithGoogle();
+      // Signup attribution: `/login?source=instagram` travels through the
+      // OAuth flow and lands on new profiles (see signInWithGoogle).
+      const source =
+        new URLSearchParams(window.location.search).get("source") ?? undefined;
+      const result = await signInWithGoogle(source);
       if (result.error) setMessage(result.error);
       // Hand off to Google's consent page (prod) or the app (dev). A full
       // navigation, not router.push — we're leaving the app or restarting it.

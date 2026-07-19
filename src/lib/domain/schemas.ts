@@ -533,6 +533,13 @@ export const profileSchema = z.object({
   id: z.string(),
   email: z.string().optional(),
   name: z.string(),
+  /**
+   * Provider-sourced first/last name (Google's full name split at the
+   * first space; granular claims preferred when a provider sends them).
+   * `name` stays the editable display name — these power the greeting.
+   */
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   isAdmin: z.boolean(),
   /** Optional profile picture, shown on the home header. */
   avatarUrl: z.string().optional(),
@@ -568,8 +575,21 @@ export const profileSchema = z.object({
    * subscribers; startCheckout decides actual trial eligibility itself.
    */
   hadSubscription: z.boolean().default(false),
+  /**
+   * Where the signup came from (`?source=` on the login URL — e.g.
+   * "instagram", "landing-hero"). Written once at first sign-in, never
+   * overwritten; analytics only.
+   */
+  signupSource: z.string().optional(),
 });
 export type Profile = z.infer<typeof profileSchema>;
+
+/** `?source=` values: short slugs only, anything else is dropped. */
+export function normalizeSignupSource(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim().toLowerCase();
+  return /^[a-z0-9_-]{1,40}$/.test(trimmed) ? trimmed : null;
+}
 
 /**
  * A subscription's provider-normalized state, as reported by a webhook or a

@@ -439,6 +439,14 @@ export class JsonStore implements DataStore {
     profile.showDesignerIntro = show;
     await db.write();
   }
+  async setProfileSignupSource(userId: string, source: string): Promise<void> {
+    const db = await getDb();
+    const profile = db.data.profiles.find((p) => p.id === userId);
+    // Write-once: the first sign-in attributes the account.
+    if (!profile || profile.signupSource) return;
+    profile.signupSource = source;
+    await db.write();
+  }
 
   // Billing -----------------------------------------------------------------
   async setProfileBillingCustomer(

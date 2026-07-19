@@ -206,12 +206,15 @@ export type Database = {
           billing_subscription_id: string | null
           created_at: string
           email: string | null
+          first_name: string | null
           height_cm: number | null
           id: string
           is_admin: boolean
+          last_name: string | null
           name: string
           show_designer_intro: boolean
           show_welcome: boolean
+          signup_source: string | null
           subscription_cancel_at_period_end: boolean
           subscription_interval: string | null
           subscription_period_end: string | null
@@ -225,12 +228,15 @@ export type Database = {
           billing_subscription_id?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           height_cm?: number | null
           id: string
           is_admin?: boolean
+          last_name?: string | null
           name?: string
           show_designer_intro?: boolean
           show_welcome?: boolean
+          signup_source?: string | null
           subscription_cancel_at_period_end?: boolean
           subscription_interval?: string | null
           subscription_period_end?: string | null
@@ -244,12 +250,15 @@ export type Database = {
           billing_subscription_id?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           height_cm?: number | null
           id?: string
           is_admin?: boolean
+          last_name?: string | null
           name?: string
           show_designer_intro?: boolean
           show_welcome?: boolean
+          signup_source?: string | null
           subscription_cancel_at_period_end?: boolean
           subscription_interval?: string | null
           subscription_period_end?: string | null

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Dumbbell, Play, Settings } from "lucide-react";
+import { ArrowRight, Dumbbell, Play, Settings, Target } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {
@@ -95,6 +95,9 @@ function UpcomingExercises({
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  // Greet with the auth provider's first name; accounts created before it
+  // was captured (or dev) fall back to the display name's first word.
+  const firstName = user.firstName ?? user.name.split(" ")[0];
   // First visit (or re-enabled in Settings): show the welcome tour before
   // anything else. The tour clears the flag when dismissed.
   if (user.showWelcome) redirect("/welcome");
@@ -105,7 +108,26 @@ export default async function DashboardPage() {
   const dashboardRuns = await getCachedDashboard(store, user.id);
 
   if (dashboardRuns.length === 0) {
-    const { programs } = await getCachedUserPrograms(store, user.id);
+    // Even without an active run the page shows Stats and Goals — mostly
+    // zeros and pointers for a fresh account, but they preview what the
+    // full app tracks (and weigh-ins from Settings chart right away).
+    const [{ programs }, bodyweight, finished] = await Promise.all([
+      getCachedUserPrograms(store, user.id),
+      getCachedBodyweight(store, user.id),
+      getCachedFinishedSessions(store, user.id),
+    ]);
+    const streak = workoutStreak(finished);
+    const totalWorkouts = finished.filter(
+      (s) => s.status === "completed",
+    ).length;
+    const goalsAchieved = programs.reduce(
+      (n, p) =>
+        n +
+        Object.values(p.goals ?? {})
+          .flat()
+          .filter((g) => g.done).length,
+      0,
+    );
     return (
       <div className="flex flex-col gap-6">
         {/* Same header as the full dashboard — fresh accounts need the
@@ -113,7 +135,7 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
-            <h1 className="truncate text-2xl font-bold">Hi, {user.name}!</h1>
+            <h1 className="truncate text-2xl font-bold">Hi, {firstName}!</h1>
           </div>
           <Link
             href="/settings"
@@ -146,6 +168,28 @@ export default async function DashboardPage() {
               <Link href="/programs">Training</Link>
             </Button>
           )}
+        </div>
+
+        <StatsSection
+          entries={bodyweight}
+          heightCm={user.heightCm}
+          targetWeightKg={user.targetWeightKg}
+          streak={streak}
+          totalWorkouts={totalWorkouts}
+          goalsAchieved={goalsAchieved}
+        />
+
+        {/* Goals live on active programs — none yet, so a preview of the
+            section instead of nothing (mirrors GoalsCard's heading). */}
+        <div className="space-y-3">
+          <h2 className="flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-primary">
+            <Target className="size-5" /> Goals
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Every program you design sets its own goals — skills, strength
+            marks, flexibility. They appear here so you can tick them off as
+            you train.
+          </p>
         </div>
       </div>
     );
@@ -277,7 +321,7 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
-          <h1 className="truncate text-2xl font-bold">Hi, {user.name}!</h1>
+          <h1 className="truncate text-2xl font-bold">Hi, {firstName}!</h1>
         </div>
         <Link
           href="/settings"

@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { dataBackend, getStore } from "@/lib/data";
 import { toISODate } from "@/lib/domain/schedule";
 import { syncSubscriptionForUser } from "@/lib/billing/sync";
+import { BillingRefresh } from "@/components/settings/billing-refresh";
 import { BillingSection } from "@/components/settings/billing-section";
 import { BodyStatsForm } from "@/components/settings/body-stats-form";
 import {
@@ -43,6 +44,9 @@ export default async function SettingsPage({
 
   return (
     <div className="space-y-4">
+      {/* Coming back from a hosted checkout/portal must re-run the sync
+          above even when the browser restores this page from bfcache. */}
+      {user.billingCustomerId && <BillingRefresh />}
       <h1 className="text-2xl font-bold">Settings</h1>
       <Card>
         <CardHeader>

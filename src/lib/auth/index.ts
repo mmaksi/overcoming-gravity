@@ -24,6 +24,8 @@ export async function getCurrentUser(): Promise<Profile | null> {
     id: "dev-athlete",
     email: profile?.email ?? "athlete@dev.local",
     name: profile?.name ?? "Dev Athlete",
+    firstName: profile?.firstName,
+    lastName: profile?.lastName,
     isAdmin,
     avatarUrl: profile?.avatarUrl,
     heightCm: profile?.heightCm,
