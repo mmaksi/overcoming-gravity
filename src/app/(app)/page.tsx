@@ -107,10 +107,27 @@ export default async function DashboardPage() {
   if (dashboardRuns.length === 0) {
     const { programs } = await getCachedUserPrograms(store, user.id);
     return (
-      <div className="flex flex-col gap-6 pt-10">
-        <div className="space-y-2 text-center">
+      <div className="flex flex-col gap-6">
+        {/* Same header as the full dashboard — fresh accounts need the
+            door to Settings too. */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
+            <h1 className="truncate text-2xl font-bold">Hi, {user.name}!</h1>
+          </div>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="-mr-2 shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Settings className="size-6" />
+          </Link>
+        </div>
+        <div className="space-y-2 pt-4 text-center">
           <Dumbbell className="mx-auto size-12 text-primary" />
-          <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
+          <h2 className="text-2xl font-bold">
+            {programs.length === 0 ? "Let's get you started" : "No active run"}
+          </h2>
           <p className="text-muted-foreground">
             {programs.length === 0
               ? "Create your first calisthenics program to get started."
@@ -196,7 +213,7 @@ export default async function DashboardPage() {
     runCards.push(
       <Card
         key={run.id}
-        className={`flex h-[26rem] flex-col ${todaySession ? "border-primary" : ""}`}
+        className={`flex h-104 flex-col ${todaySession ? "border-primary" : ""}`}
       >
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -260,7 +277,7 @@ export default async function DashboardPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar name={user.name} avatarUrl={user.avatarUrl} />
-          <h1 className="truncate text-2xl font-bold">Hi, {user.name}</h1>
+          <h1 className="truncate text-2xl font-bold">Hi, {user.name}!</h1>
         </div>
         <Link
           href="/settings"

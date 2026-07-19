@@ -32,6 +32,8 @@ export function ExerciseThumb({
         <img
           src={imageUrl}
           alt={title}
+          loading="lazy"
+          decoding="async"
           className="size-full object-cover"
           onError={() => setBroken(true)}
         />

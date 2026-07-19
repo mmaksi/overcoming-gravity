@@ -8,7 +8,7 @@ import { getServiceStore } from "@/lib/data";
 import { toISODate } from "@/lib/domain/schedule";
 import { voucherProblem } from "@/lib/domain/schemas";
 import { getBillingProvider } from "@/lib/billing/provider";
-import { isPro } from "@/lib/billing/entitlements";
+import { isPro, TRIAL_DAYS } from "@/lib/billing/entitlements";
 
 async function appOrigin(): Promise<string> {
   return (
@@ -55,14 +55,23 @@ export async function startCheckout(input: {
 
   const provider = await getBillingProvider();
   const origin = await appOrigin();
+
+  // Every first subscription starts with a free trial. A customer record
+  // alone doesn't disqualify (it's created when a checkout is merely
+  // opened) — only an actual previous subscription does, so a lapsed
+  // subscriber can't loop through endless trials.
+  const existingCustomerId =
+    user.billingProvider === provider.name ? user.billingCustomerId : undefined;
+  const hadSubscription =
+    existingCustomerId != null &&
+    (await provider.getSubscription(existingCustomerId)) !== null;
+
   const session = await provider.createCheckout({
     userId: user.id,
     email: user.email,
-    customerId:
-      user.billingProvider === provider.name
-        ? user.billingCustomerId
-        : undefined,
+    customerId: existingCustomerId,
     interval,
+    trialDays: hadSubscription ? undefined : TRIAL_DAYS,
     discountPercentOff,
     voucherCode: matchedVoucher,
     successUrl: `${origin}/settings?checkout=success`,

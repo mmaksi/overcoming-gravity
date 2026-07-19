@@ -137,7 +137,11 @@ export const stripeBilling: BillingProvider = {
         app_user_id: request.userId,
         voucher_code: request.voucherCode ?? "",
       },
-      subscription_data: { metadata: { app_user_id: request.userId } },
+      subscription_data: {
+        metadata: { app_user_id: request.userId },
+        // Card is collected now (checkout default), charged at trial end.
+        trial_period_days: request.trialDays,
+      },
     });
     if (!session.url) throw new Error("Stripe returned no checkout URL");
     return { url: session.url, customerId };

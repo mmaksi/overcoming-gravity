@@ -15,6 +15,8 @@ export type CheckoutRequest = {
   /** The provider customer already backing this user, if any. */
   customerId?: string;
   interval: PlanInterval;
+  /** Free-trial length before the first charge; omitted = no trial. */
+  trialDays?: number;
   /** Percent discount from an app-validated voucher (providers apply it their own way). */
   discountPercentOff?: number;
   /** The voucher's code, echoed back in webhook metadata so redemptions get counted. */

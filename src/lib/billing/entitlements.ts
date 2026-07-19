@@ -5,6 +5,9 @@
 
 export const FREE_CUSTOM_WORKOUT_LIMIT = 2;
 
+/** Days a first-time subscriber tries the full app before being charged. */
+export const TRIAL_DAYS = 3;
+
 /** Admins always have full access; everyone else needs a live subscription. */
 export function isPro(user: { plan: "free" | "pro"; isAdmin: boolean }): boolean {
   return user.isAdmin || user.plan === "pro";

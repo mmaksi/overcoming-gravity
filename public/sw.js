@@ -6,6 +6,8 @@ const VERSION = "v3";
 const SHELL_CACHE = `shell-${VERSION}`;
 const ASSET_CACHE = `assets-${VERSION}`;
 const SHELL_URLS = ["/", "/programs", "/calendar", "/settings"];
+/** Offline-fallback pages kept at most (see the navigation prune below). */
+const MAX_SHELL_PAGES = 60;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -42,7 +44,15 @@ self.addEventListener("fetch", (event) => {
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy));
+          caches.open(SHELL_CACHE).then(async (cache) => {
+            await cache.put(request, copy);
+            // Bound the cache: pages like /workout/<id> mint a new URL per
+            // session, so without pruning this grows forever. Cache keys
+            // come back in insertion order — drop the oldest overflow.
+            const keys = await cache.keys();
+            const overflow = keys.length - MAX_SHELL_PAGES;
+            for (let i = 0; i < overflow; i++) await cache.delete(keys[i]);
+          });
           return response;
         })
         .catch(() =>

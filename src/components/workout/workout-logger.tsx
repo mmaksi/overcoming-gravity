@@ -227,6 +227,27 @@ function formatDuration(totalSeconds: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+/**
+ * The header's live workout clock. A leaf component so its one-second tick
+ * re-renders just this text, not the whole logger tree.
+ */
+function WorkoutClock({
+  baseSeconds,
+  openedAt,
+}: {
+  baseSeconds: number;
+  openedAt: number;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  return formatDuration(
+    baseSeconds + Math.max(0, Math.floor((now - openedAt) / 1000)),
+  );
+}
+
 /** Editable raw inputs: empty string = "not recorded yet". */
 type RawSet = {
   reps: string;
@@ -299,24 +320,22 @@ export function WorkoutLogger({
 
   // Workout duration: accumulated seconds from previous visits (frozen at
   // mount) plus the time this page has been open. Persisted on every save,
-  // so backgrounding the app pauses instead of losing the timer.
+  // so backgrounding the app pauses instead of losing the timer. The ticking
+  // display lives in WorkoutClock (a leaf component) so the whole logger
+  // tree isn't re-rendered every second.
   const [baseSeconds, setBaseSeconds] = useState(session.durationSeconds ?? 0);
   const [openedAt, setOpenedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(openedAt);
-  useEffect(() => {
-    if (readOnly) return;
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [readOnly]);
-  const elapsedSeconds =
-    baseSeconds + Math.max(0, Math.floor((now - openedAt) / 1000));
+
+  /** Elapsed workout seconds right now — for saves (called in handlers). */
+  function currentElapsedSeconds(): number {
+    if (readOnly) return baseSeconds;
+    return baseSeconds + Math.max(0, Math.floor((Date.now() - openedAt) / 1000));
+  }
 
   /** Start the workout duration over from 0:00 (e.g. opened the page early). */
   function resetWorkoutTimer() {
-    const t = Date.now();
     setBaseSeconds(0);
-    setOpenedAt(t);
-    setNow(t);
+    setOpenedAt(Date.now());
   }
 
   const exercisesById = useMemo(
@@ -607,7 +626,7 @@ export function WorkoutLogger({
         sessionId: session.id,
         entries: action === "skip" ? [] : resolveEntries(action),
         action,
-        durationSeconds: elapsedSeconds,
+        durationSeconds: currentElapsedSeconds(),
       }),
     // Completing/skipping changes the cached history + progress reads. (A save
     // leaves the session planned, so it changes neither.) Navigation is done by
@@ -626,7 +645,7 @@ export function WorkoutLogger({
         sessionId: session.id,
         entries: resolveEntries("save"),
         action: "save",
-        durationSeconds: elapsedSeconds,
+        durationSeconds: currentElapsedSeconds(),
         // Background draft: persists data without invalidating any caches.
         draft: true,
       }),
@@ -846,7 +865,7 @@ export function WorkoutLogger({
             {!readOnly && (
               <span className="flex items-center gap-1 font-medium tabular-nums text-foreground">
                 <Timer className="size-4 text-primary" />
-                {formatDuration(elapsedSeconds)}
+                <WorkoutClock baseSeconds={baseSeconds} openedAt={openedAt} />
                 <button
                   type="button"
                   aria-label="Reset workout timer"

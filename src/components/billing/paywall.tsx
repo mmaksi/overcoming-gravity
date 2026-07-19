@@ -8,6 +8,7 @@ import {
   ANNUAL_SAVINGS_EUR,
   PLAN_PRICING,
   PlanInterval,
+  TRIAL_DAYS,
 } from "@/lib/billing/entitlements";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,44 @@ const PRO_FEATURES = [
   "Periodization, deload weeks and goal tracking",
   "Live cardio modes: pyramid, ladder, HIIT and Tabata runners",
 ];
+
+/** "€25" for whole euros, "€18.75" otherwise. */
+function euros(amount: number): string {
+  return `€${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+}
+
+/**
+ * A plan's price: struck-through full price next to the discounted first
+ * payment while a voucher is applied, plain price otherwise.
+ */
+function PriceTag({
+  interval,
+  percentOff,
+}: {
+  interval: PlanInterval;
+  percentOff?: number;
+}) {
+  const full = PLAN_PRICING[interval].amountEur;
+  const discounted =
+    percentOff === undefined ? null : full * (1 - percentOff / 100);
+  return (
+    <>
+      <span className="block text-2xl font-bold tabular-nums">
+        {discounted !== null && (
+          <span className="mr-1.5 align-middle text-base font-medium text-muted-foreground line-through">
+            {euros(full)}
+          </span>
+        )}
+        {euros(discounted ?? full)}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {discounted !== null
+          ? `first payment, then ${euros(full)}${PLAN_PRICING[interval].suffix}`
+          : PLAN_PRICING[interval].suffix}
+      </span>
+    </>
+  );
+}
 
 /**
  * The two subscription offers with an optional voucher input, ending in a
@@ -86,6 +125,12 @@ export function PlanCards() {
         ))}
       </ul>
 
+      {/* Trial promise, mirrored server-side in startCheckout (TRIAL_DAYS,
+          first-time subscribers only). */}
+      <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
+        {`Try everything free for ${TRIAL_DAYS} days — you won't be charged until the trial ends, and cancelling keeps you on the free plan.`}
+      </p>
+
       <div className="space-y-2">
         {/* Annual first and visually recommended. */}
         <button
@@ -111,14 +156,7 @@ export function PlanCards() {
               {pending && chosen === "year" ? (
                 <Loader2 className="size-5 animate-spin text-primary" />
               ) : (
-                <>
-                  <span className="block text-2xl font-bold tabular-nums">
-                    €{PLAN_PRICING.year.amountEur}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {PLAN_PRICING.year.suffix}
-                  </span>
-                </>
+                <PriceTag interval="year" percentOff={applied?.percentOff} />
               )}
             </span>
           </span>
@@ -143,14 +181,7 @@ export function PlanCards() {
               {pending && chosen === "month" ? (
                 <Loader2 className="size-5 animate-spin text-primary" />
               ) : (
-                <>
-                  <span className="block text-2xl font-bold tabular-nums">
-                    €{PLAN_PRICING.month.amountEur}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {PLAN_PRICING.month.suffix}
-                  </span>
-                </>
+                <PriceTag interval="month" percentOff={applied?.percentOff} />
               )}
             </span>
           </span>
