@@ -90,7 +90,7 @@ export function WelcomeCarousel({ name }: { name: string }) {
             Build full training <span className="font-semibold">programs</span>{" "}
             — goals, periodization and a week-by-week plan — or quick{" "}
             <span className="font-semibold">custom workouts</span>, all from
-            the Programs tab.
+            the Training tab.
           </p>
           <p className="text-sm text-muted-foreground">
             Want help designing the perfect program for your goals — one that

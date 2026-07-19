@@ -34,8 +34,10 @@ function euros(amount: number): string {
 }
 
 /**
- * A plan's price: struck-through full price next to the discounted first
- * payment while a voucher is applied, plain price otherwise.
+ * A plan's price with the trial leading: people read the number first, so
+ * the big figure is €0 and the real price follows in smaller text. While a
+ * voucher is applied, the discounted first payment shows next to the
+ * struck-through full price.
  */
 function PriceTag({
   interval,
@@ -49,18 +51,19 @@ function PriceTag({
     percentOff === undefined ? null : full * (1 - percentOff / 100);
   return (
     <>
-      <span className="block text-2xl font-bold tabular-nums">
+      <span className="block text-2xl font-bold tabular-nums">€0</span>
+      <span className="block text-xs text-muted-foreground">
+        {`free for ${TRIAL_DAYS} days, then`}
+      </span>
+      <span className="block text-xs font-medium tabular-nums">
         {discounted !== null && (
-          <span className="mr-1.5 align-middle text-base font-medium text-muted-foreground line-through">
+          <span className="mr-1 font-normal text-muted-foreground line-through">
             {euros(full)}
           </span>
         )}
-        {euros(discounted ?? full)}
-      </span>
-      <span className="text-xs text-muted-foreground">
         {discounted !== null
-          ? `first payment, then ${euros(full)}${PLAN_PRICING[interval].suffix}`
-          : PLAN_PRICING[interval].suffix}
+          ? `${euros(discounted)} first payment, then ${euros(full)}${PLAN_PRICING[interval].suffix}`
+          : `${euros(full)}${PLAN_PRICING[interval].suffix}`}
       </span>
     </>
   );

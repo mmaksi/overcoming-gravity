@@ -25,14 +25,14 @@ export function HomeIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Four squares: a collection of programs (replaces the dumbbell). */
-export function ProgramsIcon(props: SVGProps<SVGSVGElement>) {
+/** Angular dumbbell: rectangular plates on a straight bar — the Training tab. */
+export function TrainingIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...props}>
-      <rect x="4" y="4" width="6.5" height="6.5" />
-      <rect x="13.5" y="4" width="6.5" height="6.5" />
-      <rect x="4" y="13.5" width="6.5" height="6.5" />
-      <rect x="13.5" y="13.5" width="6.5" height="6.5" />
+      <path d="M2.5 12h1.5M20 12h1.5" />
+      <rect x="4" y="8" width="3" height="8" />
+      <rect x="17" y="8" width="3" height="8" />
+      <path d="M7 12h10" />
     </svg>
   );
 }

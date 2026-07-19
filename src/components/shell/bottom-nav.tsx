@@ -5,15 +5,15 @@ import { usePathname } from "next/navigation";
 import {
   CalendarIcon,
   HomeIcon,
-  ProgramsIcon,
   ShieldIcon,
+  TrainingIcon,
 } from "@/components/shell/nav-icons";
 import { cn } from "@/lib/utils";
 
 // Settings lives at the home top-right corner, not in the nav bar.
 const items = [
   { href: "/", label: "Home", icon: HomeIcon },
-  { href: "/programs", label: "Programs", icon: ProgramsIcon },
+  { href: "/programs", label: "Training", icon: TrainingIcon },
   { href: "/calendar", label: "Calendar", icon: CalendarIcon },
 ];
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
-import { getCachedUserPrograms } from "@/lib/data/cached";
+import { getCachedExercises, getCachedUserPrograms } from "@/lib/data/cached";
 import { isPro } from "@/lib/billing/entitlements";
 import {
   PERIODIZATION_LABELS,
@@ -11,16 +11,17 @@ import {
 } from "@/lib/domain/types";
 import { Badge } from "@/components/ui/badge";
 import { CreateProgramCta } from "@/components/programs/create-program-cta";
+import { ExerciseLibrary } from "@/components/exercise/exercise-library";
 import { IndividualWorkouts } from "@/components/workouts/individual-workouts";
 
 export default async function ProgramsPage() {
   const user = await requireUser();
   const store = await getStore();
   // Cached per user for a day; program/workout/run mutations bust the tag.
-  const { programs, runs, customWorkouts } = await getCachedUserPrograms(
-    store,
-    user.id,
-  );
+  const [{ programs, runs, customWorkouts }, exercises] = await Promise.all([
+    getCachedUserPrograms(store, user.id),
+    getCachedExercises(store),
+  ]);
   // "Active" = programs the athlete is currently following (several can run
   // at the same time).
   const activeProgramIds = new Set(
@@ -29,7 +30,7 @@ export default async function ProgramsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Programs</h1>
+      <h1 className="text-2xl font-bold">Training</h1>
 
       {/* Inviting create call-to-action; paywalled on the free plan. */}
       <CreateProgramCta locked={!isPro(user)} />
@@ -72,6 +73,9 @@ export default async function ProgramsPage() {
 
       {/* Standalone workouts: a title + exercises, no goals/periodization. */}
       <IndividualWorkouts workouts={customWorkouts} isProUser={isPro(user)} />
+
+      {/* Read-only catalog browser — free for every plan. */}
+      <ExerciseLibrary exercises={exercises} />
     </div>
   );
 }

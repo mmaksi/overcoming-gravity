@@ -143,7 +143,7 @@ export default async function DashboardPage() {
           </Button>
           {programs.length > 0 && (
             <Button asChild variant="outline" size="lg">
-              <Link href="/programs">Programs</Link>
+              <Link href="/programs">Training</Link>
             </Button>
           )}
         </div>

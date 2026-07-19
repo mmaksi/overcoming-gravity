@@ -25,8 +25,15 @@ export function ExpandableText({
 
   // A span, not a <button>: this text sometimes renders inside tappable
   // rows that are themselves buttons, and buttons cannot nest.
+  // pre-line keeps the author's line breaks (descriptions are written with
+  // deliberate paragraphs in the admin textarea).
   return (
-    <p className={cn("text-sm text-muted-foreground", className)}>
+    <p
+      className={cn(
+        "whitespace-pre-line text-sm text-muted-foreground",
+        className,
+      )}
+    >
       {shown}
       {needsClamp && (
         <span

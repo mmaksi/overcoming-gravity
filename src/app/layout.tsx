@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { InstallPromptScript } from "@/components/shell/install-prompt-script";
+import { OrientationLock } from "@/components/shell/orientation-lock";
 import { ServiceWorkerRegister } from "@/components/shell/sw-register";
 import { ThemeScript } from "@/components/theme/theme-script";
 import { QueryProvider } from "@/lib/query/provider";
@@ -56,6 +57,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-background">
         <ServiceWorkerRegister />
+        <OrientationLock />
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

@@ -137,3 +137,15 @@
     @apply font-sans;
   }
 }
+/* Portrait-only: on phones held sideways (coarse pointer, short viewport —
+   tablets and desktops are taller) a full-screen "rotate back" overlay makes
+   landscape unusable. Installed Android also locks via the manifest; iOS has
+   no lock API, so this overlay is the lock. */
+.landscape-block {
+  display: none;
+}
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 600px) {
+  .landscape-block {
+    display: flex;
+  }
+}
