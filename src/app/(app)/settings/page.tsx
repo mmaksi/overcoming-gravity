@@ -22,15 +22,17 @@ import { TipsToggle } from "@/components/settings/tips-toggle";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ checkout?: string; billing?: string }>;
+  // `billing=updated` (the portal return URL) needs no special casing —
+  // any visit with a billing customer syncs below.
+  searchParams: Promise<{ checkout?: string }>;
 }) {
   let user = await requireUser();
-  const { checkout, billing } = await searchParams;
+  const { checkout } = await searchParams;
 
-  // Back from a completed checkout or the management portal: pull the
-  // subscription straight from the provider so the change (new plan,
-  // cancellation) shows immediately, webhook or not.
-  if (checkout === "success" || billing === "updated") {
+  // Anyone with a billing customer gets a fresh pull from the provider on
+  // every visit — a cancellation made on the portal (or a missed webhook)
+  // must never show as "renews". One provider call, billing users only.
+  if (user.billingCustomerId) {
     await syncSubscriptionForUser(user);
     user = await requireUser();
   }

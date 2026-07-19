@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { Pencil, Trophy } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
+import { isPro } from "@/lib/billing/entitlements";
+import { WinBackPaywall } from "@/components/billing/win-back-paywall";
 import {
   GOAL_AREA_LABELS,
   GOAL_AREAS,
@@ -37,6 +39,10 @@ export default async function ProgramPage({
 
   const program = await store.getProgram(id);
   if (!program || program.userId !== user.id) notFound();
+
+  // Programs are a paid feature: a lapsed subscriber keeps their data but
+  // sees the win-back pitch instead of the program.
+  if (!isPro(user)) return <WinBackPaywall userId={user.id} programId={id} />;
 
   const allRuns = await store.listRuns(user.id);
   const runs = allRuns

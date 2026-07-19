@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Layers } from "lucide-react";
+import { ChevronRight, Layers, Lock } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { getCachedExercises, getCachedUserPrograms } from "@/lib/data/cached";
@@ -64,6 +64,10 @@ export default async function ProgramsPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-semibold">{p.name}</span>
+                  {/* Lapsed plan: the row leads to the win-back paywall. */}
+                  {!isPro(user) && (
+                    <Lock className="size-4 shrink-0 text-muted-foreground" />
+                  )}
                   {activeProgramIds.has(p.id) && <Badge>Active</Badge>}
                   {p.status === "draft" && (
                     <Badge variant="outline">Draft</Badge>

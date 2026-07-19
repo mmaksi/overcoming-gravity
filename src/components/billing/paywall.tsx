@@ -42,13 +42,33 @@ function euros(amount: number): string {
 function PriceTag({
   interval,
   percentOff,
+  showTrial,
 }: {
   interval: PlanInterval;
   percentOff?: number;
+  showTrial: boolean;
 }) {
   const full = PLAN_PRICING[interval].amountEur;
   const discounted =
     percentOff === undefined ? null : full * (1 - percentOff / 100);
+  if (!showTrial) {
+    // Returning subscribers get no second trial — the real price leads.
+    return (
+      <>
+        <span className="block text-2xl font-bold tabular-nums">
+          {euros(full)}
+        </span>
+        <span className="block text-xs text-muted-foreground">
+          {PLAN_PRICING[interval].suffix.slice(1)}
+        </span>
+        {discounted !== null && (
+          <span className="block text-xs font-medium tabular-nums text-primary">
+            {euros(discounted)} first payment
+          </span>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <span className="block text-2xl font-bold tabular-nums">€0</span>
@@ -76,7 +96,15 @@ function PriceTag({
  * after awaiting the action (external URL, so window.location — not
  * router.push).
  */
-export function PlanCards() {
+export function PlanCards({
+  showTrial = true,
+  showFeatures = true,
+}: {
+  /** Off for lapsed subscribers — they already used their trial. */
+  showTrial?: boolean;
+  /** Off where the surrounding page already spells out what's locked. */
+  showFeatures?: boolean;
+} = {}) {
   const [voucherCode, setVoucherCode] = useState("");
   const [applied, setApplied] = useState<{
     code: string;
@@ -120,20 +148,24 @@ export function PlanCards() {
 
   return (
     <div className="space-y-4">
-      <ul className="space-y-1.5">
-        {PRO_FEATURES.map((feature) => (
-          <li key={feature} className="flex items-start gap-2 text-sm">
-            <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+      {showFeatures && (
+        <ul className="space-y-1.5">
+          {PRO_FEATURES.map((feature) => (
+            <li key={feature} className="flex items-start gap-2 text-sm">
+              <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* Trial promise, mirrored server-side in startCheckout (TRIAL_DAYS,
           first-time subscribers only). */}
-      <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
-        {`Try everything free for ${TRIAL_DAYS} days — you won't be charged until the trial ends, and cancelling keeps you on the free plan.`}
-      </p>
+      {showTrial && (
+        <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
+          {`Try everything free for ${TRIAL_DAYS} days — you won't be charged until the trial ends, and cancelling keeps you on the free plan.`}
+        </p>
+      )}
 
       <div role="radiogroup" aria-label="Subscription plan" className="space-y-2">
         {/* Annual first and preselected as the best value. */}
@@ -163,7 +195,11 @@ export function PlanCards() {
               </span>
             </span>
             <span className="text-right">
-              <PriceTag interval="year" percentOff={applied?.percentOff} />
+              <PriceTag
+                interval="year"
+                percentOff={applied?.percentOff}
+                showTrial={showTrial}
+              />
             </span>
           </span>
         </button>
@@ -190,7 +226,11 @@ export function PlanCards() {
               </span>
             </span>
             <span className="text-right">
-              <PriceTag interval="month" percentOff={applied?.percentOff} />
+              <PriceTag
+                interval="month"
+                percentOff={applied?.percentOff}
+                showTrial={showTrial}
+              />
             </span>
           </span>
         </button>

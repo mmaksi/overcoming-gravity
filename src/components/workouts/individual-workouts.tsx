@@ -107,7 +107,15 @@ export function IndividualWorkouts({
         feature={`More than ${FREE_CUSTOM_WORKOUT_LIMIT} custom workouts`}
       />
 
-      {optimistic.length > 0 && (
+      {optimistic.length === 0 ? (
+        // Mirrors the "No programs yet" placeholder above.
+        <div className="space-y-1 py-8 text-center">
+          <p className="font-medium">No workouts yet</p>
+          <p className="text-sm text-muted-foreground">
+            Tap &ldquo;Create a workout&rdquo; above to build your first one.
+          </p>
+        </div>
+      ) : (
         <div className="space-y-4">
           {optimistic.map((w) => (
             <div key={w.id} className="flex items-center gap-1">

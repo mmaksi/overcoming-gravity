@@ -5,6 +5,8 @@ import { getCachedExercises } from "@/lib/data/cached";
 import { buildVolumeStats } from "@/lib/domain/volume";
 import { exerciseNoteKey, WorkoutDay } from "@/lib/domain/schemas";
 import { WeekFocus } from "@/lib/domain/types";
+import { isPro } from "@/lib/billing/entitlements";
+import { WinBackPaywall } from "@/components/billing/win-back-paywall";
 import { WorkoutLogger } from "@/components/workout/workout-logger";
 
 export default async function WorkoutPage({
@@ -27,6 +29,11 @@ export default async function WorkoutPage({
   if (session.runId) {
     const run = await store.getRun(session.runId);
     if (!run) notFound();
+    // Program training is a paid feature. Completed sessions stay open —
+    // "your data stays" — but a lapsed subscriber can't train the program.
+    if (!isPro(user) && session.status !== "completed") {
+      return <WinBackPaywall userId={user.id} programId={run.programId} />;
+    }
     // Summary + one extracted day — the full mesocycle never travels here.
     const [program, plan] = await Promise.all([
       store.getProgramSummary(run.programId),

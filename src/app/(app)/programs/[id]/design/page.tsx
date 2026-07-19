@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { getCachedExercises } from "@/lib/data/cached";
+import { isPro } from "@/lib/billing/entitlements";
+import { WinBackPaywall } from "@/components/billing/win-back-paywall";
 import { MesocycleDesigner } from "@/components/designer/mesocycle-designer";
 
 export default async function DesignPage({
@@ -15,6 +17,10 @@ export default async function DesignPage({
 
   const program = await store.getProgram(id);
   if (!program || program.userId !== user.id) notFound();
+
+  // Same gate as the program page: lapsed subscribers see the win-back
+  // paywall, not the designer.
+  if (!isPro(user)) return <WinBackPaywall userId={user.id} programId={id} />;
 
   const exercises = await getCachedExercises(store);
 
