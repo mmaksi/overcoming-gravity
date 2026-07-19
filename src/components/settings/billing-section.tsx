@@ -24,6 +24,7 @@ export function BillingSection({
   planRenewsAt,
   planCancelAtPeriodEnd,
   justUpgraded,
+  showTrial = true,
 }: {
   isAdmin: boolean;
   plan: "free" | "pro";
@@ -32,6 +33,8 @@ export function BillingSection({
   planCancelAtPeriodEnd: boolean;
   /** True right after a successful checkout redirect — show a welcome. */
   justUpgraded: boolean;
+  /** Off for lapsed subscribers — no second free trial. */
+  showTrial?: boolean;
 }) {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +134,7 @@ export function BillingSection({
         open={paywallOpen}
         onOpenChange={setPaywallOpen}
         feature="Everything beyond the free plan"
+        showTrial={showTrial}
       />
     </div>
   );

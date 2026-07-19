@@ -562,6 +562,12 @@ export const profileSchema = z.object({
   billingProvider: z.string().optional(),
   /** The provider's customer reference (e.g. a Stripe customer id). */
   billingCustomerId: z.string().optional(),
+  /**
+   * True once the user has ever held a subscription, even a cancelled one.
+   * Copy only — paywalls hide the free-trial promise from lapsed
+   * subscribers; startCheckout decides actual trial eligibility itself.
+   */
+  hadSubscription: z.boolean().default(false),
 });
 export type Profile = z.infer<typeof profileSchema>;
 

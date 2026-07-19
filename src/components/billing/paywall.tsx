@@ -293,11 +293,14 @@ export function PaywallDialog({
   open,
   onOpenChange,
   feature,
+  showTrial = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** e.g. "The program designer" — leads the dialog copy. */
   feature: string;
+  /** Off for lapsed subscribers — they already used their trial. */
+  showTrial?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -310,7 +313,7 @@ export function PaywallDialog({
             {feature} is part of the full Strong Journal experience.
           </DialogDescription>
         </DialogHeader>
-        <PlanCards />
+        <PlanCards showTrial={showTrial} />
       </DialogContent>
     </Dialog>
   );

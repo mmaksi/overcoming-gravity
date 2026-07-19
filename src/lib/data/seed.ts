@@ -302,6 +302,7 @@ const profiles: Profile[] = [
     showDesignerIntro: true,
     plan: "free",
     planCancelAtPeriodEnd: false,
+    hadSubscription: false,
   },
   {
     id: "dev-admin",
@@ -312,6 +313,7 @@ const profiles: Profile[] = [
     showDesignerIntro: true,
     plan: "free",
     planCancelAtPeriodEnd: false,
+    hadSubscription: false,
   },
 ];
 

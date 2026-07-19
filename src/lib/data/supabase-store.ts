@@ -631,6 +631,9 @@ class SupabaseStore implements DataStore {
       planCancelAtPeriodEnd: rows[0].subscription_cancel_at_period_end ?? false,
       billingProvider: rows[0].billing_provider ?? undefined,
       billingCustomerId: rows[0].billing_customer_id ?? undefined,
+      hadSubscription:
+        rows[0].billing_subscription_id != null ||
+        rows[0].subscription_status != null,
     };
   }
   async updateProfileName(userId: string, name: string): Promise<void> {

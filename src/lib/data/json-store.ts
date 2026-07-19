@@ -81,6 +81,7 @@ function normalizeLegacy(data: DbData): void {
   for (const profile of data.profiles) {
     profile.plan ??= "free";
     profile.planCancelAtPeriodEnd ??= false;
+    profile.hadSubscription ??= false;
   }
   // "cardio" was removed as an attribute; conditioning belongs to warm-up.
   for (const exercise of data.exercises) {
@@ -467,6 +468,9 @@ export class JsonStore implements DataStore {
     profile.planInterval = subscription?.interval;
     profile.planRenewsAt = subscription?.periodEnd;
     profile.planCancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+    // Sticky: once subscribed, always "had a subscription" (kills the trial
+    // promise in paywall copy for lapsed users).
+    if (subscription) profile.hadSubscription = true;
     await db.write();
   }
 

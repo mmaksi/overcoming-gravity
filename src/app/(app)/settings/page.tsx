@@ -77,6 +77,7 @@ export default async function SettingsPage({
             planRenewsAt={user.planRenewsAt}
             planCancelAtPeriodEnd={user.planCancelAtPeriodEnd}
             justUpgraded={checkout === "success" && user.plan === "pro"}
+            showTrial={!user.hadSubscription}
           />
         </CardContent>
       </Card>

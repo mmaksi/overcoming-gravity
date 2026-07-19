@@ -44,7 +44,10 @@ export default async function ProgramsPage() {
       </div>
 
       {/* Inviting create call-to-action; paywalled on the free plan. */}
-      <CreateProgramCta locked={!isPro(user)} />
+      <CreateProgramCta
+        locked={!isPro(user)}
+        showTrial={!user.hadSubscription}
+      />
 
       {programs.length === 0 ? (
         <div className="space-y-1 py-8 text-center">
@@ -87,7 +90,11 @@ export default async function ProgramsPage() {
       )}
 
       {/* Standalone workouts: a title + exercises, no goals/periodization. */}
-      <IndividualWorkouts workouts={customWorkouts} isProUser={isPro(user)} />
+      <IndividualWorkouts
+        workouts={customWorkouts}
+        isProUser={isPro(user)}
+        showTrial={!user.hadSubscription}
+      />
 
       {/* Read-only catalog browser — free for every plan. */}
       <ExerciseLibrary exercises={exercises} />

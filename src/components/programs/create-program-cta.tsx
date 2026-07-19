@@ -13,7 +13,14 @@ const CTA_CLASSES =
  * the same inviting card, but tapping it opens the paywall instead of the
  * wizard (the designer is a full-app feature; the server action backstops).
  */
-export function CreateProgramCta({ locked }: { locked: boolean }) {
+export function CreateProgramCta({
+  locked,
+  showTrial = true,
+}: {
+  locked: boolean;
+  /** Off for lapsed subscribers — no second free trial. */
+  showTrial?: boolean;
+}) {
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   const body = (
@@ -51,6 +58,7 @@ export function CreateProgramCta({ locked }: { locked: boolean }) {
         open={paywallOpen}
         onOpenChange={setPaywallOpen}
         feature="The program designer"
+        showTrial={showTrial}
       />
     </>
   );

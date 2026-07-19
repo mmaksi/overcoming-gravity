@@ -29,7 +29,7 @@ export default async function NewProgramPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <PlanCards />
+            <PlanCards showTrial={!user.hadSubscription} />
           </CardContent>
         </Card>
       </div>

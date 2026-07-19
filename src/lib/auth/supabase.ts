@@ -15,7 +15,7 @@ export async function getSupabaseUser(): Promise<Profile | null> {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, name, is_admin, avatar_url, height_cm, target_weight_kg, show_welcome, show_designer_intro, subscription_status, subscription_interval, subscription_period_end, subscription_cancel_at_period_end, billing_provider, billing_customer_id",
+      "id, email, name, is_admin, avatar_url, height_cm, target_weight_kg, show_welcome, show_designer_intro, subscription_status, subscription_interval, subscription_period_end, subscription_cancel_at_period_end, billing_provider, billing_customer_id, billing_subscription_id",
     )
     .eq("id", user.id)
     .single();
@@ -32,6 +32,7 @@ export async function getSupabaseUser(): Promise<Profile | null> {
       showDesignerIntro: true,
       plan: "free",
       planCancelAtPeriodEnd: false,
+      hadSubscription: false,
     };
   }
   return {
@@ -54,5 +55,10 @@ export async function getSupabaseUser(): Promise<Profile | null> {
     planCancelAtPeriodEnd: profile.subscription_cancel_at_period_end ?? false,
     billingProvider: profile.billing_provider ?? undefined,
     billingCustomerId: profile.billing_customer_id ?? undefined,
+    // A stored subscription id/status survives cancellation (only wiped when
+    // the provider reports no subscription at all).
+    hadSubscription:
+      profile.billing_subscription_id != null ||
+      profile.subscription_status != null,
   };
 }

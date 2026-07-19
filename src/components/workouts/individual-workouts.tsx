@@ -30,9 +30,12 @@ import {
 export function IndividualWorkouts({
   workouts,
   isProUser,
+  showTrial = true,
 }: {
   workouts: CustomWorkout[];
   isProUser: boolean;
+  /** Off for lapsed subscribers — no second free trial. */
+  showTrial?: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -105,6 +108,7 @@ export function IndividualWorkouts({
         open={paywallOpen}
         onOpenChange={setPaywallOpen}
         feature={`More than ${FREE_CUSTOM_WORKOUT_LIMIT} custom workouts`}
+        showTrial={showTrial}
       />
 
       {optimistic.length === 0 ? (

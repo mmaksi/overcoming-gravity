@@ -37,6 +37,7 @@ export async function getCurrentUser(): Promise<Profile | null> {
     planCancelAtPeriodEnd: profile?.planCancelAtPeriodEnd ?? false,
     billingProvider: profile?.billingProvider,
     billingCustomerId: profile?.billingCustomerId,
+    hadSubscription: profile?.hadSubscription ?? false,
   };
 }
 
