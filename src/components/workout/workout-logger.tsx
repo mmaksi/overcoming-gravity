@@ -806,19 +806,29 @@ export function WorkoutLogger({
     runnerGroup?.type === "hiit" || runnerGroup?.type === "tabata"
       ? runnerGroup.type
       : null;
-  // HIIT/Tabata/circuit runs rotate through the group's exercises in planned
-  // order.
+  // HIIT/Tabata runs rotate through the group's exercises in planned order.
   const runnerExerciseTitles = runnerFor
     ? plannedDay.exercises
         .filter((we) => we.groupId === runnerFor)
         .map((we) => exercisesById.get(we.exerciseId)?.title ?? "Exercise")
     : [];
-  // The circuit settings dialog shows one station row per group exercise.
-  const settingsExerciseTitles = settingsFor
-    ? plannedDay.exercises
-        .filter((we) => we.groupId === settingsFor)
-        .map((we) => exercisesById.get(we.exerciseId)?.title ?? "Exercise")
-    : [];
+  // The circuit runner and its settings show the PROGRESSION being performed
+  // (the athlete's live pick for this session), not the exercise name.
+  function groupProgressionNames(groupId: string | null): string[] {
+    if (!groupId) return [];
+    return plannedDay.exercises
+      .filter((we) => we.groupId === groupId)
+      .map((we) => {
+        const entry = entries.find((e) => e.workoutExerciseId === we.id);
+        const ex = exercisesById.get(entry?.exerciseId ?? we.exerciseId);
+        const progressionId = entry?.progressionId ?? we.progressionId;
+        return (
+          ex?.progressions.find((p) => p.id === progressionId)?.name ??
+          ex?.title ??
+          "Exercise"
+        );
+      });
+  }
   // Tabata is fixed by definition; HIIT reads this session's settings.
   const intervalSettings =
     intervalType === "tabata"
@@ -1548,7 +1558,7 @@ export function WorkoutLogger({
         key={settingsFor ?? "closed"}
         type={settingsGroup?.type ?? null}
         value={settingsGroup ? settingsOf(settingsGroup) : {}}
-        exerciseTitles={settingsExerciseTitles}
+        exerciseTitles={groupProgressionNames(settingsFor)}
         onOpenChange={(open) => !open && setSettingsFor(null)}
         onSave={(s) => {
           if (settingsFor) {
@@ -1594,7 +1604,7 @@ export function WorkoutLogger({
           key={`${runnerGroup.id}-${runnerRun}`}
           open
           onOpenChange={(open) => !open && setRunnerFor(null)}
-          exerciseTitles={runnerExerciseTitles}
+          exerciseTitles={groupProgressionNames(runnerFor)}
           settings={{
             rounds: settingsOf(runnerGroup).rounds ?? 3,
             stations: circuitStations(

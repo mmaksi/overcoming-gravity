@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Minus, Plus } from "lucide-react";
+import { ChevronDown, Minus, Plus, SlidersHorizontal } from "lucide-react";
 import {
   INTER_TECHNIQUES,
   Measurement,
@@ -303,7 +303,10 @@ export function ExerciseEditor({
             onClick={() => setAdvancedOpen((v) => !v)}
             className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors hover:border-foreground/30"
           >
-            Advanced settings
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="size-4 text-muted-foreground" />
+              Advanced settings
+            </span>
             <ChevronDown
               className={cn(
                 "size-4 text-muted-foreground transition-transform",

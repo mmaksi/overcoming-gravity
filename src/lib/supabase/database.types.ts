@@ -169,6 +169,21 @@ export type Database = {
         }
         Relationships: []
       }
+      sports: {
+        Row: {
+          id: string
+          name: string
+        }
+        Insert: {
+          id: string
+          name: string
+        }
+        Update: {
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           created_at: string

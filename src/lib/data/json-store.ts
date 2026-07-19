@@ -17,6 +17,7 @@ import {
   ProgramRun,
   ProgramSummary,
   SessionSummary,
+  SportDef,
   SubscriptionSnapshot,
   Voucher,
   WorkoutSession,
@@ -77,6 +78,7 @@ function normalizeLegacy(data: DbData): void {
   data.bodyweightEntries ??= [];
   data.feedback ??= [];
   data.vouchers ??= [];
+  data.sports ??= [];
   // Billing shipped after the first profiles existed.
   for (const profile of data.profiles) {
     profile.plan ??= "free";
@@ -144,6 +146,21 @@ export class JsonStore implements DataStore {
   async deleteExercise(id: string): Promise<void> {
     const db = await getDb();
     db.data.exercises = db.data.exercises.filter((e) => e.id !== id);
+    await db.write();
+  }
+
+  async listSports(): Promise<SportDef[]> {
+    return (await getDb()).data.sports;
+  }
+  async createSport(sport: SportDef): Promise<SportDef> {
+    const db = await getDb();
+    db.data.sports.push(sport);
+    await db.write();
+    return sport;
+  }
+  async deleteSport(id: string): Promise<void> {
+    const db = await getDb();
+    db.data.sports = db.data.sports.filter((s) => s.id !== id);
     await db.write();
   }
 

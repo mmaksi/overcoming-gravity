@@ -84,6 +84,18 @@ export type Exercise = z.infer<typeof exerciseSchema>;
 /** Exercises saved before sports existed are calisthenics — the app's core. */
 export const DEFAULT_SPORT = "Calisthenics";
 
+/**
+ * An admin-managed sport the exercise library spans ("Parkour", …).
+ * Calisthenics is built in and never stored. Exercises reference a sport by
+ * NAME (the `sport` string), so a defined sport is just a picker entry —
+ * deleting one leaves its exercises' string untouched.
+ */
+export const sportDefSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+});
+export type SportDef = z.infer<typeof sportDefSchema>;
+
 /** The exercise's effective sport (legacy rows default to calisthenics). */
 export function exerciseSport(
   exercise: Pick<Exercise, "sport">,

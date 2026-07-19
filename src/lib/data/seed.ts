@@ -9,6 +9,7 @@ import {
   Profile,
   Program,
   ProgramRun,
+  SportDef,
   Voucher,
   WorkoutSession,
 } from "@/lib/domain/schemas";
@@ -26,6 +27,7 @@ export type DbData = {
   bodyweightEntries: BodyweightEntry[];
   feedback: Feedback[];
   vouchers: Voucher[];
+  sports: SportDef[];
 };
 
 function ex(
@@ -330,5 +332,6 @@ export function seedData(): DbData {
     bodyweightEntries: [],
     feedback: [],
     vouchers: [],
+    sports: [],
   };
 }

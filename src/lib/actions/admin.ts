@@ -8,8 +8,11 @@ import {
   EXERCISES_TAG,
 } from "@/lib/data/cached";
 import {
+  DEFAULT_SPORT,
   defaultTemplateSchema,
   exerciseSchema,
+  exerciseSport,
+  sportDefSchema,
   voucherSchema,
 } from "@/lib/domain/schemas";
 
@@ -50,6 +53,39 @@ export async function removeExercise(id: string): Promise<void> {
     );
   }
   await store.deleteExercise(id);
+  revalidateContent();
+}
+
+/** Add a sport to the library (admin). Names are unique, case-insensitive. */
+export async function createSport(input: { name: string }): Promise<void> {
+  await requireAdmin();
+  const name = sportDefSchema.shape.name.parse(input.name.trim());
+  const store = await getStore();
+  const existing = [
+    DEFAULT_SPORT,
+    ...(await store.listSports()).map((s) => s.name),
+  ];
+  if (existing.some((n) => n.toLowerCase() === name.toLowerCase())) {
+    throw new Error(`The sport "${name}" already exists`);
+  }
+  await store.createSport({ id: crypto.randomUUID(), name });
+  revalidateContent();
+}
+
+export async function removeSport(id: string): Promise<void> {
+  await requireAdmin();
+  const store = await getStore();
+  const sport = (await store.listSports()).find((s) => s.id === id);
+  if (!sport) return;
+  const inUse = (await store.listExercises()).some(
+    (e) => exerciseSport(e) === sport.name,
+  );
+  if (inUse) {
+    throw new Error(
+      `Exercises still belong to ${sport.name} — reassign them first`,
+    );
+  }
+  await store.deleteSport(id);
   revalidateContent();
 }
 

@@ -17,6 +17,7 @@ import {
   ProgramRun,
   ProgramSummary,
   SessionSummary,
+  SportDef,
   SubscriptionSnapshot,
   Voucher,
   WorkoutSession,
@@ -258,6 +259,17 @@ class SupabaseStore implements DataStore {
   }
   async deleteExercise(id: string): Promise<void> {
     orThrow(await this.db.from("exercises").delete().eq("id", id).select());
+  }
+
+  async listSports(): Promise<SportDef[]> {
+    return orThrow(await this.db.from("sports").select().order("name"));
+  }
+  async createSport(sport: SportDef): Promise<SportDef> {
+    orThrow(await this.db.from("sports").insert(sport).select());
+    return sport;
+  }
+  async deleteSport(id: string): Promise<void> {
+    orThrow(await this.db.from("sports").delete().eq("id", id).select());
   }
 
   async getDefaultTemplate(): Promise<DefaultTemplate> {

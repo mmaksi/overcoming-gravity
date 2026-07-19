@@ -12,6 +12,7 @@ import {
   ProgramRun,
   ProgramSummary,
   SessionSummary,
+  SportDef,
   SubscriptionSnapshot,
   Voucher,
   WorkoutSession,
@@ -30,6 +31,11 @@ export interface DataStore {
   createExercise(exercise: Exercise): Promise<Exercise>;
   updateExercise(exercise: Exercise): Promise<Exercise>;
   deleteExercise(id: string): Promise<void>;
+
+  // Sports the exercise library spans (calisthenics is built in, not stored).
+  listSports(): Promise<SportDef[]>;
+  createSport(sport: SportDef): Promise<SportDef>;
+  deleteSport(id: string): Promise<void>;
 
   getDefaultTemplate(): Promise<DefaultTemplate>;
   saveDefaultTemplate(template: DefaultTemplate): Promise<DefaultTemplate>;

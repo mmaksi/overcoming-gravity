@@ -28,8 +28,14 @@ import {
   Exercise,
   exerciseSport,
   measurementOf,
+  SportDef,
 } from "@/lib/domain/schemas";
-import { removeExercise, saveExercise } from "@/lib/actions/admin";
+import {
+  createSport,
+  removeExercise,
+  removeSport,
+  saveExercise,
+} from "@/lib/actions/admin";
 import { ExerciseThumb } from "@/components/exercise/exercise-thumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,21 +86,45 @@ function titleCase(value: string): string {
   return value.replace(/(^|\s)(\S)/g, (_, sep, ch) => sep + ch.toUpperCase());
 }
 
-export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
+export function ExercisesManager({
+  exercises,
+  sports,
+}: {
+  exercises: Exercise[];
+  /** Admin-defined sports (calisthenics is built in, not stored). */
+  sports: SportDef[];
+}) {
   const [query, setQuery] = useState("");
   const [attribute, setAttribute] = useState<Attribute | null>(null);
   const [sport, setSport] = useState<string | null>(null);
+  const [newSport, setNewSport] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Every sport in the library (calisthenics first) — filter chips plus
-  // suggestions for the draft's sport input.
-  const sports = useMemo(() => {
+  // Every sport name (calisthenics first): the defined list plus anything an
+  // exercise still references (e.g. a sport deleted after assignment) —
+  // filter chips and the draft's sport picker.
+  const sportNames = useMemo(() => {
     const others = [
-      ...new Set(exercises.map(exerciseSport)),
+      ...new Set([
+        ...sports.map((s) => s.name),
+        ...exercises.map(exerciseSport),
+      ]),
     ].filter((s) => s !== DEFAULT_SPORT);
     return [DEFAULT_SPORT, ...others.sort()];
-  }, [exercises]);
+  }, [sports, exercises]);
+
+  const addSportMutation = useMutation({
+    mutationFn: (name: string) => createSport({ name }),
+    onSuccess: () => setNewSport(""),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Failed to add sport"),
+  });
+  const removeSportMutation = useMutation({
+    mutationFn: (id: string) => removeSport(id),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Failed to delete sport"),
+  });
 
   const saveMutation = useMutation({
     mutationFn: (d: Draft) =>
@@ -114,7 +144,11 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
     onError: (e) =>
       setError(e instanceof Error ? e.message : "Failed to delete"),
   });
-  const pending = saveMutation.isPending || removeMutation.isPending;
+  const pending =
+    saveMutation.isPending ||
+    removeMutation.isPending ||
+    addSportMutation.isPending ||
+    removeSportMutation.isPending;
 
   const filtered = useMemo(
     () =>
@@ -214,9 +248,9 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
         </Button>
       </div>
 
-      {sports.length > 1 && (
+      {sportNames.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
-          {sports.map((s) => (
+          {sportNames.map((s) => (
             <button
               key={s}
               type="button"
@@ -323,6 +357,52 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
         ))}
       </div>
 
+      {/* Sports the library spans — add them here, assign one per exercise
+          in the exercise form. Deleting is blocked while exercises still
+          belong to the sport. */}
+      <div className="space-y-2 rounded-lg border p-3">
+        <Label htmlFor="new-sport">Sports</Label>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="secondary">{DEFAULT_SPORT} (built in)</Badge>
+          {sports.map((s) => (
+            <Badge key={s.id} variant="outline" className="gap-1 pr-1">
+              {s.name}
+              <button
+                type="button"
+                aria-label={`Delete sport ${s.name}`}
+                disabled={pending}
+                className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-destructive"
+                onClick={() => {
+                  setError(null);
+                  removeSportMutation.mutate(s.id);
+                }}
+              >
+                <Trash2 className="size-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            id="new-sport"
+            placeholder="e.g. Parkour"
+            value={newSport}
+            onChange={(e) => setNewSport(titleCase(e.target.value))}
+          />
+          <Button
+            size="sm"
+            className="shrink-0"
+            disabled={!newSport.trim() || pending}
+            onClick={() => {
+              setError(null);
+              addSportMutation.mutate(newSport.trim());
+            }}
+          >
+            <Plus className="size-4" /> Add sport
+          </Button>
+        </div>
+      </div>
+
       <Sheet open={draft !== null} onOpenChange={(o) => !o && setDraft(null)}>
         <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto pb-8">
           <SheetHeader>
@@ -425,24 +505,25 @@ export function ExercisesManager({ exercises }: { exercises: Exercise[] }) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ex-sport">Sport</Label>
-                <Input
-                  id="ex-sport"
-                  list="ex-sport-options"
-                  placeholder={DEFAULT_SPORT}
+                <Label>Sport</Label>
+                <Select
                   value={draft.sport}
-                  onChange={(e) =>
-                    setDraft({ ...draft, sport: titleCase(e.target.value) })
-                  }
-                />
-                <datalist id="ex-sport-options">
-                  {sports.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
+                  onValueChange={(v) => setDraft({ ...draft, sport: v })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sportNames.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground">
-                  Pick an existing sport or type a new one (e.g. Parkour) —
-                  athletes can filter the library by it.
+                  Athletes can filter the library by sport. Add new sports in
+                  the Sports section of this page.
                 </p>
               </div>
 
