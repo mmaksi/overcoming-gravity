@@ -199,7 +199,7 @@ function ExerciseDetailSheet({
           no matter how much one exercise contains. */}
       <SheetContent
         side="bottom"
-        className="data-[side=bottom]:h-[66dvh] max-h-[66dvh] overflow-hidden p-0"
+        className="data-[side=bottom]:h-[66dvh] max-h-[75dvh] overflow-hidden p-0"
       >
         <div className="flex h-full min-h-0 flex-col">
           <SheetHeader>
