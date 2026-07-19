@@ -93,8 +93,7 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
           <BookOpen className="size-5 text-primary" /> Exercise library
         </h2>
         <p className="text-sm text-muted-foreground">
-          Browse every exercise and its progressions — tap one for the full
-          ladder.
+          Browse every exercise and its progressions.
         </p>
       </div>
 

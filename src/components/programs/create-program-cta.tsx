@@ -31,7 +31,7 @@ export function CreateProgramCta({
       <span className="min-w-0">
         <span className="block font-semibold">Create a program</span>
         <span className="block text-sm text-muted-foreground">
-          Pick a type, choose your skills, design the mesocycle.
+          Smart and detailed mesocycle designer.
         </span>
       </span>
       <ChevronRight className="ml-auto size-5 shrink-0 text-muted-foreground" />

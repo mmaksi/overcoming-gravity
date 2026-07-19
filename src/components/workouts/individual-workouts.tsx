@@ -72,9 +72,14 @@ export function IndividualWorkouts({
 
   return (
     <div className="space-y-5 border-t pt-6">
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <Zap className="size-5 text-primary" /> Individual workouts
-      </h2>
+      <div>
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <Zap className="size-5 text-primary" /> Individual workouts
+        </h2>
+        <p className="text-sm text-muted-foreground">
+            Good for a quick random workout or stretching and handstand/One-Arm Handstand sessions.
+        </p>
+      </div>
 
       {/* Same inviting placeholder as "Create a program". It's a button (not a
           link) because creating goes through a server action, then navigates. */}

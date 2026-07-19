@@ -38,7 +38,7 @@ export default async function ProgramsPage() {
           <Layers className="size-5 text-primary" /> Programs
         </h2>
         <p className="text-sm text-muted-foreground">
-          Design a full mesocycle — goals, periodization and a week-by-week
+          Design a full mesocycle, set goals, periodization and a week-by-week
           plan.
         </p>
       </div>

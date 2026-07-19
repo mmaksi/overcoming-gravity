@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import {
-  isServer,
   QueryClient,
   QueryClientProvider,
+  environmentManager
 } from "@tanstack/react-query";
 
 function makeQueryClient() {
@@ -28,7 +28,7 @@ function makeQueryClient() {
 let browserQueryClient: QueryClient | undefined;
 
 function getQueryClient() {
-  if (isServer) {
+  if (environmentManager.isServer()) {
     // The server must never share a client between requests (it would leak one
     // user's data into another's), so make a throwaway one per render.
     return makeQueryClient();

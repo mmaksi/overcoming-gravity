@@ -36,6 +36,7 @@ import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
 import { RunCarousel } from "@/components/home/run-carousel";
 import { StatsSection } from "@/components/home/stats-section";
 import { UserAvatar } from "@/components/home/user-avatar";
+import { TrainingIcon } from "@/components/shell/nav-icons";
 
 /** The planned exercises of the upcoming session, in section order. */
 function UpcomingExercises({
@@ -146,13 +147,13 @@ export default async function DashboardPage() {
           </Link>
         </div>
         <div className="space-y-2 pt-4 text-center">
-          <Dumbbell className="mx-auto size-12 text-primary" />
+          <TrainingIcon className="mx-auto size-12 text-primary" />
           <h2 className="text-2xl font-bold">
             {programs.length === 0 ? "Let's get you started" : "No active run"}
           </h2>
           <p className="text-muted-foreground">
             {programs.length === 0
-              ? "Create your first calisthenics program to get started."
+              ? "Create your first calisthenics program."
               : "No active program run. Start one from your programs."}
           </p>
         </div>
@@ -186,9 +187,7 @@ export default async function DashboardPage() {
             <Target className="size-5" /> Goals
           </h2>
           <p className="text-sm text-muted-foreground">
-            Every program you design sets its own goals — skills, strength
-            marks, flexibility. They appear here so you can tick them off as
-            you train.
+            Track your goals in all categories: skills, strength, flexibility or something else.
           </p>
         </div>
       </div>

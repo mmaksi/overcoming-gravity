@@ -115,7 +115,7 @@ export function StatsSection({
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {streak === 0
-                ? "Complete your next workout to start a streak — skipping one resets it."
+                ? "Complete your next workout to start a streak."
                 : `${totalWorkouts} workout${totalWorkouts === 1 ? "" : "s"} completed all-time`}
             </p>
           </CardContent>
