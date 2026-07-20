@@ -147,13 +147,20 @@ export function getCachedDashboard(
       const runs = (await store.listRuns(userId)).filter(
         (r) => r.status === "active",
       );
-      return Promise.all(
+      const cards = await Promise.all(
         runs.map(async (run) => ({
           run,
           program: await store.getProgramSummary(run.programId),
           sessions: await store.listSessionSummariesByRun(run.id),
         })),
       );
+      // Most recently trained program first: rank by the last day a workout
+      // was actually run (completed or skipped), falling back to the run's
+      // start date for programs not yet touched. Sessions come back ascending
+      // by date, so the last finished one is the newest.
+      const lastTrained = ({ run, sessions }: DashboardRun) =>
+        sessions.findLast((s) => s.status !== "planned")?.date ?? run.startDate;
+      return cards.sort((a, b) => lastTrained(b).localeCompare(lastTrained(a)));
     },
     ["user-dashboard", userId],
     { tags: [userDashboardTag(userId)] },

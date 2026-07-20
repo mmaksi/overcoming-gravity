@@ -27,6 +27,7 @@ import { StartRunButton } from "@/components/programs/start-run-button";
 import { DeleteProgramButton } from "@/components/programs/delete-program-button";
 import { GoalsEditor } from "@/components/programs/goals-editor";
 import { ResetRunButton } from "@/components/programs/reset-run-button";
+import { DeactivateRunButton } from "@/components/programs/deactivate-run-button";
 
 export default async function ProgramPage({
   params,
@@ -148,6 +149,7 @@ export default async function ProgramPage({
                   <Link href="/">Run in progress — go to dashboard</Link>
                 </Button>
                 <ResetRunButton runId={activeRun.id} />
+                <DeactivateRunButton runId={activeRun.id} />
               </>
             ) : (
               <StartRunButton
