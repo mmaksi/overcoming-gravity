@@ -40,7 +40,8 @@ function vibrate() {
  * count down and advance on the clock; reps stations wait for the athlete's
  * tap. The start beep marks every switch to the next exercise — except the
  * very first station, where the countdown sound already ends in its own go
- * cue. Nothing is recorded; the athlete logs their sets as usual afterwards.
+ * cue. On a full finish `onComplete` fires once so the logger can auto-fill
+ * each exercise's sets; stopping early records nothing.
  *
  * Mount with a fresh `key` per opening — the run starts immediately.
  */
@@ -49,12 +50,15 @@ export function CircuitRunner({
   onOpenChange,
   exerciseTitles,
   settings,
+  onComplete,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The group's exercises in planned order — one station each. */
   exerciseTitles: string[];
   settings: CircuitSettings;
+  /** Fired once when every round is done — never on an early stop. */
+  onComplete: () => void;
 }) {
   const perRound = Math.max(1, settings.stations.length);
   const totalStations = settings.rounds * perRound;
@@ -90,6 +94,17 @@ export function CircuitRunner({
       beep?.pause();
     };
   }, []);
+
+  // Auto-log exactly once, the moment the last station clears. The ref guards
+  // against the effect re-running (finished stays true, onComplete identity
+  // changes) so sets are only filled a single time.
+  const recordedRef = useRef(false);
+  useEffect(() => {
+    if (finished && !recordedRef.current) {
+      recordedRef.current = true;
+      onComplete();
+    }
+  }, [finished, onComplete]);
 
   /** Move to the next station (tap on reps, clock on seconds). */
   function advance() {
@@ -153,7 +168,7 @@ export function CircuitRunner({
                 {settings.rounds} rounds done
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Done — log how it went in the sets below.
+                Logged to your sets below — tweak any that differed.
               </p>
             </div>
             <Button

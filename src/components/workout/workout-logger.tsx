@@ -391,6 +391,42 @@ export function WorkoutLogger({
     );
   }
 
+  /**
+   * A finished circuit auto-fills every exercise in the group: `rounds` sets
+   * each, at that station's amount and unit (reps or seconds). One state
+   * update, so the debounced autosave persists the whole group at once. The
+   * runner stays on its finished screen; closing it is left to the athlete.
+   */
+  function recordCircuit(group: NonNullable<WorkoutDay["groups"]>[number]) {
+    const settings = settingsOf(group);
+    const groupExercises = plannedDay.exercises.filter(
+      (we) => we.groupId === group.id,
+    );
+    const stations = circuitStations(settings, groupExercises.length);
+    const rounds = settings.rounds ?? 3;
+    setEntries((prev) =>
+      prev.map((en) => {
+        const idx = groupExercises.findIndex(
+          (we) => we.id === en.workoutExerciseId,
+        );
+        const station = idx === -1 ? undefined : stations[idx];
+        if (!station) return en;
+        return {
+          ...en,
+          measurement: station.mode === "seconds" ? "seconds" : "reps",
+          sets: Array.from({ length: rounds }, () => ({
+            reps: String(station.amount),
+            weight: "",
+            done: true,
+            parts: [{ progressionId: en.progressionId, reps: "" }],
+            eccentricReps: "",
+          })),
+        };
+      }),
+    );
+    toast(`Circuit logged — ${rounds} set${rounds === 1 ? "" : "s"} per exercise`);
+  }
+
   // Live per-progression note texts for this workout, seeded from the server's
   // remembered notes. Swapping progression mid-workout stashes the current
   // text under the progression being left and surfaces the target
@@ -1612,6 +1648,7 @@ export function WorkoutLogger({
               runnerExerciseTitles.length,
             ),
           }}
+          onComplete={() => recordCircuit(runnerGroup)}
         />
       )}
 
