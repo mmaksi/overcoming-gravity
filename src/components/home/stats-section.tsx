@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { GoalsAchievedCount } from "@/components/home/goals-achieved";
 
 /** Simple responsive SVG line chart of weight over time. */
 function WeightChart({ entries }: { entries: BodyweightEntry[] }) {
@@ -130,7 +131,7 @@ export function StatsSection({
           <CardContent className="px-4">
             <div className="flex items-baseline gap-1.5">
               <span className="text-3xl font-bold tabular-nums">
-                {goalsAchieved}
+                <GoalsAchievedCount fallback={goalsAchieved} />
               </span>
               <span className="text-sm font-medium text-muted-foreground">
                 all-time

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/card";
 import { InstallAppButton } from "@/components/home/install-app-button";
 import { TrainingTip } from "@/components/home/training-tip";
+import { GoalsAchievedProvider } from "@/components/home/goals-achieved";
 import { GoalsCard, ProgramGoals } from "@/components/home/goals-card";
 import { RunCarousel } from "@/components/home/run-carousel";
 import { StatsSection } from "@/components/home/stats-section";
@@ -340,16 +341,20 @@ export default async function DashboardPage() {
 
       <RunCarousel>{runCards}</RunCarousel>
 
-      <StatsSection
-        entries={bodyweight}
-        heightCm={user.heightCm}
-        targetWeightKg={user.targetWeightKg}
-        streak={streak}
-        totalWorkouts={totalWorkouts}
-        goalsAchieved={goalsAchieved}
-      />
+      {/* One shared optimistic count so a tick in GoalsCard bumps the Stats
+          "Goals achieved" card at the same instant. */}
+      <GoalsAchievedProvider initial={goalsAchieved}>
+        <StatsSection
+          entries={bodyweight}
+          heightCm={user.heightCm}
+          targetWeightKg={user.targetWeightKg}
+          streak={streak}
+          totalWorkouts={totalWorkouts}
+          goalsAchieved={goalsAchieved}
+        />
 
-      <GoalsCard programs={programGoals} />
+        <GoalsCard programs={programGoals} />
+      </GoalsAchievedProvider>
     </div>
   );
 }

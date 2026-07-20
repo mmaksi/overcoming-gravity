@@ -6,6 +6,7 @@ import { Target } from "lucide-react";
 import { GOAL_AREA_LABELS, GOAL_AREAS, GoalArea } from "@/lib/domain/types";
 import { Goals } from "@/lib/domain/schemas";
 import { toggleProgramGoal } from "@/lib/actions/programs";
+import { useApplyGoalsAchievedDelta } from "@/components/home/goals-achieved";
 import { cn } from "@/lib/utils";
 
 export type ProgramGoals = {
@@ -25,6 +26,8 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
   // server write itself goes through TanStack Query. The tick reverts on its
   // own when the revalidated dashboard props arrive.
   const [, startTransition] = useTransition();
+  // Keeps the Stats "Goals achieved" card in step with our ticks.
+  const applyGoalsAchievedDelta = useApplyGoalsAchievedDelta();
   const toggleMutation = useMutation({
     mutationFn: (patch: Patch) => toggleProgramGoal(patch),
   });
@@ -93,6 +96,7 @@ export function GoalsCard({ programs }: { programs: ProgramGoals[] }) {
                       const done = e.target.checked;
                       startTransition(async () => {
                         applyOptimistic({ programId, area, index, done });
+                        applyGoalsAchievedDelta(done ? 1 : -1);
                         await toggleMutation.mutateAsync({
                           programId,
                           area,
