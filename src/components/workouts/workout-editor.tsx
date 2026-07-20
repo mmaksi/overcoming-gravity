@@ -34,6 +34,7 @@ import { DaySections } from "@/components/designer/day-card";
 import { ExercisePicker } from "@/components/designer/exercise-picker";
 import { ExerciseEditor } from "@/components/designer/exercise-editor";
 import {
+  configureGroup,
   groupExercises,
   reorderExercises,
   ungroupExercises,
@@ -220,6 +221,9 @@ export function WorkoutEditor({
           }
           onGroup={(ids, type) => applyDay(groupExercises(day, ids, type))}
           onUngroup={(groupId) => applyDay(ungroupExercises(day, groupId))}
+          onConfigureGroup={(groupId, patch) =>
+            applyDay(configureGroup(day, groupId, patch))
+          }
         />
       </div>
 

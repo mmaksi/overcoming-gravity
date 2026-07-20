@@ -18,6 +18,7 @@ import { DaySections } from "@/components/designer/day-card";
 import { ExercisePicker } from "@/components/designer/exercise-picker";
 import { ExerciseEditor } from "@/components/designer/exercise-editor";
 import {
+  configureGroup,
   groupExercises,
   reorderExercises,
   ungroupExercises,
@@ -130,6 +131,9 @@ export function DefaultsManager({
           }
           onGroup={(ids, type) => apply(groupExercises(day, ids, type))}
           onUngroup={(groupId) => apply(ungroupExercises(day, groupId))}
+          onConfigureGroup={(groupId, patch) =>
+            apply(configureGroup(day, groupId, patch))
+          }
         />
       </div>
 

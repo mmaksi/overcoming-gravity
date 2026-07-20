@@ -132,6 +132,20 @@ export function ungroupExercises(day: WorkoutDay, groupId: string): WorkoutDay {
   };
 }
 
+/** Apply mode-settings (e.g. a circuit's rounds/stations) to one group. */
+export function configureGroup(
+  day: WorkoutDay,
+  groupId: string,
+  patch: Partial<ExerciseGroup>,
+): WorkoutDay {
+  return {
+    ...day,
+    groups: (day.groups ?? []).map((g) =>
+      g.id === groupId ? { ...g, ...patch } : g,
+    ),
+  };
+}
+
 /** Copy one day's workout over other days of the same week. */
 export function copyDayToDays(
   meso: Mesocycle,

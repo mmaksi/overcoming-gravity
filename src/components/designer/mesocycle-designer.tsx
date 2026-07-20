@@ -39,6 +39,7 @@ import { ExercisePicker } from "./exercise-picker";
 import { ExerciseEditor } from "./exercise-editor";
 import { CopyDayDialog, CopyWeekDialog } from "./copy-dialogs";
 import {
+  configureGroup,
   copyDayToDays,
   copyWeekToWeeks,
   groupExercises,
@@ -441,6 +442,13 @@ export function MesocycleDesigner({
                 apply(
                   updateDay(meso, weekIndex, weekday, (d) =>
                     ungroupExercises(d, groupId),
+                  ),
+                )
+              }
+              onConfigureGroup={(groupId, patch) =>
+                apply(
+                  updateDay(meso, weekIndex, weekday, (d) =>
+                    configureGroup(d, groupId, patch),
                   ),
                 )
               }

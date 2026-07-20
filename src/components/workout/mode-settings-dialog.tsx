@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { GROUP_TYPE_LABELS, GroupType } from "@/lib/domain/types";
-import { ExerciseGroup } from "@/lib/domain/schemas";
+import { CircuitStation, ExerciseGroup } from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,22 +16,17 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-/**
- * One circuit station = one exercise's target inside every round: either a
- * rep count (advance by hand) or seconds of work (advances on the clock).
- */
-export type CircuitStation = {
-  mode: "reps" | "seconds";
-  amount: number;
-};
+/** Re-exported for the runner; the source of truth lives in the domain model. */
+export type { CircuitStation };
 
 /**
  * A mode's timing/shape settings, chosen at workout time (the designer only
- * picks the mode). Which fields matter depends on the mode: superset — rest
- * after each round; HIIT — work/rest/rounds; pyramid & ladder — the climb's
- * start, increment and interval; circuit — rounds plus one station per
- * exercise. Settings live in the logger's client state (persisted per
- * session in localStorage), never on the plan.
+ * can also configure a circuit up front). Which fields matter depends on the
+ * mode: superset — rest after each round; HIIT — work/rest/rounds; pyramid &
+ * ladder — the climb's start, increment and interval; circuit — rounds plus
+ * one station per exercise. At workout time settings live in the logger's
+ * client state (persisted per session in localStorage); a circuit's designed
+ * rounds/stations are seeded from the plan and stay overridable per session.
  */
 export type ModeSettings = {
   restSeconds?: number;
@@ -88,7 +83,9 @@ export function seedModeSettings(group: ExerciseGroup): ModeSettings {
     case "ladder":
       return { startReps: 1, increment: 1, intervalSeconds: 60 };
     case "circuit":
-      return { rounds: 3 };
+      // Seeded from the designer's config when present, so the logger opens
+      // on the planned rounds and stations (still overridable per session).
+      return { rounds: group.rounds ?? 3, stations: group.stations };
     default:
       return {};
   }

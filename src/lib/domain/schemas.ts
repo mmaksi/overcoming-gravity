@@ -272,6 +272,16 @@ export function normalizeWorkoutDay(
   };
 }
 
+/**
+ * One circuit station = one exercise's target inside every round: either a
+ * rep count (advanced by hand) or seconds of work (advances on the clock).
+ */
+export const circuitStationSchema = z.object({
+  mode: z.enum(["reps", "seconds"]),
+  amount: z.number().int().positive(),
+});
+export type CircuitStation = z.infer<typeof circuitStationSchema>;
+
 export const exerciseGroupSchema = z.object({
   id: z.string(),
   type: z.enum(GROUP_TYPES),
@@ -285,8 +295,10 @@ export const exerciseGroupSchema = z.object({
   steps: z.number().int().positive().optional(),
   /** HIIT/Tabata: the work interval (Tabata is always 20). */
   workSeconds: z.number().int().positive().optional(),
-  /** HIIT/Tabata: how many work intervals (Tabata is always 8). */
+  /** HIIT/Tabata/Circuit: how many work intervals / circuit rounds. */
   rounds: z.number().int().positive().optional(),
+  /** Circuit: one target per exercise (reps or seconds), in planned order. */
+  stations: z.array(circuitStationSchema).optional(),
 });
 export type ExerciseGroup = z.infer<typeof exerciseGroupSchema>;
 
@@ -328,6 +340,14 @@ export function groupConfigSummary(group: ExerciseGroup): string | null {
     }
     case "tabata":
       return "20s/10s × 8 · 4 min total";
+    case "circuit": {
+      const rounds = group.rounds != null ? `${group.rounds} rounds` : null;
+      if (!group.stations || group.stations.length === 0) return rounds;
+      const stations = group.stations
+        .map((st) => (st.mode === "seconds" ? `${st.amount}s` : `${st.amount}`))
+        .join("/");
+      return rounds ? `${rounds} · ${stations}` : stations;
+    }
     default:
       return null;
   }

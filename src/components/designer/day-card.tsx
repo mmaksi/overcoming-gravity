@@ -23,6 +23,7 @@ import {
   GripVertical,
   ListChecks,
   Plus,
+  Settings2,
   Trash2,
   X,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
 } from "@/lib/domain/types";
 import {
   Exercise,
+  ExerciseGroup,
   groupConfigSummary,
   measurementOf,
   sectionOf,
@@ -48,6 +50,11 @@ import {
   WorkoutExercise,
 } from "@/lib/domain/schemas";
 import { Button } from "@/components/ui/button";
+import {
+  ModeSettings,
+  ModeSettingsDialog,
+  seedModeSettings,
+} from "@/components/workout/mode-settings-dialog";
 import { cn } from "@/lib/utils";
 
 function setsSummary(we: WorkoutExercise, exercise: Exercise): string {
@@ -80,6 +87,7 @@ export function DayCard({
   onReorder,
   onGroup,
   onUngroup,
+  onConfigureGroup,
 }: {
   weekday: Weekday;
   day: WorkoutDay;
@@ -96,6 +104,8 @@ export function DayCard({
   onReorder: (fromId: string, toId: string) => void;
   onGroup: (ids: string[], type: GroupType) => void;
   onUngroup: (groupId: string) => void;
+  /** Persist a group's mode settings (circuit rounds/stations) to the plan. */
+  onConfigureGroup: (groupId: string, patch: Partial<ExerciseGroup>) => void;
 }) {
   return (
     <section
@@ -144,6 +154,7 @@ export function DayCard({
         onReorder={onReorder}
         onGroup={onGroup}
         onUngroup={onUngroup}
+        onConfigureGroup={onConfigureGroup}
       />
     </section>
   );
@@ -165,6 +176,7 @@ export function DaySections({
   onReorder,
   onGroup,
   onUngroup,
+  onConfigureGroup,
 }: {
   /** Keeps DnD context ids unique when several days render at once. */
   dndIdPrefix: string;
@@ -177,6 +189,8 @@ export function DaySections({
   onReorder: (fromId: string, toId: string) => void;
   onGroup: (ids: string[], type: GroupType) => void;
   onUngroup: (groupId: string) => void;
+  /** Persist a group's mode settings (circuit rounds/stations) to the plan. */
+  onConfigureGroup: (groupId: string, patch: Partial<ExerciseGroup>) => void;
 }) {
   // Selection mode is scoped to one section: exercises can only be grouped
   // (and reordered) inside their own section.
@@ -218,6 +232,7 @@ export function DaySections({
             // steps…) are chosen at workout time in the logger.
             onGroup={finishGrouping}
             onUngroup={onUngroup}
+            onConfigureGroup={onConfigureGroup}
             onAddExercise={() => onAddExercise(attribute)}
             onRemoveSection={() => onRemoveSection(attribute)}
             onEditExercise={onEditExercise}
@@ -242,6 +257,7 @@ function DaySection({
   onToggleSelected,
   onGroup,
   onUngroup,
+  onConfigureGroup,
   onAddExercise,
   onRemoveSection,
   onEditExercise,
@@ -259,6 +275,7 @@ function DaySection({
   onToggleSelected: (id: string) => void;
   onGroup: (type: GroupType) => void;
   onUngroup: (groupId: string) => void;
+  onConfigureGroup: (groupId: string, patch: Partial<ExerciseGroup>) => void;
   onAddExercise: () => void;
   onRemoveSection: () => void;
   onEditExercise: (workoutExerciseId: string) => void;
@@ -269,6 +286,17 @@ function DaySection({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  // Which group's circuit settings dialog is open (design-time config).
+  const [settingsFor, setSettingsFor] = useState<string | null>(null);
+  const settingsGroup = settingsFor
+    ? (day.groups ?? []).find((g) => g.id === settingsFor)
+    : undefined;
+  /** A group's exercises in planned order — one circuit station each. */
+  function groupExerciseTitles(groupId: string): string[] {
+    return exercises
+      .filter((we) => we.groupId === groupId)
+      .map((we) => exercisesById.get(we.exerciseId)?.title ?? "Exercise");
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -372,9 +400,20 @@ function DaySection({
                         {GROUP_TYPE_LABELS[group.type]}
                       </span>
                       {groupConfigSummary(group) && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="min-w-0 truncate text-xs text-muted-foreground">
                           {groupConfigSummary(group)}
                         </span>
+                      )}
+                      {group.type === "circuit" && (
+                        <button
+                          type="button"
+                          aria-label="Circuit settings"
+                          className="text-muted-foreground hover:text-foreground"
+                          title="Circuit settings"
+                          onClick={() => setSettingsFor(group.id)}
+                        >
+                          <Settings2 className="size-3.5" />
+                        </button>
                       )}
                       <button
                         type="button"
@@ -412,6 +451,25 @@ function DaySection({
           <Plus className="size-4" /> Add {ATTRIBUTE_LABELS[attribute].toLowerCase()} exercise
         </button>
       )}
+
+      {/* Design-time circuit config. Keyed per opening so the fields start
+          from the group's saved rounds/stations; saving persists them to the
+          plan (the logger still seeds from — and overrides — these). */}
+      <ModeSettingsDialog
+        key={settingsFor ?? "closed"}
+        type={settingsGroup?.type ?? null}
+        value={settingsGroup ? seedModeSettings(settingsGroup) : {}}
+        exerciseTitles={settingsFor ? groupExerciseTitles(settingsFor) : []}
+        onOpenChange={(open) => !open && setSettingsFor(null)}
+        onSave={(s: ModeSettings) => {
+          if (settingsFor) {
+            onConfigureGroup(settingsFor, {
+              rounds: s.rounds,
+              stations: s.stations,
+            });
+          }
+        }}
+      />
     </div>
   );
 }
