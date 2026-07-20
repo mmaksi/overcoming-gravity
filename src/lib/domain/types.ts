@@ -126,7 +126,7 @@ export const GROUP_TYPE_RULES: Record<
   { accepts: (count: number) => boolean; requirement: string }
 > = {
   superset: { accepts: (n) => n === 2, requirement: "exactly 2 exercises" },
-  circuit: { accepts: (n) => n > 2, requirement: "3 or more exercises" },
+  circuit: { accepts: (n) => n > 1, requirement: "2 or more exercises" },
   pyramid: { accepts: (n) => n === 1, requirement: "exactly 1 exercise" },
   ladder: { accepts: (n) => n === 1, requirement: "exactly 1 exercise" },
   to_failure: { accepts: (n) => n === 1, requirement: "exactly 1 exercise" },
