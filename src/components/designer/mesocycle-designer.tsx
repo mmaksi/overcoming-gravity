@@ -20,10 +20,9 @@ import {
   WEEKDAYS,
 } from "@/lib/domain/types";
 import {
-  defaultSetTarget,
   Exercise,
-  measurementOf,
   Mesocycle,
+  newWorkoutExercise,
   Program,
   sectionOf,
   WorkoutExercise,
@@ -488,32 +487,22 @@ export function MesocycleDesigner({
         onOpenChange={(open) => !open && setPickingFor(null)}
         exercises={exercises}
         section={pickingFor?.attribute ?? null}
-        onPick={(exercise) => {
-          if (!pickingFor) return;
-          const { weekday } = pickingFor;
-          const defaultValue = defaultSetTarget(
-            measurementOf(exercise, exercise.progressions[0].id),
-          );
-          const we: WorkoutExercise = {
-            id: crypto.randomUUID(),
-            exerciseId: exercise.id,
-            progressionId: exercise.progressions[0].id,
-            sets: Array.from({ length: 3 }, () => ({ reps: defaultValue })),
-            restSeconds: 90,
-            clusterRestSeconds:
-              exercise.repStyle === "cluster" ? 15 : undefined,
-            progressionMethod: "intra",
-            // Stays in the section it was added to, whatever its attribute.
-            section: pickingFor.attribute,
-          };
+        onAdd={(picked) => {
+          if (!pickingFor || picked.length === 0) return;
+          const { weekday, attribute } = pickingFor;
+          const added = picked.map((e) => newWorkoutExercise(e, attribute));
           apply(
             updateDay(meso, weekIndex, weekday, (d) => ({
               ...d,
-              exercises: [...d.exercises, we],
+              exercises: [...d.exercises, ...added],
             })),
           );
           setPickingFor(null);
-          setEditing({ weekday, workoutExerciseId: we.id });
+          // Adding a single exercise jumps straight into its details; a batch
+          // just drops them in to be tuned afterwards.
+          if (added.length === 1) {
+            setEditing({ weekday, workoutExerciseId: added[0].id });
+          }
         }}
       />
 

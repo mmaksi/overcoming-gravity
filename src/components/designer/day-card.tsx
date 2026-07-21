@@ -114,7 +114,7 @@ export function DayCard({
         // Periodized days get a soft tint so high/low reads at a glance.
         periodized && "-mx-2 rounded-2xl p-2",
         periodized &&
-          (day.intensity === "high" ? "bg-orange-500/[0.06]" : "bg-sky-500/[0.06]"),
+          (day.intensity === "high" ? "bg-orange-500/6" : "bg-sky-500/6"),
       )}
     >
       <div className="flex items-center justify-between">
@@ -284,7 +284,9 @@ function DaySection({
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
   // Which group's circuit settings dialog is open (design-time config).
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
@@ -319,7 +321,11 @@ function DaySection({
               aria-pressed={selecting}
               onClick={onStartSelecting}
             >
-              {selecting ? <X className="size-4" /> : <ListChecks className="size-4" />}
+              {selecting ? (
+                <X className="size-4" />
+              ) : (
+                <ListChecks className="size-4" />
+              )}
               {selecting ? "Cancel" : "Mode"}
             </Button>
             <Button
@@ -448,7 +454,8 @@ function DaySection({
           onClick={onAddExercise}
           className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed py-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
         >
-          <Plus className="size-4" /> Add {ATTRIBUTE_LABELS[attribute].toLowerCase()} exercise
+          <Plus className="size-4" /> Add{" "}
+          {ATTRIBUTE_LABELS[attribute].toLowerCase()} exercise
         </button>
       )}
 
@@ -498,8 +505,14 @@ function SortableExerciseRow({
   onEdit: () => void;
   onRemove: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: we.id, disabled: selecting });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: we.id, disabled: selecting });
 
   const progression = exercise.progressions.find(
     (p) => p.id === we.progressionId,

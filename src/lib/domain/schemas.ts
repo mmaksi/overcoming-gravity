@@ -209,6 +209,32 @@ export function defaultSetTarget(m: Measurement): number {
   return m === "minutes" ? 1 : m === "seconds" ? 10 : 8;
 }
 
+/**
+ * Build a fresh planned exercise (3 sets at the default target, 90s rest) on
+ * its first progression, placed in `section`. Shared by every place that adds
+ * an exercise to a day (program designer, custom workout, admin defaults) so
+ * the starting shape stays identical.
+ */
+export function newWorkoutExercise(
+  exercise: Exercise,
+  section?: Attribute,
+): WorkoutExercise {
+  const defaultValue = defaultSetTarget(
+    measurementOf(exercise, exercise.progressions[0].id),
+  );
+  return {
+    id: crypto.randomUUID(),
+    exerciseId: exercise.id,
+    progressionId: exercise.progressions[0].id,
+    sets: Array.from({ length: 3 }, () => ({ reps: defaultValue })),
+    restSeconds: 90,
+    clusterRestSeconds: exercise.repStyle === "cluster" ? 15 : undefined,
+    progressionMethod: "intra",
+    // Stays in the section it was added to, whatever its attribute.
+    section,
+  };
+}
+
 /** The day section a planned exercise belongs to (see `section` above). */
 export function sectionOf(
   we: WorkoutExercise,

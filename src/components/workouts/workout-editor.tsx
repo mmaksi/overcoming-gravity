@@ -8,8 +8,7 @@ import { Attribute } from "@/lib/domain/types";
 import {
   CustomWorkout,
   Exercise,
-  defaultSetTarget,
-  measurementOf,
+  newWorkoutExercise,
   sectionOf,
   WorkoutDay,
   WorkoutExercise,
@@ -263,25 +262,15 @@ export function WorkoutEditor({
         onOpenChange={(open) => !open && setPickingFor(null)}
         exercises={exercises}
         section={pickingFor}
-        onPick={(exercise) => {
-          const defaultValue = defaultSetTarget(
-            measurementOf(exercise, exercise.progressions[0].id),
+        onAdd={(picked) => {
+          if (picked.length === 0) return;
+          const added = picked.map((e) =>
+            newWorkoutExercise(e, pickingFor ?? undefined),
           );
-          const we: WorkoutExercise = {
-            id: crypto.randomUUID(),
-            exerciseId: exercise.id,
-            progressionId: exercise.progressions[0].id,
-            sets: Array.from({ length: 3 }, () => ({ reps: defaultValue })),
-            restSeconds: 90,
-            clusterRestSeconds:
-              exercise.repStyle === "cluster" ? 15 : undefined,
-            progressionMethod: "intra",
-            // Stays in the section it was added to, whatever its attribute.
-            section: pickingFor ?? undefined,
-          };
-          applyDay({ ...day, exercises: [...day.exercises, we] });
+          applyDay({ ...day, exercises: [...day.exercises, ...added] });
           setPickingFor(null);
-          setEditingId(we.id);
+          // A single add opens its editor; a batch just drops them in.
+          if (added.length === 1) setEditingId(added[0].id);
         }}
       />
 

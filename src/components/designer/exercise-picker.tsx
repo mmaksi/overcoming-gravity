@@ -22,6 +22,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExerciseThumb } from "@/components/exercise/exercise-thumb";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ export function ExercisePicker({
   onOpenChange,
   exercises,
   section = null,
-  onPick,
+  onAdd,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,12 +43,30 @@ export function ExercisePicker({
    * sheet. Remount with `key={section}` so the filter resets per section.
    */
   section?: Attribute | null;
-  onPick: (exercise: Exercise) => void;
+  /**
+   * Add the chosen exercises to the day. Tapping rows toggles a multi-select;
+   * the footer button commits them all at once (in the order they were
+   * picked). Remount with `key={section}` so the selection resets per open.
+   */
+  onAdd: (exercises: Exercise[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [attribute, setAttribute] = useState<Attribute | null>(section);
   const [sport, setSport] = useState<string | null>(null);
+  // Ids of picked exercises, kept in tap order so they're added in the order
+  // the user chose them (not library order).
+  const [picked, setPicked] = useState<string[]>([]);
+
+  function togglePicked(id: string) {
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  }
+
+  function commit() {
+    if (picked.length === 0) return;
+    const byId = new Map(exercises.map((e) => [e.id, e]));
+    onAdd(picked.map((id) => byId.get(id)!).filter(Boolean));
+  }
 
   // Sport chips appear only once the library actually spans several sports
   // (calisthenics first).
@@ -89,9 +108,9 @@ export function ExercisePicker({
                 : "Add exercise"}
             </SheetTitle>
             <SheetDescription>
-              Pick any exercise from the library
+              Pick one or more exercises from the library
               {section
-                ? ` — it goes into the ${ATTRIBUTE_LABELS[section].toLowerCase()} section.`
+                ? ` — they go into the ${ATTRIBUTE_LABELS[section].toLowerCase()} section.`
                 : "."}
             </SheetDescription>
           </SheetHeader>
@@ -143,13 +162,29 @@ export function ExercisePicker({
               </p>
             )}
             <div className="space-y-2">
-              {filtered.map((e) => (
+              {filtered.map((e) => {
+                const isPicked = picked.includes(e.id);
+                return (
                 <button
                   key={e.id}
                   type="button"
-                  onClick={() => onPick(e)}
-                  className="flex w-full items-start gap-3 rounded-xl bg-muted/50 p-4 text-left transition-colors hover:bg-muted"
+                  aria-pressed={isPicked}
+                  onClick={() => togglePicked(e.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-xl bg-muted/50 p-4 text-left transition-colors hover:bg-muted",
+                    isPicked && "bg-primary/10 ring-2 ring-primary hover:bg-primary/10",
+                  )}
                 >
+                  <span
+                    className={cn(
+                      "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-sm",
+                      isPicked
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/40",
+                    )}
+                  >
+                    {isPicked && "✓"}
+                  </span>
                   <ExerciseThumb title={e.title} imageUrl={e.imageUrl} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
@@ -174,9 +209,20 @@ export function ExercisePicker({
                     </p>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
+
+          {/* Commit bar: adds every picked exercise at once. Hidden until at
+              least one is selected so single-tap picking stays uncluttered. */}
+          {picked.length > 0 && (
+            <div className="border-t bg-background px-4 py-3">
+              <Button className="w-full" size="lg" onClick={commit}>
+                {`Add ${picked.length} exercise${picked.length === 1 ? "" : "s"}`}
+              </Button>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
