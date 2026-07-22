@@ -282,6 +282,7 @@ export function WorkoutLogger({
   exercises,
   stats,
   userNotes = {},
+  initialEditing = false,
 }: {
   session: WorkoutSession;
   /** Program name or custom workout title, shown in the sticky header. */
@@ -294,6 +295,8 @@ export function WorkoutLogger({
   stats: Record<string, VolumeStats>;
   /** Remembered notes keyed by `exerciseNoteKey(exerciseId, progressionId)`. */
   userNotes?: Record<string, string>;
+  /** Open a completed workout straight in edit mode (the history pencil). */
+  initialEditing?: boolean;
 }) {
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<
@@ -323,7 +326,7 @@ export function WorkoutLogger({
   // read-only until the athlete taps "Edit", which unlocks the same inputs
   // used to log a live workout so past data can be corrected.
   const historical = session.status !== "planned";
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEditing && historical);
   const readOnly = historical && !isEditing;
 
   // Workout duration: accumulated seconds from previous visits (frozen at
@@ -755,8 +758,9 @@ export function WorkoutLogger({
   /**
    * Persist edits to a completed workout, keeping it completed. Reuses the
    * "complete" action so the history + progress caches refresh (the run is
-   * already finished, so this never re-triggers completion navigation). Stays
-   * on the page and drops back to the read-only view on success.
+   * already finished, so this never re-triggers completion navigation). On
+   * success the athlete is sent to the training page — the push happens after
+   * the await so this fork doesn't swallow it behind the action's revalidation.
    */
   async function saveEdits() {
     if (pending) return;
@@ -764,22 +768,7 @@ export function WorkoutLogger({
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     try {
       await submitMutation.mutateAsync("complete");
-      // Drop fully-empty sets (the save discarded them too) so the read-only
-      // view matches exactly what was persisted.
-      setEntries((prev) =>
-        prev.map((en) => ({
-          ...en,
-          sets: en.sets.filter(
-            (s) =>
-              s.reps !== "" ||
-              s.eccentricReps !== "" ||
-              s.parts.some((p) => p.reps !== ""),
-          ),
-        })),
-      );
-      setIsEditing(false);
-      setPendingAction(null);
-      toast("Workout updated");
+      router.push("/programs");
     } catch {
       setPendingAction(null);
     }

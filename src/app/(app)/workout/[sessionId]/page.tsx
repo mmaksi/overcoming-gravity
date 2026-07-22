@@ -11,10 +11,15 @@ import { WorkoutLogger } from "@/components/workout/workout-logger";
 
 export default async function WorkoutPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ edit?: string }>;
 }) {
   const { sessionId } = await params;
+  // The history pencil deep-links here with ?edit=1 to open straight into
+  // editing a completed workout.
+  const { edit } = await searchParams;
   const user = await requireUser();
   const store = await getStore();
 
@@ -87,6 +92,7 @@ export default async function WorkoutPage({
       exercises={exercises}
       stats={stats}
       userNotes={userNotes}
+      initialEditing={edit === "1"}
     />
   );
 }

@@ -192,6 +192,11 @@ export async function saveWorkoutSession(input: {
     }
     if (runCompleted) updateTag(userProgramsTag(user.id));
     revalidatePath("/");
+    // The calendar renders both the month grid and the history feed. Its
+    // client Router Cache entry lives a full day (staleTimes), so without an
+    // explicit bust an edited or freshly completed workout keeps showing the
+    // stale render on the next visit.
+    revalidatePath("/calendar");
   }
   return { runCompleted, programId };
 }
@@ -243,4 +248,7 @@ export async function deleteWorkoutSession(sessionId: string): Promise<void> {
   // Completed counts / progress bars on the home cards include this session.
   updateTag(userDashboardTag(user.id));
   revalidatePath("/");
+  // The calendar's day-long client Router Cache would otherwise keep showing
+  // the deleted workout on both the grid and the history feed.
+  revalidatePath("/calendar");
 }

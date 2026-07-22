@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowDownUp, Clock, Loader2, Trash2 } from "lucide-react";
+import { ArrowDownUp, Clock, Loader2, Pencil, Trash2 } from "lucide-react";
 import { HistoryItem } from "@/lib/domain/history";
 import { loadHistoryPage } from "@/lib/actions/history";
 import { deleteWorkoutSession } from "@/lib/actions/runs";
@@ -53,15 +53,30 @@ function HistoryCard({
           </div>
           <p className="text-xs text-muted-foreground">{session.meta}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Delete workout ${session.date}`}
-          className="shrink-0 text-muted-foreground hover:text-destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="size-5" />
-        </Button>
+        <div className="flex shrink-0 items-center">
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-primary"
+          >
+            <Link
+              href={`/workout/${session.id}?edit=1`}
+              aria-label={`Edit workout ${session.date}`}
+            >
+              <Pencil className="size-5" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Delete workout ${session.date}`}
+            className="text-muted-foreground hover:text-destructive"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-5" />
+          </Button>
+        </div>
       </div>
 
       {/* Stats strip: duration + push/pull volume. */}
