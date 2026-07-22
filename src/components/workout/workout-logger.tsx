@@ -11,6 +11,7 @@ import {
   History,
   Info,
   Loader2,
+  Pencil,
   Play,
   Plus,
   RotateCcw,
@@ -318,7 +319,12 @@ export function WorkoutLogger({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle",
   );
-  const readOnly = session.status !== "planned";
+  // A completed/skipped session opened from history. Its logger renders
+  // read-only until the athlete taps "Edit", which unlocks the same inputs
+  // used to log a live workout so past data can be corrected.
+  const historical = session.status !== "planned";
+  const [isEditing, setIsEditing] = useState(false);
+  const readOnly = historical && !isEditing;
 
   // Workout duration: accumulated seconds from previous visits (frozen at
   // mount) plus the time this page has been open. Persisted on every save,
@@ -330,7 +336,9 @@ export function WorkoutLogger({
 
   /** Elapsed workout seconds right now — for saves (called in handlers). */
   function currentElapsedSeconds(): number {
-    if (readOnly) return baseSeconds;
+    // Editing history must never inflate the recorded duration: the clock is
+    // only live while training a planned session, frozen otherwise.
+    if (readOnly || historical) return baseSeconds;
     return baseSeconds + Math.max(0, Math.floor((Date.now() - openedAt) / 1000));
   }
 
@@ -446,8 +454,11 @@ export function WorkoutLogger({
     [sections],
   );
 
-  const [entries, setEntries] = useState<EntryState[]>(() =>
-    plannedDay.exercises.map((we) => {
+  // Seed logger state from the session's saved entries (a resumed or
+  // completed workout) or, for a fresh planned session, from the plan. Kept a
+  // named builder so cancelling an edit can restore the untouched values.
+  function buildInitialEntries(): EntryState[] {
+    return plannedDay.exercises.map((we) => {
       const existing = session.entries.find(
         (e) => e.workoutExerciseId === we.id,
       );
@@ -501,8 +512,10 @@ export function WorkoutLogger({
           eccentricReps: "",
         })),
       };
-    }),
-  );
+    });
+  }
+
+  const [entries, setEntries] = useState<EntryState[]>(buildInitialEntries);
 
   function updateEntry(
     workoutExerciseId: string,
@@ -579,7 +592,9 @@ export function WorkoutLogger({
           : s,
       ),
     }));
-    if (done) {
+    // Rest timers belong to a live workout — editing history just corrects
+    // recorded sets, so ticking a box there must not start one.
+    if (done && !historical) {
       const nextLabel = nextUpLabel(we, entry, setIndex);
       // Foreground rest = the in-app bar only. The service worker takes
       // over (with a notification) only if the app goes to the background
@@ -737,12 +752,55 @@ export function WorkoutLogger({
     }
   }
 
+  /**
+   * Persist edits to a completed workout, keeping it completed. Reuses the
+   * "complete" action so the history + progress caches refresh (the run is
+   * already finished, so this never re-triggers completion navigation). Stays
+   * on the page and drops back to the read-only view on success.
+   */
+  async function saveEdits() {
+    if (pending) return;
+    setPendingAction("complete");
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    try {
+      await submitMutation.mutateAsync("complete");
+      // Drop fully-empty sets (the save discarded them too) so the read-only
+      // view matches exactly what was persisted.
+      setEntries((prev) =>
+        prev.map((en) => ({
+          ...en,
+          sets: en.sets.filter(
+            (s) =>
+              s.reps !== "" ||
+              s.eccentricReps !== "" ||
+              s.parts.some((p) => p.reps !== ""),
+          ),
+        })),
+      );
+      setIsEditing(false);
+      setPendingAction(null);
+      toast("Workout updated");
+    } catch {
+      setPendingAction(null);
+    }
+  }
+
+  /** Discard in-progress edits and restore the workout's saved values. */
+  function cancelEdit() {
+    if (pending) return;
+    setEntries(buildInitialEntries());
+    setIsEditing(false);
+  }
+
   // Autosave the draft so backgrounding the app never loses recorded values:
   // debounced after every change, flushed immediately when the app hides.
   const autosaveRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     autosaveRef.current = () => {
-      if (readOnly || pending) return;
+      // No background autosave when editing history — the athlete saves those
+      // corrections explicitly, and the draft path would fight the frozen
+      // duration and completed status.
+      if (readOnly || pending || historical) return;
       // Keep the in-flight promise so an explicit submit can await it before
       // navigating (see submit()). mutateAsync rejects on error; both outcomes
       // settle to void here so that await never throws. Status is driven by the
@@ -917,7 +975,10 @@ export function WorkoutLogger({
             {session.status !== "planned" && (
               <Badge variant="secondary">{session.status}</Badge>
             )}
-            {!readOnly && (
+            {isEditing && (
+              <Badge className="bg-primary/15 text-primary">Editing</Badge>
+            )}
+            {!readOnly && !historical && (
               <span className="flex items-center gap-1 font-medium tabular-nums text-foreground">
                 <Timer className="size-4 text-primary" />
                 <WorkoutClock baseSeconds={baseSeconds} openedAt={openedAt} />
@@ -1522,7 +1583,50 @@ export function WorkoutLogger({
         </section>
       ))}
 
-      {!readOnly && (
+      {/* Read-only history: offer to unlock the same inputs for corrections. */}
+      {readOnly && historical && (
+        <div className="pb-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            size="lg"
+            onClick={() => setIsEditing(true)}
+          >
+            <Pencil className="size-4" /> Edit workout
+          </Button>
+        </div>
+      )}
+
+      {/* Editing a past workout: save the corrections or discard them. */}
+      {historical && isEditing && (
+        <div className="flex gap-2 pb-4">
+          <Button
+            className="flex-1"
+            size="lg"
+            disabled={pending}
+            onClick={saveEdits}
+          >
+            {pending && pendingAction === "complete" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <>
+                <Check className="size-4" /> Save changes
+              </>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            className="flex-1"
+            size="lg"
+            disabled={pending}
+            onClick={cancelEdit}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {!readOnly && !historical && (
         <div className="space-y-2 pb-4">
           <Button
             className="w-full"
