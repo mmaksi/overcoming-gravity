@@ -3,7 +3,11 @@ import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import { getCachedExercises } from "@/lib/data/cached";
 import { buildVolumeStats } from "@/lib/domain/volume";
-import { exerciseNoteKey, WorkoutDay } from "@/lib/domain/schemas";
+import {
+  exerciseNoteKey,
+  sessionWorkoutDay,
+  WorkoutDay,
+} from "@/lib/domain/schemas";
 import { WeekFocus } from "@/lib/domain/types";
 import { isPro } from "@/lib/billing/entitlements";
 import { WinBackPaywall } from "@/components/billing/win-back-paywall";
@@ -57,7 +61,17 @@ export default async function WorkoutPage({
     plannedDay = workout.day;
     title = workout.title;
   }
-  if (!plannedDay) notFound();
+
+  if (session.status !== "planned") {
+    // A recorded session is an immutable snapshot: render exactly what was
+    // logged, reconstructed from its own entries. The plan (which may have
+    // been edited, or no longer cover this day) is only best-effort
+    // enrichment — so this also never 404s a completed workout whose plan
+    // changed shape.
+    plannedDay = sessionWorkoutDay(session, plannedDay);
+  } else if (!plannedDay) {
+    notFound();
+  }
 
   // Only the exercises planned for this day need stats — so we fetch just the
   // completed sessions that reference them, not the athlete's whole history.

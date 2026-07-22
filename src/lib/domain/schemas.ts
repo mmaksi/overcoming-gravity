@@ -578,6 +578,68 @@ export const workoutSessionSchema = z
 export type WorkoutSession = z.infer<typeof workoutSessionSchema>;
 
 /**
+ * The workout day exactly as a *recorded* session was performed — rebuilt from
+ * the session's own entries, not the live program plan.
+ *
+ * A completed or skipped session is an immutable snapshot. The plan it came
+ * from keeps changing: editing a program re-creates workout-exercise ids and
+ * can swap progressions, add techniques, or change sets, so matching a stored
+ * entry back to the current plan by `workoutExerciseId` silently fails and the
+ * logger would otherwise show the *current* plan instead of what was logged
+ * (and, worse, an edit would then overwrite the real snapshot with plan data).
+ *
+ * So the entries are the source of truth here: one exercise per entry, in
+ * stored order, carrying the progression, technique, unit and notes actually
+ * performed. The current plan is consulted only as best-effort enrichment for
+ * cosmetic fields (rest, tempo, grouping, planned targets), matched by
+ * `workoutExerciseId` when that id still exists — otherwise sensible defaults.
+ */
+export function sessionWorkoutDay(
+  session: WorkoutSession,
+  planDay: WorkoutDay | undefined,
+): WorkoutDay {
+  const planById = new Map(
+    (planDay?.exercises ?? []).map((we) => [we.id, we]),
+  );
+  const exercises: WorkoutExercise[] = session.entries.map((entry) => {
+    const plan = planById.get(entry.workoutExerciseId);
+    // Planned set targets only feed placeholders in the read-only view; keep
+    // the plan's when the exercise still matches, else mirror the count logged.
+    const sets: SetPlan[] =
+      plan?.sets ??
+      (entry.performedSets.length > 0
+        ? entry.performedSets.map((s) => ({ reps: Math.max(1, s.reps ?? 1) }))
+        : [{ reps: 1 }]);
+    return {
+      id: entry.workoutExerciseId,
+      exerciseId: entry.exerciseId,
+      progressionId: entry.progressionId,
+      sets,
+      // What was actually performed is authoritative — the entry's absence of
+      // a technique/unit/note is meaningful (the athlete did it plain), so the
+      // plan must never fill those in, or a since-edited plan leaks onto
+      // history (e.g. a hybrid technique added after the workout was logged).
+      interTechniqueId: entry.interTechniqueId,
+      measurement: entry.measurement,
+      notes: entry.notes,
+      // Purely cosmetic design fields the entry doesn't capture: enrich from
+      // the plan when the exercise still matches by id, else sensible defaults.
+      restSeconds: plan?.restSeconds ?? 90,
+      tempo: plan?.tempo,
+      clusterRestSeconds: plan?.clusterRestSeconds,
+      progressionMethod: plan?.progressionMethod ?? "intra",
+      groupId: plan?.groupId,
+      section: plan?.section,
+    };
+  });
+  return {
+    intensity: planDay?.intensity,
+    exercises,
+    groups: planDay?.groups ?? [],
+  };
+}
+
+/**
  * A user's remembered note for one exercise **progression**. Written whenever
  * the athlete logs a note while training a progression; read back to prefill
  * the note the next time they train that same progression (swapping the
