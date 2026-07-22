@@ -5,29 +5,18 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  CheckCircle2,
-  ChevronDown,
   Clock,
-  History,
-  Info,
   Loader2,
   Pencil,
-  Play,
-  Plus,
   RotateCcw,
-  Settings2,
   SkipForward,
   Timer,
-  Trophy,
-  X,
 } from "lucide-react";
 import {
   ATTRIBUTE_LABELS,
-  GROUP_TYPE_COLORS,
   GROUP_TYPE_LABELS,
   INTENSITY_LABELS,
   Measurement,
-  MEASUREMENT_UNIT,
   TABATA,
   TECHNIQUES_BY_ID,
   WEEK_FOCUS_LABELS,
@@ -39,8 +28,6 @@ import {
   daySections,
   Exercise,
   exerciseNoteKey,
-  groupConfigSummary,
-  measurementOf,
   SessionEntry,
   VolumeStats,
   WorkoutDay,
@@ -52,25 +39,8 @@ import { rememberExerciseNote, saveWorkoutSession } from "@/lib/actions/runs";
 import { queryKeys } from "@/lib/query/keys";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Toast, useToast } from "@/components/ui/toast";
-import { ExerciseSessionSheet } from "./exercise-session-sheet";
 import { RestTimer, RestTimerState } from "./rest-timer";
 import { Stopwatch } from "./stopwatch";
 import { ClimbRunner } from "./climb-runner";
@@ -78,22 +48,21 @@ import { IntervalRunner } from "./interval-runner";
 import { CircuitRunner } from "./circuit-runner";
 import {
   circuitStations,
-  isConfigurableMode,
   ModeSettings,
   ModeSettingsDialog,
-  modeSettingsSummary,
   seedModeSettings,
 } from "./mode-settings-dialog";
+import {
+  clearRest,
+  loadModeSettings,
+  loadRest,
+  saveModeSettings,
+  saveRest,
+} from "./session-storage";
+import { ExerciseCard } from "./exercise-card";
+import type { EntryState, RawPart, RawSet } from "./logging-types";
 import { cn } from "@/lib/utils";
 import { formatClock } from "@/lib/time";
-
-/** Short unit shown next to a set input: "sec" | "min" | "cluster reps" | "reps". */
-function unitOf(exercise: Exercise, measurement: Measurement): string {
-  if (measurement === "seconds") return "sec";
-  if (measurement === "minutes") return "min";
-  if (exercise.repStyle === "cluster") return "cluster reps";
-  return "reps";
-}
 
 /** The next unit in the reps → seconds → minutes cycle. */
 function nextUnit(measurement: Measurement): Measurement {
@@ -104,121 +73,12 @@ function nextUnit(measurement: Measurement): Measurement {
       : "reps";
 }
 
-function volumeLabel(
-  sets: { reps: number | null; weight?: number }[],
-  measurement: Measurement,
-): string {
-  const values = sets.map((s) => s.reps ?? "—").join("/");
-  const unit = measurement === "reps" ? " reps" : MEASUREMENT_UNIT[measurement];
-  const weighted = sets.filter((s) => s.weight !== undefined);
-  const weight =
-    weighted.length > 0
-      ? ` @ ${weighted.map((s) => s.weight).join("/")}kg`
-      : "";
-  return `${sets.length} sets · ${values}${unit}${weight}`;
-}
-
-/** One progression-slice of a hybrid set. */
-type RawPart = { progressionId: string; reps: string };
-
-/**
- * Digits only, plus a single decimal point when the unit allows fractions
- * (minute holds like 1.5). The athlete may also clear the field completely.
- */
-function cleanNumeric(value: string, allowDecimal: boolean): string {
-  return allowDecimal
-    ? value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1")
-    : value.replace(/\D/g, "");
-}
-
-/** Select the whole value on focus so typing replaces it immediately. */
-function selectAll(e: React.FocusEvent<HTMLInputElement>) {
-  e.target.select();
-}
-
 /** Best-effort message to the service worker (PWA installs). */
 function postToServiceWorker(message: Record<string, unknown>) {
   try {
     navigator.serviceWorker?.controller?.postMessage(message);
   } catch {
     // No service worker in dev — the in-page rest bar still works.
-  }
-}
-
-/** localStorage key for a session's in-flight rest, so it survives navigation. */
-function restKey(sessionId: string) {
-  return `strong-journal-rest:${sessionId}`;
-}
-
-function saveRest(sessionId: string, timer: RestTimerState) {
-  try {
-    localStorage.setItem(
-      restKey(sessionId),
-      JSON.stringify({
-        seconds: timer.seconds,
-        nextLabel: timer.nextLabel,
-        startedAt: timer.startedAt,
-      }),
-    );
-  } catch {
-    // Private mode / storage full — the rest bar still works this session.
-  }
-}
-
-function clearRest(sessionId: string) {
-  try {
-    localStorage.removeItem(restKey(sessionId));
-  } catch {
-    // ignore
-  }
-}
-
-/** Restore a still-running rest for this session, or null if none/expired. */
-function loadRest(sessionId: string): RestTimerState | null {
-  try {
-    const raw = localStorage.getItem(restKey(sessionId));
-    if (!raw) return null;
-    const { seconds, nextLabel, startedAt } = JSON.parse(raw);
-    if (
-      typeof seconds !== "number" ||
-      typeof startedAt !== "number" ||
-      Date.now() - startedAt >= seconds * 1000
-    ) {
-      localStorage.removeItem(restKey(sessionId));
-      return null;
-    }
-    return { id: 1, seconds, nextLabel: nextLabel ?? "", startedAt };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * localStorage key for a session's workout-time mode settings (superset rest,
- * pyramid climb shape, …), so they survive leaving and returning to the page
- * without a single server write.
- */
-function modesKey(sessionId: string) {
-  return `strong-journal-modes:${sessionId}`;
-}
-
-function loadModeSettings(sessionId: string): Record<string, ModeSettings> {
-  try {
-    const raw = localStorage.getItem(modesKey(sessionId));
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveModeSettings(
-  sessionId: string,
-  settings: Record<string, ModeSettings>,
-) {
-  try {
-    localStorage.setItem(modesKey(sessionId), JSON.stringify(settings));
-  } catch {
-    // Private mode / storage full — settings still hold for this visit.
   }
 }
 
@@ -242,28 +102,6 @@ function WorkoutClock({
     baseSeconds + Math.max(0, Math.floor((now - openedAt) / 1000)),
   );
 }
-
-/** Editable raw inputs: empty string = "not recorded yet". */
-type RawSet = {
-  reps: string;
-  weight: string;
-  /** Marked finished by the athlete — starts the rest timer. */
-  done: boolean;
-  /** Hybrid sets: reps per progression inside this one set. */
-  parts: RawPart[];
-  /** Hybrid + eccentrics: eccentric reps after the dynamic ones. */
-  eccentricReps: string;
-};
-type EntryState = {
-  workoutExerciseId: string;
-  exerciseId: string;
-  progressionId: string;
-  interTechniqueId?: string;
-  notes?: string;
-  /** The unit the athlete is logging in — switchable mid-workout. */
-  measurement?: Measurement;
-  sets: RawSet[];
-};
 
 export function WorkoutLogger({
   session,
@@ -521,6 +359,82 @@ export function WorkoutLogger({
         e.workoutExerciseId === workoutExerciseId ? updater(e) : e,
       ),
     );
+  }
+
+  /** Shallow-merge the given fields into one set of an entry, by index. */
+  function updateSet(
+    workoutExerciseId: string,
+    setIndex: number,
+    patch: Partial<RawSet>,
+  ) {
+    updateEntry(workoutExerciseId, (en) => ({
+      ...en,
+      sets: en.sets.map((x, k) => (k === setIndex ? { ...x, ...patch } : x)),
+    }));
+  }
+
+  /** Transform the hybrid progression-parts of one set of an entry, by index. */
+  function updateSetParts(
+    workoutExerciseId: string,
+    setIndex: number,
+    updater: (parts: RawPart[]) => RawPart[],
+  ) {
+    updateEntry(workoutExerciseId, (en) => ({
+      ...en,
+      sets: en.sets.map((x, k) =>
+        k === setIndex ? { ...x, parts: updater(x.parts) } : x,
+      ),
+    }));
+  }
+
+  /**
+   * Apply an edit from the exercise detail sheet (progression swap, technique,
+   * notes). Notes are per progression: swapping progressions stashes and
+   * persists the note being left, then surfaces the target's remembered note.
+   */
+  function handleSheetChange(
+    workoutExerciseId: string,
+    patch: {
+      progressionId?: string;
+      interTechniqueId?: string | null;
+      notes?: string;
+    },
+  ) {
+    updateEntry(workoutExerciseId, (en) => {
+      const next = { ...en };
+      if (
+        patch.progressionId !== undefined &&
+        patch.progressionId !== en.progressionId
+      ) {
+        const oldKey = exerciseNoteKey(en.exerciseId, en.progressionId);
+        notesByProgression.current[oldKey] = en.notes ?? "";
+        if (en.notes?.trim()) {
+          rememberNoteMutation.mutate({
+            exerciseId: en.exerciseId,
+            progressionId: en.progressionId,
+            note: en.notes.trim(),
+          });
+        }
+        next.progressionId = patch.progressionId;
+        next.notes =
+          notesByProgression.current[
+            exerciseNoteKey(en.exerciseId, patch.progressionId)
+          ] || undefined;
+      }
+      if (patch.notes !== undefined) next.notes = patch.notes;
+      if (patch.interTechniqueId !== undefined) {
+        next.interTechniqueId = patch.interTechniqueId ?? undefined;
+        // Prefill the remembered note for the current progression when
+        // nothing has been typed yet.
+        if (!next.notes?.trim()) {
+          next.notes =
+            notesByProgression.current[
+              exerciseNoteKey(en.exerciseId, next.progressionId)
+            ];
+        }
+      }
+      return next;
+    });
   }
 
   /**
@@ -1024,541 +938,34 @@ export function WorkoutLogger({
             if (!entry) return null;
             const ex = exercisesById.get(entry.exerciseId);
             if (!ex) return null;
-            const progression = ex.progressions.find(
-              (p) => p.id === entry.progressionId,
-            );
-            const key = statsKey(entry.exerciseId, entry.progressionId);
-            const last = stats[key]?.last;
-            const max = stats[key]?.maxReps;
-            const swapped = entry.progressionId !== we.progressionId;
-            const technique = entry.interTechniqueId
-              ? TECHNIQUES_BY_ID.get(entry.interTechniqueId)
-              : undefined;
-            const isHybrid = technique?.kind === "hybrid";
-            const isHybridEcc = technique?.kind === "hybrid_eccentric";
-            const prev = sectionExercises[i - 1];
-            const group = we.groupId
-              ? (plannedDay.groups ?? []).find((g) => g.id === we.groupId)
-              : undefined;
-            const isGroupStart =
-              group && (!prev || prev.groupId !== we.groupId);
-            const measurement = measurementOf(
-              ex,
-              entry.progressionId,
-              entry.measurement ?? we.measurement,
-            );
-            const unit = unitOf(ex, measurement);
-            const allDone =
-              entry.sets.length > 0 && entry.sets.every((s) => s.done);
-
             return (
-              <div key={we.id}>
-                {isGroupStart && group && (
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                        GROUP_TYPE_COLORS[group.type].badge,
-                      )}
-                    >
-                      {GROUP_TYPE_LABELS[group.type]}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                      {isConfigurableMode(group.type)
-                        ? modeSettingsSummary(group.type, settingsOf(group))
-                        : groupConfigSummary(group)}
-                    </span>
-                    {!readOnly && isConfigurableMode(group.type) && (
-                      <button
-                        type="button"
-                        aria-label={`${GROUP_TYPE_LABELS[group.type]} settings`}
-                        title="Mode settings"
-                        onClick={() => setSettingsFor(group.id)}
-                        className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        <Settings2 className="size-4" />
-                      </button>
-                    )}
-                    {!readOnly &&
-                      (group.type === "pyramid" ||
-                        group.type === "ladder" ||
-                        group.type === "hiit" ||
-                        group.type === "tabata" ||
-                        group.type === "circuit") && (
-                        <Button
-                          size="sm"
-                          className="h-7 shrink-0 rounded-full px-3"
-                          onClick={() => {
-                            setRunnerRun((n) => n + 1);
-                            setRunnerFor(group.id);
-                          }}
-                        >
-                          <Play className="size-3.5" /> Start
-                        </Button>
-                      )}
-                  </div>
-                )}
-                <Card
-                  className={cn(
-                    "gap-3 py-4 transition-opacity",
-                    group &&
-                      `border-l-4 ${GROUP_TYPE_COLORS[group.type].border}`,
-                    allDone && "opacity-70",
-                  )}
-                >
-                  <CardHeader className="px-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <button
-                        type="button"
-                        className="min-w-0 text-left"
-                        onClick={() => setOpenSheetFor(we.id)}
-                      >
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <span className="truncate text-primary">
-                            {ex.title}
-                          </span>
-                          <Info className="size-4 shrink-0 text-muted-foreground" />
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                          <span
-                            className={cn(
-                              "font-medium text-sky-600 dark:text-sky-400",
-                              swapped && "text-primary",
-                            )}
-                          >
-                            {progression?.name}
-                            {swapped && " (swapped)"}
-                          </span>{" "}
-                          {we.tempo ? ` · tempo ${we.tempo}` : ""} · rest{" "}
-                          {we.restSeconds}s
-                          {ex.repStyle === "cluster" &&
-                            ` · ${we.clusterRestSeconds ?? 15}s between cluster reps`}
-                          {technique ? ` · ${technique.name}` : ""}
-                        </CardDescription>
-                      </button>
-                      <CheckCircle2
-                        aria-label={allDone ? "Exercise done" : undefined}
-                        className={cn(
-                          "size-6 shrink-0",
-                          allDone ? "text-primary" : "text-muted-foreground/30",
-                        )}
-                      />
-                    </div>
-                    <div className="space-y-0.5">
-                      {last && (
-                        <p className="flex items-center gap-1 text-xs text-primary">
-                          <History className="size-3" />
-                          Last time ({last.date}):{" "}
-                          {volumeLabel(last.performedSets, measurement)}
-                        </p>
-                      )}
-                      {max != null && (
-                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Trophy className="size-3" />
-                          Best single set: {max}
-                          {measurement === "reps"
-                            ? " reps"
-                            : MEASUREMENT_UNIT[measurement]}
-                        </p>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2.5 px-4">
-                    {entry.sets.map((s, j) => (
-                      <div key={j} className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            aria-label={`Mark set ${j + 1} done`}
-                            className="size-6 shrink-0 accent-primary"
-                            disabled={readOnly}
-                            checked={s.done}
-                            onChange={(e) =>
-                              toggleSetDone(we, j, e.target.checked)
-                            }
-                          />
-                          {/* To-Failure: the last set is the one taken to
-                              failure — labelled so it can't be missed. */}
-                          {group?.type === "to_failure" &&
-                          j === entry.sets.length - 1 ? (
-                            <span
-                              className={cn(
-                                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                                GROUP_TYPE_COLORS.to_failure.badge,
-                              )}
-                            >
-                              To-Failure
-                            </span>
-                          ) : (
-                            <span className="w-9 shrink-0 text-xs text-muted-foreground">
-                              Set {j + 1}
-                            </span>
-                          )}
-                          {!isHybrid && (
-                            <Input
-                              type="text"
-                              inputMode={
-                                measurement === "minutes" ? "decimal" : "numeric"
-                              }
-                              pattern={
-                                measurement === "minutes" ? "[0-9.]*" : "[0-9]*"
-                              }
-                              disabled={readOnly}
-                              placeholder={String(placeholderFor(entry, we, j))}
-                              value={s.reps}
-                              onFocus={selectAll}
-                              onChange={(e) =>
-                                updateEntry(we.id, (en) => ({
-                                  ...en,
-                                  sets: en.sets.map((x, k) =>
-                                    k === j
-                                      ? {
-                                          ...x,
-                                          reps: cleanNumeric(
-                                            e.target.value,
-                                            measurement === "minutes",
-                                          ),
-                                        }
-                                      : x,
-                                  ),
-                                }))
-                              }
-                            />
-                          )}
-                          {!isHybrid &&
-                            (isHybridEcc ? (
-                              <span className="w-12 shrink-0 text-xs text-muted-foreground">
-                                dyn.
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={readOnly}
-                                onClick={() => cycleUnit(we.id, measurement)}
-                                title="Tap to switch unit: reps → seconds → minutes"
-                                className="flex w-12 shrink-0 items-center gap-0.5 text-left text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-100"
-                              >
-                                {unit}
-                                {!readOnly && (
-                                  <ChevronDown className="size-3 shrink-0" />
-                                )}
-                              </button>
-                            ))}
-                          {isHybridEcc ? (
-                            <>
-                              <Input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                placeholder="0"
-                                disabled={readOnly}
-                                value={s.eccentricReps}
-                                onFocus={selectAll}
-                                onChange={(e) =>
-                                  updateEntry(we.id, (en) => ({
-                                    ...en,
-                                    sets: en.sets.map((x, k) =>
-                                      k === j
-                                        ? {
-                                            ...x,
-                                            eccentricReps: cleanNumeric(
-                                              e.target.value,
-                                              false,
-                                            ),
-                                          }
-                                        : x,
-                                    ),
-                                  }))
-                                }
-                              />
-                              <span className="shrink-0 text-xs text-muted-foreground">
-                                ecc.
-                              </span>
-                            </>
-                          ) : (
-                            !isHybrid && (
-                              <>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={0.5}
-                                  inputMode="decimal"
-                                  placeholder="—"
-                                  disabled={readOnly}
-                                  value={s.weight}
-                                  onFocus={selectAll}
-                                  onChange={(e) =>
-                                    updateEntry(we.id, (en) => ({
-                                      ...en,
-                                      sets: en.sets.map((x, k) =>
-                                        k === j
-                                          ? { ...x, weight: e.target.value }
-                                          : x,
-                                      ),
-                                    }))
-                                  }
-                                />
-                                <span className="shrink-0 text-xs text-muted-foreground">
-                                  kg
-                                </span>
-                              </>
-                            )
-                          )}
-                        </div>
-
-                        {/* Hybrid sets: any number of reps across several
-                            progressions inside this one set. */}
-                        {isHybrid && (
-                          <div className="space-y-1.5 pl-8">
-                            {s.parts.map((part, pi) => (
-                              <div key={pi} className="flex items-center gap-2">
-                                <Select
-                                  value={part.progressionId}
-                                  disabled={readOnly}
-                                  onValueChange={(progressionId) =>
-                                    updateEntry(we.id, (en) => ({
-                                      ...en,
-                                      sets: en.sets.map((x, k) =>
-                                        k === j
-                                          ? {
-                                              ...x,
-                                              parts: x.parts.map((p, q) =>
-                                                q === pi
-                                                  ? { ...p, progressionId }
-                                                  : p,
-                                              ),
-                                            }
-                                          : x,
-                                      ),
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger className="min-w-0 flex-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ex.progressions.map((p) => (
-                                      <SelectItem key={p.id} value={p.id}>
-                                        {p.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  placeholder="0"
-                                  disabled={readOnly}
-                                  className="w-20 shrink-0"
-                                  value={part.reps}
-                                  onFocus={selectAll}
-                                  onChange={(e) =>
-                                    updateEntry(we.id, (en) => ({
-                                      ...en,
-                                      sets: en.sets.map((x, k) =>
-                                        k === j
-                                          ? {
-                                              ...x,
-                                              parts: x.parts.map((p, q) =>
-                                                q === pi
-                                                  ? {
-                                                      ...p,
-                                                      reps: cleanNumeric(
-                                                        e.target.value,
-                                                        false,
-                                                      ),
-                                                    }
-                                                  : p,
-                                              ),
-                                            }
-                                          : x,
-                                      ),
-                                    }))
-                                  }
-                                />
-                                {s.parts.length > 1 && !readOnly && (
-                                  <button
-                                    type="button"
-                                    aria-label="Remove progression from set"
-                                    className="p-1 text-muted-foreground hover:text-foreground"
-                                    onClick={() =>
-                                      updateEntry(we.id, (en) => ({
-                                        ...en,
-                                        sets: en.sets.map((x, k) =>
-                                          k === j
-                                            ? {
-                                                ...x,
-                                                parts: x.parts.filter(
-                                                  (_, q) => q !== pi,
-                                                ),
-                                              }
-                                            : x,
-                                        ),
-                                      }))
-                                    }
-                                  >
-                                    <X className="size-4" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                            {!readOnly && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  updateEntry(we.id, (en) => ({
-                                    ...en,
-                                    sets: en.sets.map((x, k) =>
-                                      k === j
-                                        ? {
-                                            ...x,
-                                            parts: [
-                                              ...x.parts,
-                                              {
-                                                progressionId:
-                                                  ex.progressions[0].id,
-                                                reps: "",
-                                              },
-                                            ],
-                                          }
-                                        : x,
-                                    ),
-                                  }))
-                                }
-                              >
-                                <Plus className="size-4" /> Progression in this
-                                set
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {!readOnly && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            updateEntry(we.id, (en) => ({
-                              ...en,
-                              sets: [
-                                ...en.sets,
-                                {
-                                  reps: "",
-                                  weight: "",
-                                  done: false,
-                                  parts: [
-                                    {
-                                      progressionId: en.progressionId,
-                                      reps: "",
-                                    },
-                                  ],
-                                  eccentricReps: "",
-                                },
-                              ],
-                            }))
-                          }
-                        >
-                          + set
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={entry.sets.length <= 1}
-                          onClick={() =>
-                            updateEntry(we.id, (en) => ({
-                              ...en,
-                              sets: en.sets.slice(0, -1),
-                            }))
-                          }
-                        >
-                          − set
-                        </Button>
-                      </div>
-                    )}
-                    {/* Notes are always available and remembered per
-                        progression, so they resurface every time you train
-                        that progression. */}
-                    <Textarea
-                      placeholder={
-                        technique?.prompt ??
-                        (we.progressionMethod === "inter"
-                          ? "Manual progression notes (inter-exercise progression)…"
-                          : "Notes for this exercise (remembered next time)…")
-                      }
-                      disabled={readOnly}
-                      value={entry.notes ?? ""}
-                      onChange={(e) =>
-                        updateEntry(we.id, (en) => ({
-                          ...en,
-                          notes: e.target.value,
-                        }))
-                      }
-                    />
-                  </CardContent>
-                </Card>
-
-                <ExerciseSessionSheet
-                  open={openSheetFor === we.id}
-                  onOpenChange={(o) => setOpenSheetFor(o ? we.id : null)}
-                  exercise={ex}
-                  planned={we}
-                  progressionId={entry.progressionId}
-                  interTechniqueId={entry.interTechniqueId}
-                  notes={entry.notes}
-                  stats={stats}
-                  readOnly={readOnly}
-                  onChange={(patch) =>
-                    updateEntry(we.id, (en) => {
-                      const next = { ...en };
-                      if (
-                        patch.progressionId !== undefined &&
-                        patch.progressionId !== en.progressionId
-                      ) {
-                        // Notes are per progression: stash the current text
-                        // under the progression being left (and persist it —
-                        // the session save only carries the final
-                        // progression's note), then surface the target
-                        // progression's own remembered note.
-                        const oldKey = exerciseNoteKey(
-                          en.exerciseId,
-                          en.progressionId,
-                        );
-                        notesByProgression.current[oldKey] = en.notes ?? "";
-                        if (en.notes?.trim()) {
-                          rememberNoteMutation.mutate({
-                            exerciseId: en.exerciseId,
-                            progressionId: en.progressionId,
-                            note: en.notes.trim(),
-                          });
-                        }
-                        next.progressionId = patch.progressionId;
-                        next.notes =
-                          notesByProgression.current[
-                            exerciseNoteKey(en.exerciseId, patch.progressionId)
-                          ] || undefined;
-                      }
-                      if (patch.notes !== undefined) next.notes = patch.notes;
-                      if (patch.interTechniqueId !== undefined) {
-                        next.interTechniqueId =
-                          patch.interTechniqueId ?? undefined;
-                        // Prefill the remembered note for the current
-                        // progression when nothing has been typed yet.
-                        if (!next.notes?.trim()) {
-                          next.notes =
-                            notesByProgression.current[
-                              exerciseNoteKey(en.exerciseId, next.progressionId)
-                            ];
-                        }
-                      }
-                      return next;
-                    })
-                  }
-                />
-              </div>
+              <ExerciseCard
+                key={we.id}
+                we={we}
+                prev={sectionExercises[i - 1]}
+                entry={entry}
+                ex={ex}
+                stats={stats}
+                plannedDay={plannedDay}
+                readOnly={readOnly}
+                sheetOpen={openSheetFor === we.id}
+                settingsOf={settingsOf}
+                updateEntry={updateEntry}
+                updateSet={updateSet}
+                updateSetParts={updateSetParts}
+                toggleSetDone={toggleSetDone}
+                cycleUnit={cycleUnit}
+                placeholderFor={placeholderFor}
+                onOpenSettings={(groupId) => setSettingsFor(groupId)}
+                onStartRunner={(groupId) => {
+                  setRunnerRun((n) => n + 1);
+                  setRunnerFor(groupId);
+                }}
+                onSheetOpenChange={(open) =>
+                  setOpenSheetFor(open ? we.id : null)
+                }
+                onSheetChange={handleSheetChange}
+              />
             );
           })}
         </section>
