@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronRight, Layers, Lock } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
-import { getCachedExercises, getCachedUserPrograms } from "@/lib/data/cached";
+import { getCachedUserPrograms } from "@/lib/data/cached";
 import { isPro } from "@/lib/billing/entitlements";
 import {
   PERIODIZATION_LABELS,
@@ -11,17 +11,16 @@ import {
 } from "@/lib/domain/types";
 import { Badge } from "@/components/ui/badge";
 import { CreateProgramCta } from "@/components/programs/create-program-cta";
-import { ExerciseLibrary } from "@/components/exercise/exercise-library";
 import { IndividualWorkouts } from "@/components/workouts/individual-workouts";
 
 export default async function ProgramsPage() {
   const user = await requireUser();
   const store = await getStore();
   // Cached per user for a day; program/workout/run mutations bust the tag.
-  const [{ programs, runs, customWorkouts }, exercises] = await Promise.all([
-    getCachedUserPrograms(store, user.id),
-    getCachedExercises(store),
-  ]);
+  const { programs, runs, customWorkouts } = await getCachedUserPrograms(
+    store,
+    user.id,
+  );
   // "Active" = programs the athlete is currently following (several can run
   // at the same time).
   const activeProgramIds = new Set(
@@ -95,9 +94,6 @@ export default async function ProgramsPage() {
         isProUser={isPro(user)}
         showTrial={!user.hadSubscription}
       />
-
-      {/* Read-only catalog browser — free for every plan. */}
-      <ExerciseLibrary exercises={exercises} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   CalendarIcon,
   HomeIcon,
   ShieldIcon,
+  ToolkitIcon,
   TrainingIcon,
 } from "@/components/shell/nav-icons";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ const items = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/programs", label: "Training", icon: TrainingIcon },
   { href: "/calendar", label: "Calendar", icon: CalendarIcon },
+  { href: "/toolkit", label: "Toolkit", icon: ToolkitIcon },
 ];
 
 export function BottomNav({ isAdmin }: { isAdmin: boolean }) {

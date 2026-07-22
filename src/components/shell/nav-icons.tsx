@@ -49,6 +49,18 @@ export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Drafting compass: a pivot with two splayed legs — the Toolkit tab. */
+export function ToolkitIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 3.5v4" />
+      <path d="m12 7.5-4 13" />
+      <path d="m12 7.5 4 13" />
+      <path d="M10 14h4" />
+    </svg>
+  );
+}
+
 /** Angular shield with a check: the admin area. */
 export function ShieldIcon(props: SVGProps<SVGSVGElement>) {
   return (
