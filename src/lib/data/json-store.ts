@@ -8,6 +8,7 @@ import {
   DefaultTemplate,
   Exercise,
   ExerciseNote,
+  ExerciseNoteKey,
   Feedback,
   planFromStatus,
   Profile,
@@ -402,6 +403,18 @@ export class JsonStore implements DataStore {
       else db.data.exerciseNotes[i] = note;
     }
     await db.write();
+  }
+  async deleteExerciseNotes(keys: ExerciseNoteKey[]): Promise<void> {
+    if (keys.length === 0) return;
+    const db = await getDb();
+    const drop = new Set(
+      keys.map((k) => `${k.userId}:${k.exerciseId}:${k.progressionId}`),
+    );
+    const before = db.data.exerciseNotes.length;
+    db.data.exerciseNotes = db.data.exerciseNotes.filter(
+      (n) => !drop.has(`${n.userId}:${n.exerciseId}:${n.progressionId}`),
+    );
+    if (db.data.exerciseNotes.length !== before) await db.write();
   }
 
   // Users -----------------------------------------------------------------

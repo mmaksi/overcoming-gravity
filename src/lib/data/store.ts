@@ -4,6 +4,7 @@ import {
   DefaultTemplate,
   Exercise,
   ExerciseNote,
+  ExerciseNoteKey,
   Feedback,
   Profile,
   ProfileStats,
@@ -135,6 +136,11 @@ export interface DataStore {
     exerciseIds?: string[],
   ): Promise<ExerciseNote[]>;
   saveExerciseNotes(notes: ExerciseNote[]): Promise<void>;
+  /**
+   * Forget remembered notes by (userId, exerciseId, progressionId) key — used
+   * when an athlete clears a note's text. A no-op for keys with no stored note.
+   */
+  deleteExerciseNotes(keys: ExerciseNoteKey[]): Promise<void>;
 
   // Users -----------------------------------------------------------------
   getProfile(userId: string): Promise<Profile | null>;

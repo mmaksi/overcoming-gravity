@@ -7,6 +7,7 @@ import {
   DefaultTemplate,
   Exercise,
   ExerciseNote,
+  ExerciseNoteKey,
   Feedback,
   isTimeMeasurement,
   planFromStatus,
@@ -618,6 +619,35 @@ class SupabaseStore implements DataStore {
         )
         .select("exercise_id"),
     );
+  }
+  async deleteExerciseNotes(keys: ExerciseNoteKey[]): Promise<void> {
+    if (keys.length === 0) return;
+    // Progression id lives in the reused `technique_id` column (see
+    // listExerciseNotes). One delete per user; the OR matches each cleared
+    // note's (exercise, progression) pair. Ids are UUIDs/slugs, so no PostgREST
+    // filter escaping is needed.
+    const byUser = new Map<string, ExerciseNoteKey[]>();
+    for (const key of keys) {
+      const group = byUser.get(key.userId) ?? [];
+      group.push(key);
+      byUser.set(key.userId, group);
+    }
+    for (const [userId, userKeys] of byUser) {
+      const or = userKeys
+        .map(
+          (k) =>
+            `and(exercise_id.eq.${k.exerciseId},technique_id.eq.${k.progressionId})`,
+        )
+        .join(",");
+      orThrow(
+        await this.db
+          .from("exercise_notes")
+          .delete()
+          .eq("user_id", userId)
+          .or(or)
+          .select("exercise_id"),
+      );
+    }
   }
 
   // Users -----------------------------------------------------------------

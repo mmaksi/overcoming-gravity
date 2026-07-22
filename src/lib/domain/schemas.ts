@@ -658,6 +658,12 @@ export const exerciseNoteSchema = z.object({
 });
 export type ExerciseNote = z.infer<typeof exerciseNoteSchema>;
 
+/** Identifies a remembered note without its text — used to delete cleared notes. */
+export type ExerciseNoteKey = Pick<
+  ExerciseNote,
+  "userId" | "exerciseId" | "progressionId"
+>;
+
 /** Map key for remembered-note lookups (one note per exercise progression). */
 export function exerciseNoteKey(exerciseId: string, progressionId: string) {
   return `${exerciseId}:${progressionId}`;

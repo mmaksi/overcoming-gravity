@@ -160,6 +160,22 @@ export async function saveWorkoutSession(input: {
         updatedAt: now,
       })),
   );
+  // Clearing a note's text forgets the remembered note (an emptied note is
+  // upserted by nothing above, so without this its old text would linger). Only
+  // on explicit saves — the 2.5s autosave would otherwise add a delete round
+  // trip covering every note-less exercise on every tick. Entries not in this
+  // session are untouched, so notes for other progressions still resurface.
+  if (!draft) {
+    await store.deleteExerciseNotes(
+      entries
+        .filter((entry) => !entry.notes?.trim())
+        .map((entry) => ({
+          userId: user.id,
+          exerciseId: entry.exerciseId,
+          progressionId: entry.progressionId,
+        })),
+    );
+  }
 
   // A run is finished once no planned sessions remain. Custom-workout
   // sessions have no run to complete.
