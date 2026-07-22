@@ -85,6 +85,7 @@ import {
   seedModeSettings,
 } from "./mode-settings-dialog";
 import { cn } from "@/lib/utils";
+import { formatClock } from "@/lib/time";
 
 /** Short unit shown next to a set input: "sec" | "min" | "cluster reps" | "reps". */
 function unitOf(exercise: Exercise, measurement: Measurement): string {
@@ -221,15 +222,6 @@ function saveModeSettings(
   }
 }
 
-function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const mm = String(m).padStart(2, "0");
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
 /**
  * The header's live workout clock. A leaf component so its one-second tick
  * re-renders just this text, not the whole logger tree.
@@ -246,7 +238,7 @@ function WorkoutClock({
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
-  return formatDuration(
+  return formatClock(
     baseSeconds + Math.max(0, Math.floor((now - openedAt) / 1000)),
   );
 }

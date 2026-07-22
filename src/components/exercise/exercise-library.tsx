@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ExpandableText } from "@/components/ui/expandable-text";
 import { ExerciseThumb } from "@/components/exercise/exercise-thumb";
-import { cn } from "@/lib/utils";
+import { FilterChip } from "@/components/ui/filter-chip";
 
 /** Rows rendered before any scrolling; the sentinel reveals more. */
 const INITIAL_VISIBLE = 3;
@@ -273,27 +273,3 @@ function LibraryImage({ src, alt }: { src?: string; alt: string }) {
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-sm transition-colors",
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:border-foreground/30",
-      )}
-    >
-      {label}
-    </button>
-  );
-}

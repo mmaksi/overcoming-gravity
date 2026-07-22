@@ -20,6 +20,7 @@ import {
   WeekFocus,
   WEEKDAYS,
 } from "./types";
+import { shortDuration } from "@/lib/time";
 
 // ---------------------------------------------------------------------------
 // Admin-managed content
@@ -327,11 +328,6 @@ export const exerciseGroupSchema = z.object({
   stations: z.array(circuitStationSchema).optional(),
 });
 export type ExerciseGroup = z.infer<typeof exerciseGroupSchema>;
-
-/** "90s" for odd amounts, "2 min" for whole minutes. */
-function shortDuration(seconds: number): string {
-  return seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds}s`;
-}
 
 /**
  * Compact human summary of a group's mode settings ("rest 2 min",

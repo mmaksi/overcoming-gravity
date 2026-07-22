@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated build output nested in worktrees/other dirs, and the
+    // worktrees themselves — these are not source and only bury real issues.
+    "**/.next/**",
+    ".claude/**",
   ]),
 ]);
 

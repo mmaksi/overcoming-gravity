@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { shortDuration } from "@/lib/time";
 
 /** Re-exported for the runner; the source of truth lives in the domain model. */
 export type { CircuitStation };
@@ -89,11 +90,6 @@ export function seedModeSettings(group: ExerciseGroup): ModeSettings {
     default:
       return {};
   }
-}
-
-/** "90s" for odd amounts, "2 min" for whole minutes. */
-function shortDuration(seconds: number): string {
-  return seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds}s`;
 }
 
 /** Compact summary shown beside the mode badge in the logger. */

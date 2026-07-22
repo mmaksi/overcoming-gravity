@@ -12,8 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+import { ONE_DAY_MS } from "@/lib/time";
 
 /**
  * A Stats-section card: how many personal records the athlete holds (one per

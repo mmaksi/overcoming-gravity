@@ -17,6 +17,7 @@ import {
   playSound,
   START_BEEP_SRC,
   unlockSound,
+  vibrate,
 } from "./sounds";
 
 export type CircuitSettings = {
@@ -24,15 +25,6 @@ export type CircuitSettings = {
   /** One station per exercise in the group, in planned order. */
   stations: CircuitStation[];
 };
-
-/** Best-effort haptic tick on a station change. */
-function vibrate() {
-  try {
-    navigator.vibrate?.([180, 80, 180]);
-  } catch {
-    // Unsupported — the visual change is enough.
-  }
-}
 
 /**
  * Runs a circuit live: a get-ready countdown (with its "4… 3… 2… 1" sound),

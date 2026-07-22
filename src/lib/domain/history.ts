@@ -15,6 +15,7 @@ import {
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
 import { statsKey } from "@/lib/domain/volume";
+import { formatClock } from "@/lib/time";
 
 /** Workouts fetched per history page (first render + each scroll load). */
 export const HISTORY_PAGE_SIZE = 3;
@@ -60,15 +61,6 @@ export function makeSessionLabel(
     session.runId
       ? (programNameByRun.get(session.runId) ?? "Program")
       : (customWorkoutTitles.get(session.customWorkoutId ?? "") ?? "Workout");
-}
-
-function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const mm = String(m).padStart(2, "0");
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
 /** Total reps logged in a set (hybrid parts already fold into `reps`). */
@@ -142,7 +134,7 @@ export function buildHistoryItems(
       meta: `${WEEKDAY_LABELS[session.weekday]}, week ${session.weekIndex + 1} · ${lines.length} exercises`,
       duration:
         session.durationSeconds != null
-          ? formatDuration(session.durationSeconds)
+          ? formatClock(session.durationSeconds)
           : undefined,
       pushVolume,
       pullVolume,

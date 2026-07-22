@@ -19,17 +19,8 @@ import {
   totalReps,
 } from "./climb";
 import { PREP_SECONDS } from "./interval";
-import { COUNTDOWN_SRC, createSound, playSound } from "./sounds";
+import { COUNTDOWN_SRC, createSound, playSound, vibrate } from "./sounds";
 import { cn } from "@/lib/utils";
-
-/** Best-effort haptic tick when a new step begins. */
-function vibrate() {
-  try {
-    navigator.vibrate?.([180, 80, 180]);
-  } catch {
-    // Unsupported — the visual change is enough.
-  }
-}
 
 /**
  * Runs a ladder or pyramid live: each step owns one interval of the clock —

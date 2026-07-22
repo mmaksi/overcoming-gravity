@@ -23,17 +23,9 @@ import {
   playSound,
   START_BEEP_SRC,
   unlockSound,
+  vibrate,
 } from "./sounds";
 import { cn } from "@/lib/utils";
-
-/** Best-effort haptic tick on a phase change. */
-function vibrate() {
-  try {
-    navigator.vibrate?.([180, 80, 180]);
-  } catch {
-    // Unsupported — the visual change is enough.
-  }
-}
 
 /** "4 min" for whole minutes, "3.5 min" otherwise. */
 function minutesLabel(seconds: number): string {

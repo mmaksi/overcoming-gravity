@@ -1,8 +1,18 @@
 /**
- * Sound effects for the mode runners. All best-effort: every call swallows
- * failures (SSR, autoplay policies, missing files) — the visual timers are
- * the source of truth, sound is garnish.
+ * Sound and haptic feedback for the mode runners. All best-effort: every call
+ * swallows failures (SSR, autoplay policies, missing files, unsupported
+ * hardware) — the visual timers are the source of truth, sound and buzz are
+ * garnish.
  */
+
+/** A short double-buzz marking a phase change on devices that support it. */
+export function vibrate() {
+  try {
+    navigator.vibrate?.([180, 80, 180]);
+  } catch {
+    // Unsupported — the visual change is enough.
+  }
+}
 
 /** "4… 3… 2… 1" voice for the get-ready countdown. */
 export const COUNTDOWN_SRC = "/sound-effects/4321.mp3";

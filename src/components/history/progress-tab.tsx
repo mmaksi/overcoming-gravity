@@ -5,8 +5,7 @@ import { loadExerciseRecords } from "@/lib/actions/history";
 import { queryKeys } from "@/lib/query/keys";
 import { ProgressList } from "@/components/history/progress-list";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+import { ONE_DAY_MS } from "@/lib/time";
 
 /**
  * The Progress tab's content, fetched on first visit only: Radix mounts a
