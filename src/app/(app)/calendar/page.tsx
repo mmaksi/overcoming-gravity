@@ -49,9 +49,11 @@ const MONTHS = [
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; tab?: string }>;
 }) {
-  const { month: monthParam } = await searchParams;
+  const { month: monthParam, tab: tabParam } = await searchParams;
+  // The home records card deep-links here with ?tab=progress.
+  const activeTab = tabParam === "progress" ? "progress" : "workouts";
   const user = await requireUser();
   const store = await getStore();
 
@@ -232,7 +234,7 @@ export default async function CalendarPage({
       </div>
 
       {/* History + progress, merged in from the old separate History tab. */}
-      <Tabs defaultValue="workouts" className="pt-2">
+      <Tabs defaultValue={activeTab} className="pt-2">
         <TabsList className="h-auto w-full p-1 py-5">
           <TabsTrigger
             value="workouts"
@@ -257,8 +259,8 @@ export default async function CalendarPage({
 
         <TabsContent value="progress" className="space-y-4 pt-2">
           <p className="text-sm text-muted-foreground">
-            Your current progression, method and best set in every skill and
-            strength exercise — so you know exactly what to do next workout.
+            Your personal records — the best set you&apos;ve logged in every
+            skill and strength progression you&apos;ve trained.
           </p>
           <ProgressTab />
         </TabsContent>

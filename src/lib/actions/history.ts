@@ -6,18 +6,18 @@ import { getStore } from "@/lib/data";
 import {
   getCachedCompletedPage,
   getCachedCompletedSessions,
+  getCachedExerciseNotes,
   getCachedExercises,
   getCachedUserPrograms,
 } from "@/lib/data/cached";
 import {
+  buildExerciseRecords,
   buildHistoryItems,
-  buildProgressRows,
+  ExerciseRecordGroup,
   HISTORY_PAGE_SIZE,
   HistoryItem,
   makeSessionLabel,
 } from "@/lib/domain/history";
-import { buildVolumeStats } from "@/lib/domain/volume";
-import type { ProgressRow } from "@/components/history/progress-list";
 
 const offsetSchema = z.number().int().min(0).max(100_000);
 
@@ -49,16 +49,17 @@ export async function loadHistoryPage(
 }
 
 /**
- * The Progress tab's rows, fetched only when the user opens that tab — this
- * is the heavy full-history read, so it stays out of the calendar's initial
- * render.
+ * The Progress tab's personal-record groups (and the count on the home
+ * records card), fetched only when a client first needs them — this is the
+ * heavy full-history read, so it stays out of the calendar's initial render.
  */
-export async function loadProgressRows(): Promise<ProgressRow[]> {
+export async function loadExerciseRecords(): Promise<ExerciseRecordGroup[]> {
   const user = await requireUser();
   const store = await getStore();
-  const [completed, exercises] = await Promise.all([
+  const [completed, exercises, notes] = await Promise.all([
     getCachedCompletedSessions(store, user.id),
     getCachedExercises(store),
+    getCachedExerciseNotes(store, user.id),
   ]);
-  return buildProgressRows(exercises, completed, buildVolumeStats(completed));
+  return buildExerciseRecords(exercises, completed, notes);
 }

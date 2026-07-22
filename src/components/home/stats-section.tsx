@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { GoalsAchievedCount } from "@/components/home/goals-achieved";
+import { RecordsCard } from "@/components/home/records-card";
 
 /** Simple responsive SVG line chart of weight over time. */
 function WeightChart({ entries }: { entries: BodyweightEntry[] }) {
@@ -98,6 +99,8 @@ export function StatsSection({
       <h2 className="flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-primary">
         <Activity className="size-5" /> Stats
       </h2>
+
+      <RecordsCard />
 
       {/* Streak and lifetime achieved goals sit on top, side by side. */}
       <div className="grid grid-cols-2 gap-3">

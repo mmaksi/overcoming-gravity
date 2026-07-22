@@ -1,19 +1,20 @@
 import {
+  convertMeasureValue,
   CustomWorkoutSummary,
   Exercise,
+  ExerciseNote,
   measurementOf,
   ProgramRun,
   ProgramSummary,
-  VolumeStats,
   WorkoutSession,
 } from "@/lib/domain/schemas";
 import {
+  Measurement,
   MEASUREMENT_UNIT,
   TECHNIQUES_BY_ID,
   WEEKDAY_LABELS,
 } from "@/lib/domain/types";
 import { statsKey } from "@/lib/domain/volume";
-import type { ProgressRow } from "@/components/history/progress-list";
 
 /** Workouts fetched per history page (first render + each scroll load). */
 export const HISTORY_PAGE_SIZE = 3;
@@ -150,60 +151,167 @@ export function buildHistoryItems(
   });
 }
 
-/** Unit suffix for a "best" value: " reps" | "s" | "min". */
-function bestUnit(m: ReturnType<typeof measurementOf>): string {
-  return m === "reps" ? " reps" : MEASUREMENT_UNIT[m];
-}
+// ---------------------------------------------------------------------------
+// Personal records (the Progress tab + the home records card)
+//
+// A record is the athlete's all-time best *for one progression* — not one
+// summary per exercise. "Best" ranks the heaviest added load first, then the
+// highest value (reps, or seconds/minutes of hold) at that load, so a weighted
+// pull-up at 15 kg × 5 outranks a bodyweight set of 12, and a bodyweight-only
+// progression simply keeps its highest value. Only progressions with at least
+// one recorded set appear; untrained ones are hidden.
 
-/** "Intra" or the inter-exercise technique's name — what to do next time. */
-function methodLabel(interTechniqueId?: string): string {
-  if (!interTechniqueId) return "Intra";
-  return TECHNIQUES_BY_ID.get(interTechniqueId)?.name ?? "Inter";
+/** The single best recorded set of one progression. */
+type BestSet = {
+  /** Value in the progression's own unit: reps, or seconds/minutes of hold. */
+  value: number;
+  /** Added load in kg for that set (0 = bodyweight). */
+  weightKg: number;
+};
+
+/** One trained progression's all-time record, ready to render. */
+export type ProgressionRecord = {
+  progressionId: string;
+  name: string;
+  /** 1-based position in the exercise's full progression ladder. */
+  level: number;
+  totalLevels: number;
+  /** Formatted best, e.g. "15 kg × 5", "12 reps", "1:30" (a hold). */
+  best: string;
+  /** The athlete's remembered note for this progression, if any. */
+  note?: string;
+};
+
+/** Every trained progression of one exercise, grouped for the records list. */
+export type ExerciseRecordGroup = {
+  exerciseId: string;
+  title: string;
+  attribute: "skill" | "strength";
+  records: ProgressionRecord[];
+};
+
+/** Ranks candidate sets: heavier wins, then the higher value at equal load. */
+function isBetterSet(candidate: BestSet, current: BestSet | undefined): boolean {
+  if (!current) return true;
+  if (candidate.weightKg !== current.weightKg) {
+    return candidate.weightKg > current.weightKg;
+  }
+  return candidate.value > current.value;
 }
 
 /**
- * Current progression, method and best set for every skill/strength exercise,
- * for the Progress tab.
+ * Fold completed sessions into the best recorded set per
+ * exercise+progression (keyed by `statsKey`). Values are normalized into the
+ * progression's own unit, so a hold logged once in seconds and once in minutes
+ * compares correctly. Hybrid sets credit each part's own progression (matching
+ * `buildVolumeStats`); parts carry no load, so they compete on value alone.
  */
-export function buildProgressRows(
-  exercises: Exercise[],
+export function buildProgressionBests(
   completed: WorkoutSession[],
-  stats: Record<string, VolumeStats>,
-): ProgressRow[] {
-  const currentProgression = new Map<string, string>();
-  const currentMethod = new Map<string, string | undefined>();
+  exercisesById: Map<string, Exercise>,
+): Map<string, BestSet> {
+  const bests = new Map<string, BestSet>();
+  const consider = (key: string, candidate: BestSet) => {
+    if (isBetterSet(candidate, bests.get(key))) bests.set(key, candidate);
+  };
+
   for (const session of completed) {
     for (const entry of session.entries) {
-      if (!currentProgression.has(entry.exerciseId)) {
-        currentProgression.set(entry.exerciseId, entry.progressionId);
-        currentMethod.set(entry.exerciseId, entry.interTechniqueId);
+      const ex = exercisesById.get(entry.exerciseId);
+      const logged = measurementOf(ex, entry.progressionId, entry.measurement);
+      for (const set of entry.performedSets) {
+        if (set.reps === null) continue; // never recorded
+        if (set.parts && set.parts.length > 0) {
+          for (const part of set.parts) {
+            consider(statsKey(entry.exerciseId, part.progressionId), {
+              value: part.reps,
+              weightKg: 0,
+            });
+          }
+          continue;
+        }
+        // Normalize the logged value into the progression's own unit.
+        const canonical = measurementOf(ex, entry.progressionId);
+        consider(statsKey(entry.exerciseId, entry.progressionId), {
+          value: convertMeasureValue(set.reps, logged, canonical),
+          weightKg: set.weight ?? 0,
+        });
       }
     }
   }
+  return bests;
+}
+
+/** A hold in seconds shown as "m:ss" once it passes a minute (e.g. "1:30"). */
+function formatHold(value: number, measurement: Measurement): string {
+  const seconds =
+    measurement === "minutes" ? Math.round(value * 60) : Math.round(value);
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Format a best set for display in its own unit, with load when present. */
+export function formatBest(
+  value: number,
+  measurement: Measurement,
+  weightKg: number,
+): string {
+  const amount =
+    measurement === "reps"
+      ? String(Math.round(value))
+      : formatHold(value, measurement);
+  if (weightKg > 0) return `${weightKg} kg × ${amount}`;
+  return measurement === "reps"
+    ? `${amount} ${MEASUREMENT_UNIT.reps}`
+    : amount;
+}
+
+/**
+ * The records shown on the Progress tab: every trained progression of every
+ * skill/strength exercise, grouped by exercise, each with its formatted best
+ * and remembered note. Exercises with no trained progression drop out.
+ */
+export function buildExerciseRecords(
+  exercises: Exercise[],
+  completed: WorkoutSession[],
+  notes: ExerciseNote[],
+): ExerciseRecordGroup[] {
+  const exercisesById = new Map(exercises.map((e) => [e.id, e]));
+  const bests = buildProgressionBests(completed, exercisesById);
+  const noteByKey = new Map(
+    notes.map((n) => [statsKey(n.exerciseId, n.progressionId), n.note]),
+  );
 
   return exercises
     .filter((e) => e.attribute === "skill" || e.attribute === "strength")
-    .sort((a, b) => a.title.localeCompare(b.title))
     .map((ex) => {
-      const progressionId = currentProgression.get(ex.id);
-      const progression = progressionId
-        ? ex.progressions.find((p) => p.id === progressionId)
-        : undefined;
-      const best = progressionId
-        ? stats[statsKey(ex.id, progressionId)]?.maxReps
-        : undefined;
-      const step = progression
-        ? ex.progressions.findIndex((p) => p.id === progression.id) + 1
-        : 0;
+      const records: ProgressionRecord[] = [];
+      ex.progressions.forEach((prog, i) => {
+        const best = bests.get(statsKey(ex.id, prog.id));
+        if (!best) return; // progression never trained — hidden
+        const note = noteByKey.get(statsKey(ex.id, prog.id))?.trim();
+        records.push({
+          progressionId: prog.id,
+          name: prog.name,
+          level: i + 1,
+          totalLevels: ex.progressions.length,
+          best: formatBest(
+            best.value,
+            measurementOf(ex, prog.id),
+            best.weightKg,
+          ),
+          note: note || undefined,
+        });
+      });
       return {
         exerciseId: ex.id,
         title: ex.title,
         attribute: ex.attribute as "skill" | "strength",
-        detail: progression
-          ? `${progression.name} · best ${best ?? "—"}${bestUnit(measurementOf(ex, progression.id))} · ${methodLabel(currentMethod.get(ex.id))}`
-          : "Not trained yet",
-        step,
-        totalSteps: ex.progressions.length,
+        records,
       };
-    });
+    })
+    .filter((group) => group.records.length > 0)
+    .sort((a, b) => a.title.localeCompare(b.title));
 }

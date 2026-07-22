@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Dumbbell, Play, Settings, Target } from "lucide-react";
+import { ArrowRight, Play, Settings, Target } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getStore } from "@/lib/data";
 import {

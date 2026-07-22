@@ -108,6 +108,20 @@ export function getCachedCompletedSessions(store: DataStore, userId: string) {
 }
 
 /**
+ * A user's remembered per-progression notes (the Progress tab's records show
+ * each progression's note). Cached under the history tag: notes are written
+ * alongside completed workouts, so completing/deleting a workout — which busts
+ * this tag — also refreshes them.
+ */
+export function getCachedExerciseNotes(store: DataStore, userId: string) {
+  return unstable_cache(
+    () => store.listExerciseNotes(userId),
+    ["user-exercise-notes", userId],
+    { revalidate: ONE_WEEK_SECONDS, tags: [userHistoryTag(userId)] },
+  )();
+}
+
+/**
  * Finished schedule slots (completed + skipped, oldest first) for the home
  * streak. Same tag as history — completing or skipping a workout busts it.
  */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { loadProgressRows } from "@/lib/actions/history";
+import { loadExerciseRecords } from "@/lib/actions/history";
 import { queryKeys } from "@/lib/query/keys";
 import { ProgressList } from "@/components/history/progress-list";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,14 +16,14 @@ const ONE_DAY_MS = 1000 * 60 * 60 * 24;
  * a completed/deleted workout invalidates the `progress` key.
  */
 export function ProgressTab() {
-  const { data: rows } = useQuery({
+  const { data: groups } = useQuery({
     queryKey: queryKeys.progress(),
-    queryFn: () => loadProgressRows(),
+    queryFn: () => loadExerciseRecords(),
     staleTime: ONE_DAY_MS,
     gcTime: ONE_DAY_MS,
   });
 
-  if (rows === undefined) {
+  if (groups === undefined) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 5 }, (_, i) => (
@@ -36,5 +36,5 @@ export function ProgressTab() {
     );
   }
 
-  return <ProgressList rows={rows} />;
+  return <ProgressList groups={groups} />;
 }
