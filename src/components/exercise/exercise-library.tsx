@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { BookOpen, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 import {
   Attribute,
   ATTRIBUTE_LABELS,
@@ -87,16 +87,7 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
   const visible = filtered.slice(0, visibleCount);
 
   return (
-    <section className="space-y-3 border-t pt-6">
-      <div>
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <BookOpen className="size-5 text-primary" /> Exercise library
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Browse every exercise and its progressions.
-        </p>
-      </div>
-
+    <section className="space-y-3">
       <Input
         placeholder="Search exercises…"
         value={query}
