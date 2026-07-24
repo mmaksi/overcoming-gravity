@@ -104,7 +104,7 @@ const saveSessionSchema = z.object({
   sessionId: z.string(),
   entries: z.array(sessionEntrySchema),
   action: z.enum(["save", "complete", "skip"]),
-  /** Accumulated active workout time; the clock pauses in the background. */
+  /** How long the workout took: wall time, time in other apps included. */
   durationSeconds: z.number().int().min(0).optional(),
 });
 

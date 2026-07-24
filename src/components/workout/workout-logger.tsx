@@ -43,16 +43,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Toast, useToast } from "@/components/ui/toast";
-import { RestTimer, RestTimerState } from "./rest-timer";
+import { RestTimer, RestTimerState, restEndsAt } from "./rest-timer";
 import {
-  clearRestNotifications,
-  isKeepingAwake,
+  armFallbackRest,
+  dropFallbackRest,
   showResting,
   showRestOver,
-  startKeepAwake,
-  stopKeepAwake,
+  standDownRest,
 } from "./rest-alert";
-import { vibrate } from "./sounds";
+import { isKeepingAwake, startKeepAwake, stopKeepAwake } from "./keep-awake";
 import { Stopwatch } from "./stopwatch";
 import { ClimbRunner } from "./climb-runner";
 import { IntervalRunner } from "./interval-runner";
@@ -99,14 +98,12 @@ function nowMs(): number {
   return Date.now();
 }
 
-/** Best-effort message to the service worker (PWA installs). */
-function postToServiceWorker(message: Record<string, unknown>) {
-  try {
-    navigator.serviceWorker?.controller?.postMessage(message);
-  } catch {
-    // No service worker in dev — the in-page rest bar still works.
-  }
-}
+/**
+ * How late a rest's zero crossing may be and still be worth alerting about.
+ * Past this the page was evidently frozen through the end of the rest, and the
+ * athlete is reading "Go!" on screen anyway.
+ */
+const STALE_ALERT_MS = 5000;
 
 /**
  * The header's live workout clock. A leaf component so its one-second tick
@@ -191,57 +188,40 @@ export function WorkoutLogger({
   const [isEditing, setIsEditing] = useState(initialEditing && historical);
   const readOnly = historical && !isEditing;
 
-  // Workout duration = `baseSeconds` (active time already banked) + the time
-  // since `openedAt` (the current active stretch). Backgrounding the app banks
-  // the stretch and pauses the clock; coming back starts a new stretch, so
-  // time spent away is never counted. The ticking display is the leaf
-  // WorkoutClock, so the whole logger tree isn't re-rendered every second.
+  // Workout duration = `baseSeconds` (time already banked) + the time since
+  // `openedAt`. It runs on wall time and is deliberately *not* paused when the
+  // app is backgrounded: a rest spent answering a message is still part of the
+  // workout, and a clock that stalls the moment you look away is unreadable.
+  //
+  // What it will not do is count a gap it never witnessed. A fresh page load
+  // resumes from the banked total (see the draft restore below), so a session
+  // left open overnight can't come back reading eleven hours.
+  //
+  // The ticking display is the leaf WorkoutClock, so the whole logger tree
+  // isn't re-rendered every second.
   const [baseSeconds, setBaseSeconds] = useState(session.durationSeconds ?? 0);
   const [openedAt, setOpenedAt] = useState(() => Date.now());
-  // The clock's authority is this ref, not the state above: pause/resume run
-  // from visibilitychange handlers as iOS is freezing the process, and a ref
-  // updates there and then. The state exists to drive WorkoutClock's display
-  // and may flush a beat later without anything being miscounted.
-  const clockRef = useRef({
-    base: baseSeconds,
-    startedAt: openedAt,
-    paused: false,
-  });
+  // The clock's authority is this ref, not the state above: `startClockAt` is
+  // called from handlers that persist the draft in the same breath, and a ref
+  // is current there and then. The state exists to drive WorkoutClock's
+  // display and may flush a beat later without anything being miscounted.
+  const clockRef = useRef({ base: baseSeconds, startedAt: openedAt });
 
   /** Elapsed workout seconds right now — for saves (called in handlers). */
   function currentElapsedSeconds(): number {
     const clock = clockRef.current;
     // Editing history must never inflate the recorded duration: the clock is
-    // only live while training a planned session, frozen otherwise. A paused
-    // clock has already banked everything it earned.
-    if (readOnly || historical || clock.paused) return clock.base;
+    // only live while training a planned session, frozen otherwise.
+    if (readOnly || historical) return clock.base;
     return (
       clock.base + Math.max(0, Math.floor((nowMs() - clock.startedAt) / 1000))
     );
   }
 
-  /** Bank the running stretch and stop the clock (the app is going away). */
-  function pauseClock() {
-    if (clockRef.current.paused) return;
-    const banked = currentElapsedSeconds();
-    const t = nowMs();
-    clockRef.current = { base: banked, startedAt: t, paused: true };
-    setBaseSeconds(banked);
-    setOpenedAt(t);
-  }
-
-  /** Start a new active stretch (the app is back in front of the athlete). */
-  function resumeClock() {
-    if (!clockRef.current.paused) return;
-    const t = nowMs();
-    clockRef.current = { ...clockRef.current, startedAt: t, paused: false };
-    setOpenedAt(t);
-  }
-
   /** Set the clock to a known number of banked seconds and run from now. */
   function startClockAt(seconds: number) {
     const t = nowMs();
-    clockRef.current = { base: seconds, startedAt: t, paused: false };
+    clockRef.current = { base: seconds, startedAt: t };
     setBaseSeconds(seconds);
     setOpenedAt(t);
   }
@@ -779,8 +759,7 @@ export function WorkoutLogger({
   ): SubmitVars {
     return {
       action,
-      entries:
-        action === "skip" ? [] : resolveEntries(action, source),
+      entries: action === "skip" ? [] : resolveEntries(action, source),
       durationSeconds,
     };
   }
@@ -790,11 +769,9 @@ export function WorkoutLogger({
     // `pending` only flips once the mutation starts, after the await).
     if (pending) return;
     setPendingAction(action);
-    setTimer(null);
-    clearRest(session.id);
-    stopKeepAwake();
-    postToServiceWorker({ type: "rest-timer-cancel" });
-    void clearRestNotifications();
+    // Finishing ends any rest in progress; this always runs from a tap, so the
+    // athlete is looking at the app and the banner goes with it.
+    dismissRest();
     const result = await syncToServer(submitVars(action));
     if (!result) {
       setPendingAction(null);
@@ -908,23 +885,19 @@ export function WorkoutLogger({
   // synchronous and local. Deliberately no network call here: a server action
   // fired as iOS suspends the PWA has its response cut mid-stream, and that
   // half-delivered response is what used to crash the logger on return.
+  //
+  // Coming back needs no counterpart: the clock reads wall time, so it is
+  // simply right again the moment the page thaws.
   const leaveRef = useRef<() => void>(() => undefined);
-  const returnRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     leaveRef.current = () => {
       if (readOnly || historical) return;
-      pauseClock();
       persistDraft();
-    };
-    returnRef.current = () => {
-      if (readOnly || historical) return;
-      resumeClock();
     };
   });
   useEffect(() => {
     function onVisibility() {
       if (document.visibilityState === "hidden") leaveRef.current();
-      else returnRef.current();
     }
     function onPageHide() {
       leaveRef.current();
@@ -955,20 +928,6 @@ export function WorkoutLogger({
   }, []);
 
   /**
-   * Stand the service worker down and take the banner away — except when the
-   * app is in the background, where that banner is the only thing telling the
-   * athlete rest is over. Dismissal runs on a four-second timer after "Go!",
-   * so without that exception it would tidy away the alert nobody has seen.
-   */
-  function standDownRest() {
-    const visible = document.visibilityState === "visible";
-    postToServiceWorker({
-      type: visible ? "rest-timer-cancel" : "rest-timer-done",
-    });
-    if (visible) void clearRestNotifications();
-  }
-
-  /**
    * The countdown reached zero. The alert fires wherever the athlete is,
    * inside the app or out of it — "your set is ready" is worth nothing as a
    * foreground-only event.
@@ -976,7 +935,7 @@ export function WorkoutLogger({
   function restOver() {
     // Whatever the worker was holding for this rest is now redundant; drop it
     // without closing notifications, since one is about to go up.
-    postToServiceWorker({ type: "rest-timer-done" });
+    dropFallbackRest();
     clearRest(session.id);
     // The live state, not `timerRef`: a zero-second rest is over on the bar's
     // very first render, and the ref is only synced by an effect afterwards.
@@ -985,12 +944,10 @@ export function WorkoutLogger({
     // refused) thaws on reopening and crosses zero right then. Alerting there
     // reproduces the exact bug this path exists to fix — a buzz for a rest
     // that ended minutes ago — so a stale crossing passes in silence.
-    const stale = !t || nowMs() - (t.startedAt + t.seconds * 1000) > 5000;
-    if (stale) {
+    if (!t || nowMs() - restEndsAt(t) > STALE_ALERT_MS) {
       stopKeepAwake();
       return;
     }
-    vibrate();
     // The audio session goes back only once the notification is actually up.
     // Backgrounded, that track is the only reason this page is still running;
     // releasing it first lets iOS freeze us mid-await, with nothing shown.
@@ -1012,26 +969,21 @@ export function WorkoutLogger({
   // is dependable on Android and desktop and a long shot on iOS.
   useEffect(() => {
     function onVisibility() {
-      if (document.visibilityState === "hidden") {
-        const t = timerRef.current;
-        if (!t) return;
-        const endsAt = t.startedAt + t.seconds * 1000;
-        if (endsAt - nowMs() <= 1000) return;
-        if (isKeepingAwake()) {
-          void showResting(t.nextLabel, endsAt);
-          return;
-        }
-        postToServiceWorker({
-          type: "rest-timer",
-          seconds: (endsAt - nowMs()) / 1000,
-          nextLabel: t.nextLabel,
-        });
-      } else {
+      if (document.visibilityState !== "hidden") {
         // Back in the app: the rest bar is the UI again, so drop the banner
         // and stand the worker down before it can fire a duplicate.
-        postToServiceWorker({ type: "rest-timer-cancel" });
-        void clearRestNotifications();
+        standDownRest();
+        return;
       }
+      const t = timerRef.current;
+      if (!t) return;
+      const remaining = restEndsAt(t) - nowMs();
+      if (remaining <= 1000) return;
+      if (isKeepingAwake()) {
+        void showResting(t.nextLabel, restEndsAt(t));
+        return;
+      }
+      armFallbackRest(remaining / 1000, t.nextLabel);
     }
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);

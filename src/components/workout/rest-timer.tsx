@@ -13,6 +13,11 @@ export type RestTimerState = {
   startedAt: number;
 };
 
+/** Epoch ms this rest period is due to be over. */
+export function restEndsAt(timer: RestTimerState): number {
+  return timer.startedAt + timer.seconds * 1000;
+}
+
 /**
  * Rest-countdown card: a progress bar draining over the rest period, the
  * seconds left, and what comes next. This card is the in-app half of a rest;

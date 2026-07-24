@@ -103,7 +103,10 @@ export function saveModeSettings(
  */
 export type SessionDraft = {
   entries: EntryState[];
-  /** Accumulated *active* workout seconds (the clock pauses in background). */
+  /**
+   * Workout seconds so far. Wall time, background included — only a fresh
+   * page load resumes from this figure instead of counting through the gap.
+   */
   elapsedSeconds: number;
   /** Epoch ms of the last write — how we know this copy is the newer one. */
   updatedAt: number;

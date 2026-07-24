@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   keepAwakeEnabled,
   setKeepAwakeEnabled,
-} from "@/components/workout/rest-alert";
+} from "@/components/workout/keep-awake";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
  * phone is on something else. Both are properties of this phone rather than of
  * the account, so both live in the browser, not the database.
  */
-export function RestAlerts() {
+export function AlertsSection() {
   // null until mounted — permission and the preference are client-only, and
   // the server has no way to guess either.
   const [permission, setPermission] = useState<NotificationPermission | null>(
