@@ -2,7 +2,7 @@
  * - navigations: network-first, falling back to the cached shell
  * - static assets (/_next/static, icons, fonts): cache-first
  */
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `shell-${VERSION}`;
 const ASSET_CACHE = `assets-${VERSION}`;
 const SHELL_URLS = ["/", "/programs", "/calendar", "/settings"];
@@ -67,6 +67,7 @@ self.addEventListener("fetch", (event) => {
   const isStatic =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/sound-effects/") ||
     url.pathname === "/manifest.webmanifest";
   if (isStatic) {
     event.respondWith(
@@ -83,13 +84,21 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-/* Rest-period notifications — background only. While the app is visible the
- * in-page rest bar is the whole UI (no notifications). When the app goes to
- * the background mid-rest, the page posts {type: "rest-timer"} with the
- * REMAINING seconds: we show a quiet "Resting…" notification and replace it
- * with "Rest over" when the period ends. When the app becomes visible again
- * it posts {type: "rest-timer-cancel"}, which clears the countdown and any
- * notification — so nothing ever fires (or fires twice) in the foreground. */
+/* Rest-period notifications — the fallback path.
+ *
+ * The page alerts for itself whenever it is alive, which now includes being
+ * backgrounded (it holds an inaudible track playing to stay that way; see
+ * components/workout/rest-alert.ts). This worker takes the countdown only
+ * when that is not running: the page posts {type: "rest-timer"} with the
+ * REMAINING seconds, we show a quiet "Resting…" notification and replace it
+ * with "Rest over" at the end. Dependable on Android and desktop; on iOS the
+ * worker is frozen along with the app, which is exactly why the page holds
+ * itself awake rather than trusting this.
+ *
+ * Two ways to stand down: {type: "rest-timer-done"} drops a pending countdown
+ * and leaves notifications alone (the page has just alerted, or is about to);
+ * {type: "rest-timer-cancel"} also closes them, for when the athlete is back
+ * in the app and the rest bar is the UI again. */
 let restTimeout = null;
 let restDone = null; // resolves the waitUntil promise below
 
@@ -134,6 +143,10 @@ self.addEventListener("message", (event) => {
         }, seconds * 1000);
       }),
     );
+  }
+
+  if (data.type === "rest-timer-done") {
+    cancelRest();
   }
 
   if (data.type === "rest-timer-cancel") {

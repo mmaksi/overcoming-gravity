@@ -16,6 +16,7 @@ import { AdminToggle } from "@/components/settings/admin-toggle";
 import { AvatarForm } from "@/components/settings/avatar-form";
 import { FeedbackForm } from "@/components/settings/feedback-form";
 import { NameForm } from "@/components/settings/name-form";
+import { RestAlerts } from "@/components/settings/rest-alerts";
 import { SignOutButton } from "@/components/settings/sign-out-button";
 import { ThemePicker } from "@/components/settings/theme-picker";
 import { TipsToggle } from "@/components/settings/tips-toggle";
@@ -109,6 +110,17 @@ export default async function SettingsPage({
           <TipsToggle
             initialShow={user.showWelcome || user.showDesignerIntro}
           />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Alerts</CardTitle>
+          <CardDescription>
+            How this phone tells you a rest period is over.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RestAlerts />
         </CardContent>
       </Card>
       <Card>

@@ -44,6 +44,15 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Toast, useToast } from "@/components/ui/toast";
 import { RestTimer, RestTimerState } from "./rest-timer";
+import {
+  clearRestNotifications,
+  isKeepingAwake,
+  showResting,
+  showRestOver,
+  startKeepAwake,
+  stopKeepAwake,
+} from "./rest-alert";
+import { vibrate } from "./sounds";
 import { Stopwatch } from "./stopwatch";
 import { ClimbRunner } from "./climb-runner";
 import { IntervalRunner } from "./interval-runner";
@@ -610,9 +619,11 @@ export function WorkoutLogger({
     // recorded sets, so ticking a box there must not start one.
     if (done && !historical) {
       const nextLabel = nextUpLabel(we, entry, setIndex);
-      // Foreground rest = the in-app bar only. The service worker takes
-      // over (with a notification) only if the app goes to the background
-      // mid-rest — see the visibilitychange hand-off below.
+      // This tap is a user gesture, the only moment iOS will let us start
+      // audio — and the keep-awake track is what stops the page (and so the
+      // rest alert) from being frozen the second the app is backgrounded.
+      // Nothing to stay awake for when the exercise prescribes no rest.
+      if (we.restSeconds > 0) startKeepAwake(nextLabel);
       setTimer((prev) => {
         const next = {
           id: (prev?.id ?? 0) + 1,
@@ -781,7 +792,9 @@ export function WorkoutLogger({
     setPendingAction(action);
     setTimer(null);
     clearRest(session.id);
+    stopKeepAwake();
     postToServiceWorker({ type: "rest-timer-cancel" });
+    void clearRestNotifications();
     const result = await syncToServer(submitVars(action));
     if (!result) {
       setPendingAction(null);
@@ -924,10 +937,6 @@ export function WorkoutLogger({
     };
   }, []);
 
-  // Rest-timer hand-off: while the app is visible the in-app bar is the only
-  // rest UI (no notifications). Going to the background mid-rest hands the
-  // remaining seconds to the service worker, which notifies when rest ends;
-  // coming back cancels the SW side so nothing fires twice.
   const timerRef = useRef<RestTimerState | null>(null);
   useEffect(() => {
     timerRef.current = timer;
@@ -944,26 +953,94 @@ export function WorkoutLogger({
     if (restored) setTimer(restored);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Stand the service worker down and take the banner away — except when the
+   * app is in the background, where that banner is the only thing telling the
+   * athlete rest is over. Dismissal runs on a four-second timer after "Go!",
+   * so without that exception it would tidy away the alert nobody has seen.
+   */
+  function standDownRest() {
+    const visible = document.visibilityState === "visible";
+    postToServiceWorker({
+      type: visible ? "rest-timer-cancel" : "rest-timer-done",
+    });
+    if (visible) void clearRestNotifications();
+  }
+
+  /**
+   * The countdown reached zero. The alert fires wherever the athlete is,
+   * inside the app or out of it — "your set is ready" is worth nothing as a
+   * foreground-only event.
+   */
+  function restOver() {
+    // Whatever the worker was holding for this rest is now redundant; drop it
+    // without closing notifications, since one is about to go up.
+    postToServiceWorker({ type: "rest-timer-done" });
+    clearRest(session.id);
+    // The live state, not `timerRef`: a zero-second rest is over on the bar's
+    // very first render, and the ref is only synced by an effect afterwards.
+    const t = timer;
+    // A page that got frozen anyway (keep-awake switched off, or playback
+    // refused) thaws on reopening and crosses zero right then. Alerting there
+    // reproduces the exact bug this path exists to fix — a buzz for a rest
+    // that ended minutes ago — so a stale crossing passes in silence.
+    const stale = !t || nowMs() - (t.startedAt + t.seconds * 1000) > 5000;
+    if (stale) {
+      stopKeepAwake();
+      return;
+    }
+    vibrate();
+    // The audio session goes back only once the notification is actually up.
+    // Backgrounded, that track is the only reason this page is still running;
+    // releasing it first lets iOS freeze us mid-await, with nothing shown.
+    void showRestOver(t.nextLabel).then(stopKeepAwake, stopKeepAwake);
+  }
+
+  /** Rest cleared: dismissed by the athlete, or by the bar timing itself out. */
+  function dismissRest() {
+    setTimer(null);
+    clearRest(session.id);
+    stopKeepAwake();
+    standDownRest();
+  }
+  // Leaving the app mid-rest: one of two things owns the countdown from here.
+  // If the keep-awake track is playing the page survives being backgrounded
+  // and will fire its own alert on time (see `restOver` above), so all we do
+  // is put up a quiet placeholder. If it is not — the athlete switched it off,
+  // or iOS refused playback — the countdown goes to the service worker, which
+  // is dependable on Android and desktop and a long shot on iOS.
   useEffect(() => {
     function onVisibility() {
       if (document.visibilityState === "hidden") {
         const t = timerRef.current;
         if (!t) return;
-        const remaining = t.seconds - (Date.now() - t.startedAt) / 1000;
-        if (remaining > 1) {
-          postToServiceWorker({
-            type: "rest-timer",
-            seconds: remaining,
-            nextLabel: t.nextLabel,
-          });
+        const endsAt = t.startedAt + t.seconds * 1000;
+        if (endsAt - nowMs() <= 1000) return;
+        if (isKeepingAwake()) {
+          void showResting(t.nextLabel, endsAt);
+          return;
         }
+        postToServiceWorker({
+          type: "rest-timer",
+          seconds: (endsAt - nowMs()) / 1000,
+          nextLabel: t.nextLabel,
+        });
       } else {
+        // Back in the app: the rest bar is the UI again, so drop the banner
+        // and stand the worker down before it can fire a duplicate.
         postToServiceWorker({ type: "rest-timer-cancel" });
+        void clearRestNotifications();
       }
     }
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
+
+  // The page is going away for good (navigation, tab close): nothing is left
+  // to fire an alert, and a still-playing track would keep the athlete's music
+  // hostage, so hand back the audio session on the way out.
+  useEffect(() => stopKeepAwake, []);
 
   const settingsGroup = settingsFor
     ? (plannedDay.groups ?? []).find((g) => g.id === settingsFor)
@@ -1275,11 +1352,8 @@ export function WorkoutLogger({
               seconds={timer.seconds}
               nextLabel={timer.nextLabel}
               startedAt={timer.startedAt}
-              onDismiss={() => {
-                setTimer(null);
-                clearRest(session.id);
-                postToServiceWorker({ type: "rest-timer-cancel" });
-              }}
+              onOver={restOver}
+              onDismiss={dismissRest}
             />
           </div>
         </div>
