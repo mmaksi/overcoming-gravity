@@ -104,26 +104,27 @@ const saveSessionSchema = z.object({
   sessionId: z.string(),
   entries: z.array(sessionEntrySchema),
   action: z.enum(["save", "complete", "skip"]),
-  /** Accumulated active workout time; the timer pauses between visits. */
+  /** Accumulated active workout time; the clock pauses in the background. */
   durationSeconds: z.number().int().min(0).optional(),
-  /**
-   * True for the debounced background autosave. Drafts persist the data but
-   * never invalidate caches — only the logger itself reads a draft back, and
-   * it always fetches the session uncached. Explicit "Save progress" /
-   * "Complete workout" clicks pass false.
-   */
-  draft: z.boolean().optional(),
 });
 
+/**
+ * Write a session to the server. Only ever called from an explicit "Save
+ * progress" / "Complete workout" / "Skip" — while training, the athlete's log
+ * lives on their device (see components/workout/session-storage.ts). There is
+ * deliberately no background autosave: any `revalidatePath` here makes the
+ * action's response carry a full re-render of the workout page, and a
+ * backgrounded PWA has that stream cut mid-flight, which crashed the logger.
+ * Every call below therefore happens with the app in the foreground.
+ */
 export async function saveWorkoutSession(input: {
   sessionId: string;
   entries: unknown;
   action: "save" | "complete" | "skip";
   durationSeconds?: number;
-  draft?: boolean;
 }): Promise<{ runCompleted: boolean; programId: string | null }> {
   const user = await requireUser();
-  const { sessionId, entries, action, durationSeconds, draft } =
+  const { sessionId, entries, action, durationSeconds } =
     saveSessionSchema.parse(input);
   const store = await getStore();
   const session = await store.getSession(sessionId);
@@ -147,7 +148,7 @@ export async function saveWorkoutSession(input: {
   // Notes belong to the user + exercise progression, so they resurface every
   // time that specific progression is trained (mid-workout progression swaps
   // are captured because the entry carries the progression actually performed).
-  // One bulk upsert — this runs on every save, including the 2.5s autosave.
+  // One bulk upsert.
   const now = new Date().toISOString();
   await store.saveExerciseNotes(
     entries
@@ -161,21 +162,18 @@ export async function saveWorkoutSession(input: {
       })),
   );
   // Clearing a note's text forgets the remembered note (an emptied note is
-  // upserted by nothing above, so without this its old text would linger). Only
-  // on explicit saves — the 2.5s autosave would otherwise add a delete round
-  // trip covering every note-less exercise on every tick. Entries not in this
-  // session are untouched, so notes for other progressions still resurface.
-  if (!draft) {
-    await store.deleteExerciseNotes(
-      entries
-        .filter((entry) => !entry.notes?.trim())
-        .map((entry) => ({
-          userId: user.id,
-          exerciseId: entry.exerciseId,
-          progressionId: entry.progressionId,
-        })),
-    );
-  }
+  // upserted by nothing above, so without this its old text would linger).
+  // Entries not in this session are untouched, so notes for other
+  // progressions still resurface.
+  await store.deleteExerciseNotes(
+    entries
+      .filter((entry) => !entry.notes?.trim())
+      .map((entry) => ({
+        userId: user.id,
+        exerciseId: entry.exerciseId,
+        progressionId: entry.progressionId,
+      })),
+  );
 
   // A run is finished once no planned sessions remain. Custom-workout
   // sessions have no run to complete.
@@ -194,26 +192,21 @@ export async function saveWorkoutSession(input: {
     }
   }
 
-  // Draft autosaves (every 2.5s while logging) must not expire any data
-  // cache: the dashboard, programs and history caches only care about
-  // *finished* schedule changes. They do refresh this workout's page in the
-  // client router cache so revisiting the logger resumes the latest draft.
-  if (draft) {
-    revalidatePath(`/workout/${sessionId}`);
-  } else {
-    updateTag(userDashboardTag(user.id));
-    if (action !== "save") {
-      // The workout just entered (or left) the completed history.
-      updateTag(userHistoryTag(user.id));
-    }
-    if (runCompleted) updateTag(userProgramsTag(user.id));
-    revalidatePath("/");
-    // The calendar renders both the month grid and the history feed. Its
-    // client Router Cache entry lives a full day (staleTimes), so without an
-    // explicit bust an edited or freshly completed workout keeps showing the
-    // stale render on the next visit.
-    revalidatePath("/calendar");
+  updateTag(userDashboardTag(user.id));
+  if (action !== "save") {
+    // The workout just entered (or left) the completed history.
+    updateTag(userHistoryTag(user.id));
   }
+  if (runCompleted) updateTag(userProgramsTag(user.id));
+  revalidatePath("/");
+  // The calendar renders both the month grid and the history feed. Its
+  // client Router Cache entry lives a full day (staleTimes), so without an
+  // explicit bust an edited or freshly completed workout keeps showing the
+  // stale render on the next visit.
+  revalidatePath("/calendar");
+  // This session's own page too: leaving mid-workout via "Save progress" and
+  // coming back must not replay the router-cached render from before the save.
+  revalidatePath(`/workout/${sessionId}`);
   return { runCompleted, programId };
 }
 

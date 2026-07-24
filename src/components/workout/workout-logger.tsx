@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   Check,
   Clock,
+  CloudOff,
   Loader2,
   Pencil,
   RotateCcw,
   SkipForward,
+  Smartphone,
   Timer,
 } from "lucide-react";
 import {
@@ -53,11 +55,16 @@ import {
   seedModeSettings,
 } from "./mode-settings-dialog";
 import {
+  clearDraft,
   clearRest,
+  loadDraft,
   loadModeSettings,
   loadRest,
+  mergeDraftEntries,
+  saveDraft,
   saveModeSettings,
   saveRest,
+  SessionDraft,
 } from "./session-storage";
 import { ExerciseCard } from "./exercise-card";
 import type { EntryState, RawPart, RawSet } from "./logging-types";
@@ -71,6 +78,16 @@ function nextUnit(measurement: Measurement): Measurement {
     : measurement === "seconds"
       ? "minutes"
       : "reps";
+}
+
+/**
+ * Wall-clock read, kept at module scope. The workout clock and the on-device
+ * draft are inherently time-stamped, and reading the clock from inside the
+ * component trips the purity rule even in effects and handlers where it is
+ * legitimate — this is the one place that impurity is admitted.
+ */
+function nowMs(): number {
+  return Date.now();
 }
 
 /** Best-effort message to the service worker (PWA installs). */
@@ -133,8 +150,6 @@ export function WorkoutLogger({
     "save" | "complete" | "skip" | null
   >(null);
   const pending = pendingAction !== null;
-  /** Last background draft save; awaited before any explicit submit. */
-  const autosaveInflight = useRef<Promise<void>>(Promise.resolve());
   const [openSheetFor, setOpenSheetFor] = useState<string | null>(null);
   const [timer, setTimer] = useState<RestTimerState | null>(null);
   const [stopwatchOpen, setStopwatchOpen] = useState(false);
@@ -149,9 +164,17 @@ export function WorkoutLogger({
   /** Bumped per opening so every run starts fresh (the runner is keyed). */
   const [runnerRun, setRunnerRun] = useState(0);
   const { message: toastMessage, toast } = useToast();
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
-    "idle",
-  );
+  /**
+   * Where this workout currently lives. "local" — on this phone only, which
+   * is the normal state while training; "syncing"/"synced" — an explicit save
+   * in flight or landed; "failed" — a save that never reached the server,
+   * retried the next time the logger opens.
+   */
+  const [syncState, setSyncState] = useState<
+    "local" | "syncing" | "synced" | "failed"
+  >("local");
+  /** The device refused to store the draft — the athlete must save manually. */
+  const [storageBlocked, setStorageBlocked] = useState(false);
   // A completed/skipped session opened from history. Its logger renders
   // read-only until the athlete taps "Edit", which unlocks the same inputs
   // used to log a live workout so past data can be corrected.
@@ -159,26 +182,65 @@ export function WorkoutLogger({
   const [isEditing, setIsEditing] = useState(initialEditing && historical);
   const readOnly = historical && !isEditing;
 
-  // Workout duration: accumulated seconds from previous visits (frozen at
-  // mount) plus the time this page has been open. Persisted on every save,
-  // so backgrounding the app pauses instead of losing the timer. The ticking
-  // display lives in WorkoutClock (a leaf component) so the whole logger
-  // tree isn't re-rendered every second.
+  // Workout duration = `baseSeconds` (active time already banked) + the time
+  // since `openedAt` (the current active stretch). Backgrounding the app banks
+  // the stretch and pauses the clock; coming back starts a new stretch, so
+  // time spent away is never counted. The ticking display is the leaf
+  // WorkoutClock, so the whole logger tree isn't re-rendered every second.
   const [baseSeconds, setBaseSeconds] = useState(session.durationSeconds ?? 0);
   const [openedAt, setOpenedAt] = useState(() => Date.now());
+  // The clock's authority is this ref, not the state above: pause/resume run
+  // from visibilitychange handlers as iOS is freezing the process, and a ref
+  // updates there and then. The state exists to drive WorkoutClock's display
+  // and may flush a beat later without anything being miscounted.
+  const clockRef = useRef({
+    base: baseSeconds,
+    startedAt: openedAt,
+    paused: false,
+  });
 
   /** Elapsed workout seconds right now — for saves (called in handlers). */
   function currentElapsedSeconds(): number {
+    const clock = clockRef.current;
     // Editing history must never inflate the recorded duration: the clock is
-    // only live while training a planned session, frozen otherwise.
-    if (readOnly || historical) return baseSeconds;
-    return baseSeconds + Math.max(0, Math.floor((Date.now() - openedAt) / 1000));
+    // only live while training a planned session, frozen otherwise. A paused
+    // clock has already banked everything it earned.
+    if (readOnly || historical || clock.paused) return clock.base;
+    return (
+      clock.base + Math.max(0, Math.floor((nowMs() - clock.startedAt) / 1000))
+    );
+  }
+
+  /** Bank the running stretch and stop the clock (the app is going away). */
+  function pauseClock() {
+    if (clockRef.current.paused) return;
+    const banked = currentElapsedSeconds();
+    const t = nowMs();
+    clockRef.current = { base: banked, startedAt: t, paused: true };
+    setBaseSeconds(banked);
+    setOpenedAt(t);
+  }
+
+  /** Start a new active stretch (the app is back in front of the athlete). */
+  function resumeClock() {
+    if (!clockRef.current.paused) return;
+    const t = nowMs();
+    clockRef.current = { ...clockRef.current, startedAt: t, paused: false };
+    setOpenedAt(t);
+  }
+
+  /** Set the clock to a known number of banked seconds and run from now. */
+  function startClockAt(seconds: number) {
+    const t = nowMs();
+    clockRef.current = { base: seconds, startedAt: t, paused: false };
+    setBaseSeconds(seconds);
+    setOpenedAt(t);
   }
 
   /** Start the workout duration over from 0:00 (e.g. opened the page early). */
   function resetWorkoutTimer() {
-    setBaseSeconds(0);
-    setOpenedAt(Date.now());
+    startClockAt(0);
+    persistDraft({ elapsedSeconds: 0 });
   }
 
   const exercisesById = useMemo(
@@ -349,6 +411,49 @@ export function WorkoutLogger({
   }
 
   const [entries, setEntries] = useState<EntryState[]>(buildInitialEntries);
+
+  // The live entries, mirrored for the event handlers (visibilitychange, the
+  // draft writer) that would otherwise close over a stale render's copy.
+  const entriesRef = useRef(entries);
+  useEffect(() => {
+    entriesRef.current = entries;
+  });
+
+  /** An explicit save that hasn't reached the server yet, if any. */
+  const pendingSyncRef = useRef<"save" | "complete" | "skip" | null>(null);
+  /** True once the on-device draft has been read, so writing it is safe. */
+  const restoredRef = useRef(false);
+  /** Handed over to the server for good — never write this draft again. */
+  const finishedRef = useRef(false);
+
+  /**
+   * Write the whole workout to this device. This is the save that matters
+   * while training: it is synchronous, needs no network, and therefore can't
+   * be cut off by the app being backgrounded. The server hears about it only
+   * when the athlete saves, completes or skips.
+   */
+  function persistDraft(overrides?: Partial<SessionDraft>) {
+    if (readOnly || historical || finishedRef.current) return;
+    const ok = saveDraft(session.id, {
+      entries: entriesRef.current,
+      elapsedSeconds: currentElapsedSeconds(),
+      updatedAt: nowMs(),
+      pending: pendingSyncRef.current,
+      ...overrides,
+    });
+    // Storage refused (private mode, device full). This is the only copy of
+    // the athlete's sets, so it can't be swallowed the way the rest timer is.
+    setStorageBlocked(!ok);
+  }
+
+  // Every change to the log is written to the device immediately.
+  useEffect(() => {
+    if (!restoredRef.current) return; // don't overwrite the draft before it loads
+    if (readOnly || historical) return;
+    persistDraft();
+    if (pendingSyncRef.current === null) setSyncState("local");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries]);
 
   function updateEntry(
     workoutExerciseId: string,
@@ -527,8 +632,12 @@ export function WorkoutLogger({
    * "complete" drops untouched sets entirely — only what the athlete
    * actually recorded is registered.
    */
-  function resolveEntries(action: "save" | "complete"): SessionEntry[] {
-    return entries.map((entry) => {
+  function resolveEntries(
+    action: "save" | "complete",
+    /** Defaults to the live entries; the retry-on-open path passes a draft's. */
+    source: EntryState[] = entries,
+  ): SessionEntry[] {
+    return source.map((entry) => {
       const kind = entry.interTechniqueId
         ? TECHNIQUES_BY_ID.get(entry.interTechniqueId)?.kind
         : undefined;
@@ -578,42 +687,35 @@ export function WorkoutLogger({
 
   const queryClient = useQueryClient();
 
-  // Every server write goes through TanStack Query. The explicit submit
-  // invalidates the client-cached history + progress reads on complete/skip
-  // (a "save" leaves the session planned, so it changes neither); the draft
-  // autosave writes silently and invalidates nothing.
+  /** One server write. The payload is built by the caller, never read from
+   *  state inside the mutation — the retry-on-open path submits a draft that
+   *  isn't in state yet. */
+  type SubmitVars = {
+    action: "save" | "complete" | "skip";
+    entries: SessionEntry[];
+    durationSeconds: number;
+  };
+
+  // Every server write goes through TanStack Query, and only ever from an
+  // explicit save/complete/skip — there is no background autosave any more
+  // (see session-storage.ts). Completing or skipping changes the client-cached
+  // history + progress reads; a "save" leaves the session planned, so it
+  // changes neither. Navigation is done by the caller after awaiting, not
+  // here: a router.push queued in the same tick as the action's revalidation
+  // is swallowed in this Next fork.
   const submitMutation = useMutation({
-    mutationFn: (action: "save" | "complete" | "skip") =>
+    mutationFn: (vars: SubmitVars) =>
       saveWorkoutSession({
         sessionId: session.id,
-        entries: action === "skip" ? [] : resolveEntries(action),
-        action,
-        durationSeconds: currentElapsedSeconds(),
+        entries: vars.entries,
+        action: vars.action,
+        durationSeconds: vars.durationSeconds,
       }),
-    // Completing/skipping changes the cached history + progress reads. (A save
-    // leaves the session planned, so it changes neither.) Navigation is done by
-    // the caller after awaiting, not here: a router.push queued in the same tick
-    // as the action's revalidation is swallowed in this Next fork.
-    onSuccess: (_result, action) => {
-      if (action === "save") return;
+    onSuccess: (_result, vars) => {
+      if (vars.action === "save") return;
       queryClient.invalidateQueries({ queryKey: queryKeys.history() });
       queryClient.invalidateQueries({ queryKey: queryKeys.progress() });
     },
-  });
-
-  const autosaveMutation = useMutation({
-    mutationFn: () =>
-      saveWorkoutSession({
-        sessionId: session.id,
-        entries: resolveEntries("save"),
-        action: "save",
-        durationSeconds: currentElapsedSeconds(),
-        // Background draft: persists data without invalidating any caches.
-        draft: true,
-      }),
-    onMutate: () => setSaveStatus("saving"),
-    onSuccess: () => setSaveStatus("saved"),
-    onError: () => setSaveStatus("idle"),
   });
 
   // Fire-and-forget: persists the note of a progression the athlete is
@@ -627,37 +729,113 @@ export function WorkoutLogger({
     }) => rememberExerciseNote(input),
   });
 
+  /**
+   * Push the workout to the server. Records the intent on the device first,
+   * so a failure here leaves a draft that says what the athlete was trying to
+   * do — the next open finishes the job. Returns null when the server was
+   * unreachable; the workout is still safe on the phone.
+   */
+  async function syncToServer(vars: SubmitVars) {
+    pendingSyncRef.current = vars.action;
+    persistDraft({ pending: vars.action, elapsedSeconds: vars.durationSeconds });
+    setSyncState("syncing");
+    try {
+      const result = await submitMutation.mutateAsync(vars);
+      pendingSyncRef.current = null;
+      if (vars.action === "save") {
+        // Still training: keep the draft, just no longer waiting to be sent.
+        persistDraft({ pending: null, elapsedSeconds: vars.durationSeconds });
+      } else {
+        // Finished or skipped — the server owns this session now. Nothing may
+        // re-create the draft afterwards (a pagehide during the navigation
+        // away would otherwise leave an orphan behind).
+        finishedRef.current = true;
+        clearDraft(session.id);
+      }
+      setSyncState("synced");
+      return result;
+    } catch {
+      setSyncState("failed");
+      return null;
+    }
+  }
+
+  /** The payload for an action, from the live entries or a restored draft. */
+  function submitVars(
+    action: "save" | "complete" | "skip",
+    source?: EntryState[],
+    durationSeconds = currentElapsedSeconds(),
+  ): SubmitVars {
+    return {
+      action,
+      entries:
+        action === "skip" ? [] : resolveEntries(action, source),
+      durationSeconds,
+    };
+  }
+
   async function submit(action: "save" | "complete" | "skip") {
-    // Synchronous guard so a double-tap during the autosave await below can't
-    // fire two submits (the derived `pending` only flips once the mutation
-    // starts, which is after the await).
+    // Synchronous guard so a double-tap can't fire two submits (the derived
+    // `pending` only flips once the mutation starts, after the await).
     if (pending) return;
     setPendingAction(action);
     setTimer(null);
     clearRest(session.id);
     postToServiceWorker({ type: "rest-timer-cancel" });
-    // No autosave overlap: a draft write still in flight when this one
-    // navigates would swallow the navigation, so cancel and await it first.
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    await autosaveInflight.current;
-    try {
-      const result = await submitMutation.mutateAsync(action);
-      if (action === "save") {
-        setPendingAction(null);
-        return;
-      }
-      // Navigate here, after the await, so the push isn't swallowed by the
-      // action's revalidation; this component then unmounts.
-      if (result.runCompleted && result.programId) {
-        // The whole program just finished — its page is the bigger celebration.
-        router.push(`/programs/${result.programId}`);
-      } else if (action === "complete") {
-        router.push(`/workout/${session.id}/congrats`);
-      } else {
-        router.push("/");
-      }
-    } catch {
+    const result = await syncToServer(submitVars(action));
+    if (!result) {
       setPendingAction(null);
+      toast(
+        "No connection — this workout is saved on your phone and will sync next time you open it.",
+      );
+      return;
+    }
+    if (action === "save") {
+      setPendingAction(null);
+      return;
+    }
+    // Navigate here, after the await, so the push isn't swallowed by the
+    // action's revalidation; this component then unmounts.
+    if (result.runCompleted && result.programId) {
+      // The whole program just finished — its page is the bigger celebration.
+      router.push(`/programs/${result.programId}`);
+    } else if (action === "complete") {
+      router.push(`/workout/${session.id}/congrats`);
+    } else {
+      router.push("/");
+    }
+  }
+
+  /**
+   * A save/complete/skip that never reached the server last time, replayed
+   * when the logger reopens. The entries come from the draft (state hasn't
+   * caught up yet at this point), and a failure simply leaves it pending for
+   * the next open.
+   */
+  async function retryPendingSync(draft: SessionDraft) {
+    if (!draft.pending) return;
+    // Offline for sure — don't burn a request, the next open will try again.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    const merged = mergeDraftEntries(buildInitialEntries(), draft.entries);
+    setPendingAction(draft.pending);
+    const result = await syncToServer(
+      submitVars(draft.pending, merged, draft.elapsedSeconds),
+    );
+    if (!result) {
+      setPendingAction(null);
+      return;
+    }
+    if (draft.pending === "save") {
+      setPendingAction(null);
+      toast("Your last save is now synced.");
+      return;
+    }
+    if (result.runCompleted && result.programId) {
+      router.push(`/programs/${result.programId}`);
+    } else if (draft.pending === "complete") {
+      router.push(`/workout/${session.id}/congrats`);
+    } else {
+      router.push("/");
     }
   }
 
@@ -671,14 +849,40 @@ export function WorkoutLogger({
   async function saveEdits() {
     if (pending) return;
     setPendingAction("complete");
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     try {
-      await submitMutation.mutateAsync("complete");
+      await submitMutation.mutateAsync(submitVars("complete"));
       router.push("/programs");
     } catch {
       setPendingAction(null);
+      toast("Couldn't save those corrections — check your connection.");
     }
   }
+
+  // Restore this device's draft — mount-only, and necessarily in an effect:
+  // the server can't read localStorage, so this must run post-hydration. The
+  // draft is always the newer copy of a workout in progress, so it wins over
+  // what the server rendered into this page.
+  useEffect(() => {
+    if (readOnly || historical) {
+      restoredRef.current = true;
+      return;
+    }
+    const draft = loadDraft(session.id);
+    restoredRef.current = true;
+    if (!draft) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setEntries((prev) => mergeDraftEntries(prev, draft.entries));
+    // The clock resumes from the banked time, not from zero.
+    startClockAt(draft.elapsedSeconds);
+    // A save that never made it to the server last time: finish it now.
+    if (draft.pending) {
+      pendingSyncRef.current = draft.pending;
+      setSyncState("failed");
+      void retryPendingSync(draft);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Discard in-progress edits and restore the workout's saved values. */
   function cancelEdit() {
@@ -687,52 +891,36 @@ export function WorkoutLogger({
     setIsEditing(false);
   }
 
-  // Autosave the draft so backgrounding the app never loses recorded values:
-  // debounced after every change, flushed immediately when the app hides.
-  const autosaveRef = useRef<() => void>(() => undefined);
+  // Leaving the app banks the workout clock and writes the draft — both
+  // synchronous and local. Deliberately no network call here: a server action
+  // fired as iOS suspends the PWA has its response cut mid-stream, and that
+  // half-delivered response is what used to crash the logger on return.
+  const leaveRef = useRef<() => void>(() => undefined);
+  const returnRef = useRef<() => void>(() => undefined);
   useEffect(() => {
-    autosaveRef.current = () => {
-      // No background autosave when editing history — the athlete saves those
-      // corrections explicitly, and the draft path would fight the frozen
-      // duration and completed status.
-      if (readOnly || pending || historical) return;
-      // Keep the in-flight promise so an explicit submit can await it before
-      // navigating (see submit()). mutateAsync rejects on error; both outcomes
-      // settle to void here so that await never throws. Status is driven by the
-      // mutation's onMutate/onSuccess/onError callbacks.
-      autosaveInflight.current = autosaveMutation.mutateAsync().then(
-        () => undefined,
-        () => undefined,
-      );
+    leaveRef.current = () => {
+      if (readOnly || historical) return;
+      pauseClock();
+      persistDraft();
+    };
+    returnRef.current = () => {
+      if (readOnly || historical) return;
+      resumeClock();
     };
   });
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dirtyRef = useRef(false);
   useEffect(() => {
-    if (!dirtyRef.current) {
-      dirtyRef.current = true; // skip the initial render
-      return;
+    function onVisibility() {
+      if (document.visibilityState === "hidden") leaveRef.current();
+      else returnRef.current();
     }
-    if (readOnly) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(() => autosaveRef.current(), 2500);
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-    // openedAt changes only on a timer reset — autosave persists the reset.
-  }, [entries, openedAt, readOnly]);
-  useEffect(() => {
-    function onHide() {
-      if (document.visibilityState === "hidden") {
-        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-        autosaveRef.current();
-      }
+    function onPageHide() {
+      leaveRef.current();
     }
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
     };
   }, []);
 
@@ -888,15 +1076,25 @@ export function WorkoutLogger({
                 </button>
               </span>
             )}
-            {!readOnly && saveStatus !== "idle" && (
+            {/* Where the workout currently lives. While training it lives on
+                this phone; the server only hears about it on save/complete. */}
+            {!readOnly && !historical && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                {saveStatus === "saving" ? (
+                {syncState === "syncing" ? (
                   <>
                     <Loader2 className="size-3 animate-spin" /> Saving…
                   </>
+                ) : syncState === "synced" ? (
+                  <>
+                    <Check className="size-3 text-primary" /> Synced
+                  </>
+                ) : syncState === "failed" ? (
+                  <span className="flex items-center gap-1 text-amber-600">
+                    <CloudOff className="size-3" /> Not synced yet
+                  </span>
                 ) : (
                   <>
-                    <Check className="size-3 text-primary" /> Saved
+                    <Smartphone className="size-3" /> Saved on this phone
                   </>
                 )}
               </span>
@@ -913,6 +1111,17 @@ export function WorkoutLogger({
           <Clock className="size-5" />
         </Button>
       </div>
+
+      {storageBlocked && !readOnly && !historical && (
+        <Alert>
+          <AlertTitle>This phone won&apos;t store your workout</AlertTitle>
+          <AlertDescription>
+            Private browsing or a full device — we can&apos;t keep your sets
+            here between visits. Tap &quot;Save progress&quot; now and then so
+            nothing is lost.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {isDeload && (
         <Alert>
