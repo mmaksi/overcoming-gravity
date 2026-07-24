@@ -195,9 +195,11 @@ export function ExercisePicker({
                           exerciseSport(e) !== DEFAULT_SPORT && (
                             <Badge>{exerciseSport(e)}</Badge>
                           )}
-                        <Badge variant="outline">
-                          {CATEGORY_LABELS[e.category]}
-                        </Badge>
+                        {e.category && (
+                          <Badge variant="outline">
+                            {CATEGORY_LABELS[e.category]}
+                          </Badge>
+                        )}
                         {attribute === null && (
                           <Badge variant="secondary">
                             {ATTRIBUTE_LABELS[e.attribute]}

@@ -79,3 +79,51 @@ export function weightedOneRepMax(
   const total = oneRepMax(bodyweight + addedWeight, reps);
   return total - bodyweight;
 }
+
+/** The rep targets the load table covers, in the order it shows them. */
+export const LOAD_TABLE_REPS = [1, 2, 3, 4, 5, 6, 8, 10, 12] as const;
+
+/**
+ * The load that should allow exactly `reps` repetitions of a lift whose
+ * one-rep max is `oneRm` — Epley solved for weight:
+ *
+ *   weight = 1RM ÷ (1 + reps / 30)
+ *
+ * The inverse of `oneRepMax`, and the direction an athlete acts on: they know
+ * their max and need to know what to put on the belt today. Returns 0 for
+ * non-positive inputs so callers can treat that as "no result".
+ */
+export function loadForReps(oneRm: number, reps: number): number {
+  if (oneRm <= 0 || reps <= 0) return 0;
+  return oneRm / (1 + reps / 30);
+}
+
+/**
+ * Load for a rep target in weighted calisthenics, as the *added* load.
+ * `oneRmAdded` is a one-rep max expressed the way `weightedOneRepMax` returns
+ * it — added weight only — so bodyweight is folded back in for the estimate
+ * and taken out again afterwards.
+ *
+ * A negative result is a real answer, not an error: the rep target is out of
+ * reach at bodyweight alone, and the figure is how much assistance it would
+ * take to get there.
+ */
+export function addedLoadForReps(
+  bodyweight: number,
+  oneRmAdded: number,
+  reps: number,
+): number {
+  if (bodyweight <= 0 || reps <= 0 || bodyweight + oneRmAdded <= 0) return 0;
+  return loadForReps(bodyweight + oneRmAdded, reps) - bodyweight;
+}
+
+/**
+ * What share of a one-rep max, as a percentage, a set of `reps` represents.
+ * Independent of the max itself — the same Epley curve every load table is
+ * printed from. Meaningless for weighted calisthenics, where the athlete only
+ * controls the load above their bodyweight.
+ */
+export function percentOfMax(reps: number): number {
+  if (reps <= 0) return 0;
+  return 100 / (1 + reps / 30);
+}

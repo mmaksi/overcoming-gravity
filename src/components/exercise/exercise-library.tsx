@@ -131,9 +131,11 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium">{e.title}</span>
-                  <Badge variant="outline" className="shrink-0">
-                    {CATEGORY_LABELS[e.category]}
-                  </Badge>
+                  {e.category && (
+                    <Badge variant="outline" className="shrink-0">
+                      {CATEGORY_LABELS[e.category]}
+                    </Badge>
+                  )}
                 </div>
                 <p className="line-clamp-1 text-sm text-muted-foreground">
                   {e.progressions.length}{" "}
@@ -195,7 +197,7 @@ function ExerciseDetailSheet({
           <SheetHeader>
             <SheetTitle>{exercise.title}</SheetTitle>
             <SheetDescription>
-              {CATEGORY_LABELS[exercise.category]} ·{" "}
+              {exercise.category && `${CATEGORY_LABELS[exercise.category]} · `}
               {ATTRIBUTE_LABELS[exercise.attribute]} ·{" "}
               {exercise.progressions.length}{" "}
               {exercise.progressions.length === 1

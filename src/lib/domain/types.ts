@@ -238,6 +238,14 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   legs: "Legs",
 };
 
+/** One fill per movement pattern, for the weekly-volume bars. */
+export const CATEGORY_COLORS: Record<Category, string> = {
+  push: "bg-sky-500",
+  pull: "bg-violet-500",
+  both: "bg-amber-500",
+  legs: "bg-emerald-500",
+};
+
 export const ATTRIBUTE_LABELS: Record<Attribute, string> = {
   warmup: "Warm-up",
   skill: "Skill",

@@ -86,10 +86,15 @@ function normalizeLegacy(data: DbData): void {
     profile.planCancelAtPeriodEnd ??= false;
     profile.hadSubscription ??= false;
   }
-  // "cardio" was removed as an attribute; conditioning belongs to warm-up.
   for (const exercise of data.exercises) {
+    // "cardio" was removed as an attribute; conditioning belongs to warm-up.
     if ((exercise.attribute as string) === "cardio") {
       exercise.attribute = "warmup";
+    }
+    // Category is strength-only now — drop it from everything else, the JSON
+    // twin of migration 0018.
+    if (exercise.attribute !== "strength") {
+      delete exercise.category;
     }
   }
   // The template used to be a flat entries list; it is now a workout day.

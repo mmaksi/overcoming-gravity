@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { BookOpen, ChevronRight, Dumbbell, Repeat, Timer } from "lucide-react";
+import {
+  BarChart3,
+  BookOpen,
+  ChevronRight,
+  Dumbbell,
+  Repeat,
+  Timer,
+  Weight,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 // Insight/decision helpers for athletes. Each tool is a self-contained page;
@@ -7,28 +15,40 @@ import { Card, CardContent } from "@/components/ui/card";
 const tools = [
   {
     href: "/toolkit/isometric-sweet-spot",
-    title: "Isometric sweet spot",
+    title: "Isometric Sweet Spot",
     description:
       "Enter your max hold and get the recommended sets × hold to train.",
     icon: Timer,
   },
   {
     href: "/toolkit/one-rep-max",
-    title: "1 rep max calculator",
+    title: "1 Rep Max Calculator",
     description:
       "Estimate your 1RM from a set — barbell or weighted calisthenics.",
     icon: Dumbbell,
   },
   {
+    href: "/toolkit/load-for-reps",
+    title: "Load for Target Reps",
+    description: "Turn your 1RM into the weight to load for any rep target.",
+    icon: Weight,
+  },
+  {
+    href: "/toolkit/weekly-volume",
+    title: "Weekly Volume",
+    description: "Your working sets per week, split by movement pattern.",
+    icon: BarChart3,
+  },
+  {
     href: "/toolkit/concentric-rules",
-    title: "Concentric rules",
+    title: "Concentric Exercises Rules",
     description:
       "The three rules for programming concentric exercises effectively.",
     icon: Repeat,
   },
   {
     href: "/toolkit/exercise-library",
-    title: "Exercise library",
+    title: "Exercise Library",
     description: "Browse every exercise and its progressions.",
     icon: BookOpen,
   },

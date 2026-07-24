@@ -57,7 +57,8 @@ const toVoucher = (r: Row): Voucher => ({
 const toExercise = (r: Row): Exercise => ({
   id: r.id,
   title: r.title,
-  category: r.category,
+  // Strength-only, so null for every other attribute (migration 0018).
+  category: r.category ?? undefined,
   // "cardio" was removed as an attribute; treat legacy rows as warm-up.
   attribute: r.attribute === "cardio" ? "warmup" : r.attribute,
   measurement: r.measurement ?? "reps",
@@ -228,7 +229,7 @@ class SupabaseStore implements DataStore {
       await this.db.from("exercises").insert({
         id: exercise.id,
         title: exercise.title,
-        category: exercise.category,
+        category: exercise.category ?? null,
         attribute: exercise.attribute,
         measurement: columnMeasurement(exercise.measurement),
         rep_style: exercise.repStyle,
@@ -245,7 +246,7 @@ class SupabaseStore implements DataStore {
         .from("exercises")
         .update({
           title: exercise.title,
-          category: exercise.category,
+          category: exercise.category ?? null,
           attribute: exercise.attribute,
           measurement: columnMeasurement(exercise.measurement),
           rep_style: exercise.repStyle,

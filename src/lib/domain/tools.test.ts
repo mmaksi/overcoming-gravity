@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  addedLoadForReps,
   formatSweetSpot,
   isometricSweetSpot,
+  loadForReps,
   oneRepMax,
+  percentOfMax,
   weightedOneRepMax,
 } from "./tools";
 
@@ -73,5 +76,52 @@ describe("weightedOneRepMax", () => {
   it("returns 0 for non-positive bodyweight or reps", () => {
     expect(weightedOneRepMax(0, 20, 3)).toBe(0);
     expect(weightedOneRepMax(75, 20, 0)).toBe(0);
+  });
+});
+
+describe("loadForReps", () => {
+  it("inverts oneRepMax", () => {
+    expect(loadForReps(oneRepMax(100, 5), 5)).toBeCloseTo(100, 6);
+    expect(loadForReps(oneRepMax(80, 10), 10)).toBeCloseTo(80, 6);
+  });
+
+  it("returns the max itself for a single rep", () => {
+    expect(loadForReps(120, 1)).toBeCloseTo(116.129, 3); // 120 ÷ (1 + 1/30)
+  });
+
+  it("returns 0 for non-positive max or reps", () => {
+    expect(loadForReps(0, 5)).toBe(0);
+    expect(loadForReps(120, 0)).toBe(0);
+  });
+});
+
+describe("addedLoadForReps", () => {
+  it("inverts weightedOneRepMax", () => {
+    const oneRm = weightedOneRepMax(75, 20, 3); // 29.5 added
+    expect(addedLoadForReps(75, oneRm, 3)).toBeCloseTo(20, 6);
+  });
+
+  it("goes negative when the rep target needs assistance", () => {
+    // 75 + 20 = 95 total 1RM; 95 ÷ (1 + 12/30) = 67.857 total, 7.14 under
+    // bodyweight — that much help is needed to reach 12 reps.
+    expect(addedLoadForReps(75, 20, 12)).toBeCloseTo(-7.1429, 4);
+  });
+
+  it("returns 0 for non-positive bodyweight, reps, or total load", () => {
+    expect(addedLoadForReps(0, 20, 5)).toBe(0);
+    expect(addedLoadForReps(75, 20, 0)).toBe(0);
+    expect(addedLoadForReps(75, -80, 5)).toBe(0);
+  });
+});
+
+describe("percentOfMax", () => {
+  it("is 100% at one rep only in the limit — Epley discounts even a single", () => {
+    expect(percentOfMax(1)).toBeCloseTo(96.774, 3);
+    expect(percentOfMax(5)).toBeCloseTo(85.714, 3);
+    expect(percentOfMax(10)).toBeCloseTo(75, 6);
+  });
+
+  it("returns 0 for non-positive reps", () => {
+    expect(percentOfMax(0)).toBe(0);
   });
 });

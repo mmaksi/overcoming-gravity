@@ -71,7 +71,8 @@ type DraftProgression = {
 type Draft = {
   id: string;
   title: string;
-  category: Category;
+  /** Strength-only: undefined for every other attribute. */
+  category?: Category;
   attribute: Attribute;
   measurement: Measurement;
   repStyle: RepStyle;
@@ -297,9 +298,11 @@ export function ExercisesManager({
               <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="truncate font-medium">{e.title}</span>
-                <Badge variant="outline" className="text-[10px]">
-                  {CATEGORY_LABELS[e.category]}
-                </Badge>
+                {e.category && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {CATEGORY_LABELS[e.category]}
+                  </Badge>
+                )}
                 <Badge variant="secondary" className="text-[10px]">
                   {ATTRIBUTE_LABELS[e.attribute]}
                 </Badge>
@@ -461,48 +464,69 @@ export function ExercisesManager({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select
-                    value={draft.category}
-                    onValueChange={(v) =>
-                      setDraft({ ...draft, category: v as Category })
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {CATEGORY_LABELS[c]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Attribute</Label>
-                  <Select
-                    value={draft.attribute}
-                    onValueChange={(v) =>
-                      setDraft({ ...draft, attribute: v as Attribute })
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ATTRIBUTES.map((a) => (
-                        <SelectItem key={a} value={a}>
-                          {ATTRIBUTE_LABELS[a]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              {(() => {
+                const attributeField = (
+                  <div className="space-y-2">
+                    <Label>Attribute</Label>
+                    <Select
+                      value={draft.attribute}
+                      onValueChange={(v) => {
+                        const attribute = v as Attribute;
+                        // Category is strength-only: default it to push when
+                        // switching into strength, drop it when switching out.
+                        setDraft({
+                          ...draft,
+                          attribute,
+                          category:
+                            attribute === "strength"
+                              ? (draft.category ?? "push")
+                              : undefined,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ATTRIBUTES.map((a) => (
+                          <SelectItem key={a} value={a}>
+                            {ATTRIBUTE_LABELS[a]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+
+                // Push/pull/legs only means something for strength work, so the
+                // picker only appears there; other attributes show attribute alone.
+                if (draft.attribute !== "strength") return attributeField;
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select
+                        value={draft.category}
+                        onValueChange={(v) =>
+                          setDraft({ ...draft, category: v as Category })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {CATEGORY_LABELS[c]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {attributeField}
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2">
                 <Label>Sport</Label>

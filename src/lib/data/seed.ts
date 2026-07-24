@@ -41,7 +41,9 @@ function ex(
   return {
     id,
     title,
-    category,
+    // Category is strength-only; the `category` arg is ignored for every other
+    // attribute so seed rows match the invariant the schema enforces.
+    category: attribute === "strength" ? category : undefined,
     attribute,
     measurement: opts.measurement ?? "reps",
     repStyle: opts.repStyle ?? "standard",

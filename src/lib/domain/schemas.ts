@@ -55,31 +55,48 @@ export const progressionSchema = z.object({
 });
 export type Progression = z.infer<typeof progressionSchema>;
 
-export const exerciseSchema = z.object({
-  id: z.string(),
-  title: z.string().min(1),
-  category: z.enum(CATEGORIES),
-  attribute: z.enum(ATTRIBUTES),
-  /**
-   * Exercise-level default measurement — a coarse fallback only. The precise
-   * per-progression unit (reps/seconds/minutes) lives on each progression; this
-   * column stays reps/seconds so the persisted DB check constraint holds. Each
-   * progression overrides it; resolve the effective value with `measurementOf`.
-   */
-  measurement: measurementValue.default("reps"),
-  /** Cluster style marks eccentric work: rest between single reps in a set. */
-  repStyle: z.enum(REP_STYLES).default("standard"),
-  /**
-   * The sport this exercise belongs to ("Calisthenics", "Parkour", …) — a
-   * free-form admin-managed name, so new sports need no code change. Optional
-   * for back-compat: exercises saved before sports existed are calisthenics.
-   * Resolve the effective value with `exerciseSport`.
-   */
-  sport: z.string().min(1).optional(),
-  /** Optional illustration shown in the picker; admin-managed. */
-  imageUrl: z.string().url().or(z.literal("")).optional(),
-  progressions: z.array(progressionSchema).min(1),
-});
+export const exerciseSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().min(1),
+    /**
+     * Push / pull / legs is a property of *strength* work only — a warm-up or
+     * a stretch has no movement pattern to balance. So this is required for
+     * strength exercises and absent for every other attribute; the refine and
+     * transform below make that invariant hold on parse. Resolve nothing extra:
+     * an undefined category simply means "not categorised".
+     */
+    category: z.enum(CATEGORIES).optional(),
+    attribute: z.enum(ATTRIBUTES),
+    /**
+     * Exercise-level default measurement — a coarse fallback only. The precise
+     * per-progression unit (reps/seconds/minutes) lives on each progression; this
+     * column stays reps/seconds so the persisted DB check constraint holds. Each
+     * progression overrides it; resolve the effective value with `measurementOf`.
+     */
+    measurement: measurementValue.default("reps"),
+    /** Cluster style marks eccentric work: rest between single reps in a set. */
+    repStyle: z.enum(REP_STYLES).default("standard"),
+    /**
+     * The sport this exercise belongs to ("Calisthenics", "Parkour", …) — a
+     * free-form admin-managed name, so new sports need no code change. Optional
+     * for back-compat: exercises saved before sports existed are calisthenics.
+     * Resolve the effective value with `exerciseSport`.
+     */
+    sport: z.string().min(1).optional(),
+    /** Optional illustration shown in the picker; admin-managed. */
+    imageUrl: z.string().url().or(z.literal("")).optional(),
+    progressions: z.array(progressionSchema).min(1),
+  })
+  .refine((e) => e.attribute !== "strength" || e.category !== undefined, {
+    message: "Strength exercises need a push, pull, both or legs category.",
+    path: ["category"],
+  })
+  // Category is strength-only: drop it for any other attribute so a stale value
+  // (an exercise re-attributed away from strength) can never linger.
+  .transform((e) =>
+    e.attribute === "strength" ? e : { ...e, category: undefined },
+  );
 export type Exercise = z.infer<typeof exerciseSchema>;
 
 /** Exercises saved before sports existed are calisthenics — the app's core. */
@@ -565,7 +582,7 @@ export const workoutSessionSchema = z
     weekday: z.enum(WEEKDAYS),
     status: z.enum(["planned", "completed", "skipped"]),
     entries: z.array(sessionEntrySchema),
-    /** Active workout time in seconds (paused while the draft is closed). */
+    /** How long the workout took: wall time, time in other apps included. */
     durationSeconds: z.number().int().min(0).optional(),
   })
   .refine((s) => s.runId !== undefined || s.customWorkoutId !== undefined, {

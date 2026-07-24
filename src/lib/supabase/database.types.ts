@@ -136,7 +136,7 @@ export type Database = {
       exercises: {
         Row: {
           attribute: string
-          category: string
+          category: string | null
           id: string
           image_url: string | null
           measurement: string
@@ -147,7 +147,7 @@ export type Database = {
         }
         Insert: {
           attribute: string
-          category: string
+          category?: string | null
           id: string
           image_url?: string | null
           measurement?: string
@@ -158,7 +158,7 @@ export type Database = {
         }
         Update: {
           attribute?: string
-          category?: string
+          category?: string | null
           id?: string
           image_url?: string | null
           measurement?: string
